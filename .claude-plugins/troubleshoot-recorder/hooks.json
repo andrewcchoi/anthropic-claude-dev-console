@@ -1,0 +1,40 @@
+{
+  "hooks": [
+    {
+      "event": "SessionStart",
+      "type": "agent",
+      "agent": "environment-collector",
+      "async": false,
+      "description": "Capture environment metadata at session start"
+    },
+    {
+      "event": "PostToolUse",
+      "matcher": "Bash",
+      "type": "agent",
+      "agent": "failure-detector",
+      "async": true,
+      "description": "Detect test/build failures from bash output"
+    },
+    {
+      "event": "UserPromptSubmit",
+      "type": "agent",
+      "agent": "solution-detector",
+      "async": true,
+      "description": "Detect solution phrases in user messages"
+    },
+    {
+      "event": "PostToolUse",
+      "matcher": "Bash",
+      "type": "agent",
+      "agent": "solution-detector",
+      "async": true,
+      "description": "Detect test success after previous failures"
+    },
+    {
+      "event": "Stop",
+      "type": "agent",
+      "agent": "doc-generator",
+      "description": "Generate documentation at session end"
+    }
+  ]
+}

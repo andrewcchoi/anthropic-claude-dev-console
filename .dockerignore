@@ -1,0 +1,41 @@
+# Ignore build artifacts and dependencies
+.next
+node_modules
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Ignore logs and temporary files
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Ignore version control
+.git
+.gitignore
+
+# Ignore IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Ignore environment files (security)
+.env
+.env.local
+.env*.local
+
+# Ignore test coverage
+coverage
+.coverage
+htmlcov
+
+# Ignore Docker files (no need to copy into context)
+Dockerfile
+docker-compose.yml
+.dockerignore

@@ -1,0 +1,16 @@
+{
+  "name": "troubleshoot-recorder",
+  "version": "2.1.0",
+  "description": "Automatically detects development issues from test/build failures and generates troubleshooting documentation",
+  "author": "Claude Code",
+  "hooks": ["SessionStart", "PostToolUse", "UserPromptSubmit", "Stop"],
+  "commands": ["troubleshoot"],
+  "agents": ["environment-collector", "failure-detector", "solution-detector", "doc-generator"],
+  "storage": {
+    "directory": ".claude/troubleshoot",
+    "files": [
+      "problems.jsonl",
+      "sessions.jsonl"
+    ]
+  }
+}
