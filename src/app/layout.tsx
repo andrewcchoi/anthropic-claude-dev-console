@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { DebugProvider } from '@/components/providers/DebugProvider';
+import { ErrorBoundary } from '@/components/error/ErrorBoundary';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -18,7 +19,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <DebugProvider>{children}</DebugProvider>
+        <DebugProvider>
+          <ErrorBoundary>{children}</ErrorBoundary>
+        </DebugProvider>
       </body>
     </html>
   );

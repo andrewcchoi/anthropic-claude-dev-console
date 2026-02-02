@@ -179,9 +179,102 @@ if (isDebugEnabled()) {
    }
    ```
 
+## Phase 3: Error Boundaries (COMPLETED)
+
+### Created Files
+
+1. **src/components/error/ErrorBoundary.tsx** - Generic error boundary
+   - Catches React errors in component tree
+   - Logs errors to structured logger
+   - Shows user-friendly fallback UI
+   - Provides "Try again" reset button
+   - Displays error details in collapsible section
+   - Customizable via `fallback` prop
+   - Optional `onError` callback
+
+2. **src/components/error/TerminalErrorBoundary.tsx** - Terminal-specific error boundary
+   - Terminal-themed error UI (green-on-black)
+   - ASCII art error display
+   - "Restart Terminal" button
+   - Wraps ErrorBoundary with custom fallback
+
+3. **src/app/error.tsx** - Next.js app-level error page
+   - Global error boundary for entire app
+   - Shows error message, digest, and stack trace
+   - "Try again" and "Go home" buttons
+   - Styled with Tailwind CSS
+   - Includes debugging tips
+
+### Modified Files
+
+1. **src/app/layout.tsx** - Wrapped app with ErrorBoundary
+
+### Features
+
+**Generic Error Boundary:**
+```typescript
+import { ErrorBoundary } from '@/components/error/ErrorBoundary';
+
+<ErrorBoundary>
+  <YourComponent />
+</ErrorBoundary>
+
+// With custom fallback:
+<ErrorBoundary
+  fallback={(error, reset) => <CustomErrorUI error={error} onReset={reset} />}
+  onError={(error, errorInfo) => {
+    // Custom error handling
+  }}
+>
+  <YourComponent />
+</ErrorBoundary>
+```
+
+**Terminal Error Boundary:**
+```typescript
+import { TerminalErrorBoundary } from '@/components/error/TerminalErrorBoundary';
+
+<TerminalErrorBoundary>
+  <Terminal />
+</TerminalErrorBoundary>
+```
+
+**Error Logging:**
+All caught errors are automatically logged to the structured logger with:
+- Error message
+- Stack trace
+- Component stack (for React errors)
+- Error digest (for Next.js errors)
+
+### Default Error UI Features
+
+- User-friendly error message
+- Collapsible technical details
+- "Try again" button to reset error boundary
+- "Go home" button (app-level errors)
+- Dark theme styling matching app design
+- Responsive layout
+
+### Verification Results
+
+✅ Build compiles successfully
+✅ ErrorBoundary catches React errors
+✅ Terminal-specific fallback UI renders
+✅ App-level error page works
+✅ Errors logged to structured logger
+✅ Reset functionality works
+✅ No app crashes on component errors
+
+### Benefits
+
+- **Graceful degradation:** Errors don't crash the entire app
+- **User experience:** Clear error messages with recovery options
+- **Debugging:** Structured logging of all errors
+- **Customizable:** Custom fallback UI per component
+- **Monitoring ready:** Error logs include full context
+
 ## Next Steps (Not Yet Implemented)
 
-- Phase 3: Error Boundaries (React error boundaries)
 - Phase 4: API Request Logging (correlation IDs, timing middleware)
 - Phase 5: Log Streaming (WebSocket log viewer)
 
