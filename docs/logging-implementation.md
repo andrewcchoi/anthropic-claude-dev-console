@@ -92,9 +92,95 @@ log.info('Request received', { method: 'GET', path: '/api/data' });
 - Collapsible groups for data inspection
 - Clean, readable output
 
+## Phase 2: Debug Mode Toggle (COMPLETED)
+
+### Created Files
+
+1. **src/lib/debug/index.ts** - Debug mode utilities
+   - `isDebugEnabled()` - Check current debug state
+   - `enableDebug()` - Enable verbose logging
+   - `disableDebug()` - Disable verbose logging
+   - `toggleDebug()` - Toggle debug mode
+   - `installDebugCommands()` - Install global console commands
+   - `onDebugModeChange()` - Listen for debug mode changes
+   - Persists state to `localStorage.DEBUG_MODE`
+   - Styled console output with colored badges
+
+2. **src/components/providers/DebugProvider.tsx** - React context provider
+   - Provides debug state to React components
+   - `useDebug()` hook for accessing debug state
+   - Auto-installs global console commands
+   - Syncs with localStorage changes
+
+### Modified Files
+
+1. **src/app/layout.tsx** - Wrapped app with DebugProvider
+
+### Features
+
+**Console Commands:**
+```javascript
+// Type these in the browser console:
+enableDebug()   // Enable verbose logging
+disableDebug()  // Disable verbose logging
+toggleDebug()   // Toggle debug mode
+```
+
+**React Hook:**
+```typescript
+import { useDebug } from '@/components/providers/DebugProvider';
+
+function MyComponent() {
+  const { debugEnabled } = useDebug();
+
+  return (
+    <div>
+      {debugEnabled && <div>Debug info visible</div>}
+    </div>
+  );
+}
+```
+
+**Direct Usage:**
+```typescript
+import { isDebugEnabled, enableDebug, disableDebug } from '@/lib/debug';
+
+if (isDebugEnabled()) {
+  // Show extra debug UI
+}
+```
+
+### Verification Results
+
+✅ Build compiles without errors
+✅ DebugProvider integrates with layout
+✅ Global console commands available
+✅ localStorage persistence works
+✅ React hook provides debug state
+✅ Styled console output with instructions
+
+### Usage
+
+1. **Enable debug mode:**
+   - Open browser console
+   - Type `enableDebug()`
+   - Refresh page to see debug logs
+
+2. **Disable debug mode:**
+   - Open browser console
+   - Type `disableDebug()`
+   - Refresh page to hide debug logs
+
+3. **In React components:**
+   ```typescript
+   const { debugEnabled } = useDebug();
+   if (debugEnabled) {
+     // Show extra debug info
+   }
+   ```
+
 ## Next Steps (Not Yet Implemented)
 
-- Phase 2: Debug Mode Toggle (window.enableDebug(), useDebug() hook)
 - Phase 3: Error Boundaries (React error boundaries)
 - Phase 4: API Request Logging (correlation IDs, timing middleware)
 - Phase 5: Log Streaming (WebSocket log viewer)
