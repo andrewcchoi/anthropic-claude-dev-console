@@ -36,6 +36,7 @@
         "ms-azuretools.vscode-docker",
         "redhat.vscode-yaml",
         "eamodio.gitlens",
+        "ms-vscode-remote.remote-containers",
         // Python (base stack includes Python 3.12)
         "ms-python.python",
         "ms-python.vscode-pylance",
