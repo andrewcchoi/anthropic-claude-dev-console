@@ -176,64 +176,20 @@ Execute per parallel_groups from C:
 <!-- This section is updated during multi-agent execution to persist context across clears -->
 
 ### Current State
-- Project phase: **Troubleshoot Recorder Plugin Implemented**
-- Last updated: 2026-01-28
-- Server running: http://localhost:3000
-- Status: Plugin fully implemented and tested with documentation generation working
-- Recent: Session switching bugs documented (3 new problems added to troubleshooting guide)
+- Project phase: **Planning/Initial Setup**
+- No application source code implemented yet
+- See PLAN.md for architecture and roadmap
 
 ### Key Decisions
-- **Replaced SDK with CLI subprocess**: Spawns `claude -p --verbose --output-format stream-json --include-partial-messages`
-- **Telemetry logging**: Captures CLI telemetry (cost, tokens) to `/workspace/logs/telemetry.jsonl`
-- Uses Tailwind CSS v4 with new `@import "tailwindcss"` syntax
-- Simplified color scheme using standard Tailwind colors
-- Implemented SSE streaming for real-time Claude responses
-- Used Zustand for client-side state management
-- CLI integration provides full Claude Code functionality (tools, MCP, hooks, sessions)
-
-### Files Created (Troubleshoot Recorder Plugin)
-**Plugin Core:**
-- `.claude-plugins/troubleshoot-recorder/plugin.json` - Plugin manifest
-- `.claude-plugins/troubleshoot-recorder/hooks.json` - Hook configuration (SessionStart, PostToolUse, SessionEnd)
-- `.claude-plugins/troubleshoot-recorder/commands/troubleshoot.md` - /troubleshoot command
-
-**Scripts:**
-- `scripts/init-storage.sh` - Storage initialization
-- `scripts/capture-event.sh` - Hook-based event capture (errors only)
-- `scripts/aggregate-problems.py` - Problem aggregation and error matching
-- `scripts/generate-docs.py` - Documentation generator
-
-**Templates & Documentation:**
-- `templates/guide-template.md` - Markdown template for generated docs
-- `README.md`, `QUICK_START.md`, `INTEGRATION_TEST.md` - User documentation
-- `references/schema.md` - Data schema documentation
-- `test-full-workflow.sh` - Integration test suite (all tests pass)
-
-**Storage & Output:**
-- `.claude/troubleshoot/` - Storage directory (events.jsonl, problems.jsonl, sessions.jsonl, active-problem.json)
-- `docs/troubleshooting/TROUBLESHOOTING_GUIDE.md` - Generated documentation
+- Uses Tailwind CSS v4 with `@import "tailwindcss"` syntax
+- Zustand for client-side state management
+- CLI integration spawns `claude -p --verbose --output-format stream-json`
 
 ### Learnings
-**Telemetry (Previous):**
-- Telemetry is on stdout, uses JS object notation with unquoted keys
-- Bracket depth tracking needed for complete objects
-- Session IDs persist with `--session-id` flag
-
-**Troubleshoot Recorder Plugin:**
-- **Hook + Skill hybrid**: Combines automatic capture (hooks) with user control (commands)
-- **JSONL for events**: Append-only storage matches existing telemetry pattern, simpler than SQLite
-- **Error signature normalization**: Replace paths/UUIDs/timestamps with placeholders for matching
-- **Fuzzy error matching**: Use SequenceMatcher for 80%+ similarity to group related errors
-- **Python path issue**: System Python at `/usr/bin/python3`, not `/usr/bin/env python3`
-- **JSON spacing**: Problems.jsonl uses spaces after colons, requires flexible grep patterns
-- **Filter hooks early**: Only capture errors (status=error) to avoid noise in event log
-- **Cross-session state**: active-problem.json persists state between Claude sessions
-- **Auto-categorization**: Pattern-based category detection (file-system, network, syntax, logic, etc.)
+<!-- Updated during multi-agent execution -->
 
 ### Blockers
-- None - Plugin fully implemented and all tests pass
+- None
 
 ### Next Steps
-1. Enable plugin in `.claude/settings.local.json` (if needed)
-2. Test manual commands: `/troubleshoot record`, `/troubleshoot solve`
-3. Verify hook capture works with real tool errors
+- See PLAN.md for implementation roadmap
