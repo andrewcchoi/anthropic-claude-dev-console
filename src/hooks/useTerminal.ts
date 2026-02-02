@@ -28,6 +28,7 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
   const fitAddonRef = useRef<FitAddon | null>(null);
   const wsClientRef = useRef<WebSocketClient | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const isMountedRef = useRef(true);
 
   const [isConnected, setIsConnected] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -35,6 +36,8 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
 
   // Cleanup function
   const cleanup = () => {
+    isMountedRef.current = false;
+
     if (resizeObserverRef.current) {
       resizeObserverRef.current.disconnect();
       resizeObserverRef.current = null;
@@ -55,6 +58,9 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
 
   // Connect function
   const connect = async () => {
+    // Reset mounted flag on new connection
+    isMountedRef.current = true;
+
     if (!terminalRef.current) {
       const errorMsg = 'Terminal container ref is not available';
       setError(errorMsg);
@@ -97,8 +103,9 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
 
       // Create WebSocket client
       const wsClient = new WebSocketClient({
-        url: 'ws://localhost:3001/terminal',
         onConnected: (sid: string) => {
+          // Check if still mounted before updating state
+          if (!isMountedRef.current) return;
           setIsConnected(true);
           setSessionId(sid);
           onConnected?.(sid);
@@ -107,10 +114,14 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
           xterm.write(data);
         },
         onError: (errorMsg: string) => {
+          // Check if still mounted before updating state
+          if (!isMountedRef.current) return;
           setError(errorMsg);
           onError?.(errorMsg);
         },
         onExit: (code: number) => {
+          // Check if still mounted before updating state
+          if (!isMountedRef.current) return;
           setIsConnected(false);
           setSessionId(null);
           onDisconnected?.();
@@ -138,7 +149,16 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
       // Connect WebSocket
       await wsClient.connect();
 
+      // Check if still mounted after connection completes
+      if (!isMountedRef.current) {
+        wsClient.close();
+        return;
+      }
+
     } catch (err) {
+      // Only handle error if still mounted
+      if (!isMountedRef.current) return;
+
       const errorMsg = err instanceof Error ? err.message : 'Failed to connect terminal';
       setError(errorMsg);
       onError?.(errorMsg);

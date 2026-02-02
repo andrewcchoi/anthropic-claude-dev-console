@@ -52,6 +52,12 @@ export function useClaudeChat() {
       try {
         // Get fresh sessionId from store to avoid stale closure
         const currentSessionId = useChatStore.getState().sessionId;
+        log.debug('Sending message', {
+          sessionId: currentSessionId,
+          contentLength: prompt.length
+        });
+
+        log.debug('Starting stream', { endpoint: '/api/claude' });
         const response = await fetch('/api/claude', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -85,6 +91,7 @@ export function useClaudeChat() {
             if (line.startsWith('data: ') && line !== 'data: [DONE]') {
               try {
                 const message: SDKMessage = JSON.parse(line.slice(6));
+                log.debug('Received chunk', { type: message.type });
 
                 // Handle different message types from Claude CLI
                 if (message.type === 'system') {
@@ -198,6 +205,11 @@ export function useClaudeChat() {
         updateMessage(assistantMessageId, { isStreaming: false });
         setIsStreaming(false);
         setCurrentMessageId(null);
+
+        const currentSession = useChatStore.getState().currentSession;
+        log.debug('Stream completed', {
+          messageCount: currentSession?.messages?.length || useChatStore.getState().messages.length
+        });
       } catch (error: any) {
         setError(error.message || 'Failed to send message');
         setIsStreaming(false);

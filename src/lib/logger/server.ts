@@ -23,6 +23,17 @@ const LOG_LEVELS: Record<LogLevel, number> = {
   error: 3,
 };
 
+// Runtime debug mode toggle
+let serverDebugMode = false;
+
+export function setServerDebugMode(enabled: boolean): void {
+  serverDebugMode = enabled;
+}
+
+export function isServerDebugMode(): boolean {
+  return serverDebugMode;
+}
+
 class ServerLogger {
   private minLevel: number;
 
@@ -32,7 +43,8 @@ class ServerLogger {
   }
 
   private shouldLog(level: LogLevel): boolean {
-    return LOG_LEVELS[level] >= this.minLevel;
+    const effectiveMinLevel = serverDebugMode ? LOG_LEVELS.debug : this.minLevel;
+    return LOG_LEVELS[level] >= effectiveMinLevel;
   }
 
   private log(

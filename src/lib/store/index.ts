@@ -74,6 +74,7 @@ export const useChatStore = create<ChatStore>()(
 
       startNewSession: () => {
         const newSessionId = uuidv4();
+        log.debug('Starting new session', { id: newSessionId });
         set({
           sessionId: newSessionId,
           currentSession: null,
@@ -85,8 +86,10 @@ export const useChatStore = create<ChatStore>()(
       },
 
       switchSession: async (id) => {
+        const currentId = get().sessionId;
         const session = get().sessions.find((s) => s.id === id);
         if (session) {
+          log.debug('Switching session', { from: currentId, to: id });
           // Set loading state but DON'T clear messages yet
           set({ isLoadingHistory: true });
 
@@ -137,6 +140,8 @@ export const useChatStore = create<ChatStore>()(
         if (currentSession) return;
 
         if (!sessionId || sessions.some((s) => s.id === sessionId)) return;
+
+        log.debug('Saving session', { id: sessionId });
 
         const name =
           messages.find((m) => m.role === 'user')?.content?.[0]?.text?.slice(0, 50) ||

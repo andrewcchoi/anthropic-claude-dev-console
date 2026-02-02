@@ -1,7 +1,26 @@
 'use client';
 
-import { ReadOnlyTerminal } from './ReadOnlyTerminal';
-import { InteractiveTerminal } from './InteractiveTerminal';
+import dynamic from 'next/dynamic';
+
+// Dynamically import terminal components with SSR disabled
+// xterm uses browser globals (self, window) that don't exist during SSR
+const ReadOnlyTerminal = dynamic(
+  () => import('./ReadOnlyTerminal').then(mod => ({ default: mod.ReadOnlyTerminal })),
+  { ssr: false, loading: () => <TerminalSkeleton /> }
+);
+
+const InteractiveTerminal = dynamic(
+  () => import('./InteractiveTerminal').then(mod => ({ default: mod.InteractiveTerminal })),
+  { ssr: false, loading: () => <TerminalSkeleton /> }
+);
+
+function TerminalSkeleton() {
+  return (
+    <div className="h-full w-full bg-gray-900 rounded animate-pulse flex items-center justify-center">
+      <span className="text-gray-500 text-sm">Loading terminal...</span>
+    </div>
+  );
+}
 
 interface TerminalProps {
   mode?: 'readonly' | 'interactive';

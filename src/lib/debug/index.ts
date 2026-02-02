@@ -17,15 +17,27 @@ export function isDebugEnabled(): boolean {
  * Enable debug mode
  * Enables verbose logging and persists to localStorage
  */
-export function enableDebug(): void {
+export async function enableDebug(): Promise<void> {
   if (typeof window === 'undefined') return;
 
   localStorage.setItem(DEBUG_KEY, 'true');
+
+  // Enable server-side debug mode
+  try {
+    await fetch('/api/debug', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: true }),
+    });
+  } catch (e) {
+    console.warn('Failed to enable server debug mode:', e);
+  }
+
   console.log(
     '%c✓ Debug mode enabled',
     'background: #22c55e; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold;'
   );
-  console.log('%cRefresh the page to see debug logs', 'color: #6b7280;');
+  console.log('%cDebug logs will appear immediately', 'color: #6b7280;');
 
   // Dispatch event for providers to react
   window.dispatchEvent(new CustomEvent('debug-mode-change', { detail: { enabled: true } }));
@@ -35,15 +47,27 @@ export function enableDebug(): void {
  * Disable debug mode
  * Disables verbose logging and removes from localStorage
  */
-export function disableDebug(): void {
+export async function disableDebug(): Promise<void> {
   if (typeof window === 'undefined') return;
 
   localStorage.removeItem(DEBUG_KEY);
+
+  // Disable server-side debug mode
+  try {
+    await fetch('/api/debug', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: false }),
+    });
+  } catch (e) {
+    console.warn('Failed to disable server debug mode:', e);
+  }
+
   console.log(
     '%c✓ Debug mode disabled',
     'background: #ef4444; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold;'
   );
-  console.log('%cRefresh the page to apply changes', 'color: #6b7280;');
+  console.log('%cDebug logs will stop appearing immediately', 'color: #6b7280;');
 
   // Dispatch event for providers to react
   window.dispatchEvent(new CustomEvent('debug-mode-change', { detail: { enabled: false } }));
@@ -52,11 +76,11 @@ export function disableDebug(): void {
 /**
  * Toggle debug mode
  */
-export function toggleDebug(): void {
+export async function toggleDebug(): Promise<void> {
   if (isDebugEnabled()) {
-    disableDebug();
+    await disableDebug();
   } else {
-    enableDebug();
+    await enableDebug();
   }
 }
 
@@ -67,10 +91,10 @@ export function toggleDebug(): void {
 export function installDebugCommands(): void {
   if (typeof window === 'undefined') return;
 
-  // Make functions available globally
-  (window as any).enableDebug = enableDebug;
-  (window as any).disableDebug = disableDebug;
-  (window as any).toggleDebug = toggleDebug;
+  // Make functions available globally (fire-and-forget wrappers)
+  (window as any).enableDebug = () => { enableDebug().catch(console.error); };
+  (window as any).disableDebug = () => { disableDebug().catch(console.error); };
+  (window as any).toggleDebug = () => { toggleDebug().catch(console.error); };
 
   // Show welcome message with instructions
   if (process.env.NODE_ENV === 'development') {

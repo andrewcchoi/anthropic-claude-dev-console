@@ -19,6 +19,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { prompt, sessionId, cwd } = body;
 
+    log.debug('Received chat request', {
+      sessionId,
+      cwd,
+      promptLength: prompt.length
+    });
+
     if (!prompt) {
       return new Response(
         JSON.stringify({ error: 'Prompt is required' }),
@@ -53,6 +59,11 @@ export async function POST(req: NextRequest) {
           }
 
           // Spawn Claude CLI process
+          log.debug('Spawning Claude CLI', {
+            args,
+            cwd: cwd || '/workspace'
+          });
+
           const claude = spawn('claude', args, {
             cwd: cwd || '/workspace',
             stdio: ['pipe', 'pipe', 'pipe'],
@@ -66,6 +77,8 @@ export async function POST(req: NextRequest) {
 
           // Handle stdout (JSON stream)
           claude.stdout.on('data', (chunk: Buffer) => {
+            log.debug('CLI stdout chunk', { bytesReceived: chunk.length });
+
             const data = chunk.toString();
             const lines = data.split('\n');
 
@@ -137,6 +150,11 @@ export async function POST(req: NextRequest) {
 
           // Handle process completion
           claude.on('close', async (code) => {
+            log.debug('CLI process closed', {
+              exitCode: code,
+              hadSuccess: receivedSuccessResult
+            });
+
             // Parse and log telemetry if we captured any
             if (telemetryBuffer) {
               try {

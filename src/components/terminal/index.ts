@@ -1,4 +1,4 @@
+// Only export the Terminal facade component to avoid SSR issues
+// ReadOnlyTerminal and InteractiveTerminal are dynamically imported internally
 export { Terminal } from './Terminal';
-export { ReadOnlyTerminal } from './ReadOnlyTerminal';
-export { InteractiveTerminal } from './InteractiveTerminal';
 export { terminalTheme } from './TerminalTheme';

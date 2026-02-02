@@ -30,10 +30,16 @@ export function InteractiveTerminal({
     onError,
   });
 
-  // Auto-connect on mount
+  // Auto-connect on mount with debounce to avoid React Strict Mode race condition
+  // Strict Mode: mount → unmount → remount happens synchronously
+  // setTimeout(0) defers connect() until after this cycle completes
   useEffect(() => {
-    connect();
+    const timeoutId = setTimeout(() => {
+      connect();
+    }, 0);
+
     return () => {
+      clearTimeout(timeoutId);
       disconnect();
     };
   }, []);
@@ -58,7 +64,12 @@ export function InteractiveTerminal({
       {/* Error display */}
       {error && (
         <div className="absolute top-10 left-2 right-2 z-10 bg-red-900/80 text-red-200 px-3 py-2 rounded text-sm">
-          Error: {error}
+          <strong>Connection Error:</strong> {error}
+          {error.includes('WebSocket') && (
+            <p className="mt-1 text-xs opacity-80">
+              Ensure terminal server is running: npm run dev:terminal
+            </p>
+          )}
         </div>
       )}
 

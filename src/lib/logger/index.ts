@@ -56,7 +56,13 @@ class Logger {
   }
 
   private shouldLog(level: LogLevel): boolean {
-    return LOG_LEVELS[level] >= this.minLevel;
+    // Dynamically check debug mode on each call (handles SSR + runtime changes)
+    const debugMode = typeof window !== 'undefined'
+      ? localStorage.getItem('DEBUG_MODE') === 'true'
+      : false;
+
+    const effectiveMinLevel = debugMode ? LOG_LEVELS.debug : this.minLevel;
+    return LOG_LEVELS[level] >= effectiveMinLevel;
   }
 
   private formatEntry(entry: LogEntry): void {
