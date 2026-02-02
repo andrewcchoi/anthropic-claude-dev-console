@@ -6,6 +6,7 @@ import { SearchAddon } from '@xterm/addon-search';
 import { WebSocketClient } from '@/lib/terminal/websocket-client';
 
 interface UseTerminalOptions {
+  cwd?: string;
   onConnected?: (sessionId: string) => void;
   onDisconnected?: () => void;
   onError?: (error: string) => void;
@@ -21,7 +22,7 @@ interface UseTerminalReturn {
 }
 
 export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn {
-  const { onConnected, onDisconnected, onError } = options;
+  const { cwd, onConnected, onDisconnected, onError } = options;
 
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
@@ -93,67 +94,89 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
       xterm.loadAddon(webLinksAddon);
       xterm.loadAddon(searchAddon);
 
-      // Open terminal in DOM
-      xterm.open(terminalRef.current);
-      fitAddon.fit();
-
-      // Store refs
+      // Store refs early
       xtermRef.current = xterm;
       fitAddonRef.current = fitAddon;
 
-      // Create WebSocket client
-      const wsClient = new WebSocketClient({
-        onConnected: (sid: string) => {
-          // Check if still mounted before updating state
-          if (!isMountedRef.current) return;
-          setIsConnected(true);
-          setSessionId(sid);
-          onConnected?.(sid);
-        },
-        onData: (data: string) => {
-          xterm.write(data);
-        },
-        onError: (errorMsg: string) => {
-          // Check if still mounted before updating state
-          if (!isMountedRef.current) return;
-          setError(errorMsg);
-          onError?.(errorMsg);
-        },
-        onExit: (code: number) => {
-          // Check if still mounted before updating state
-          if (!isMountedRef.current) return;
-          setIsConnected(false);
-          setSessionId(null);
-          onDisconnected?.();
-        },
-      });
-      wsClientRef.current = wsClient;
-
-      // Connect xterm input to WebSocket
-      xterm.onData((data: string) => {
-        wsClient.sendInput(data);
-      });
-
-      // Set up resize observer
-      const resizeObserver = new ResizeObserver(() => {
-        if (fitAddonRef.current && wsClientRef.current && isConnected) {
-          fitAddonRef.current.fit();
-          const { cols, rows } = xterm;
-          wsClientRef.current.resize(cols, rows);
+      // Wait for container to have dimensions before opening
+      const openTerminalAndConnect = async () => {
+        const container = terminalRef.current;
+        if (!container) {
+          throw new Error('Terminal container ref is not available');
         }
-      });
 
-      resizeObserver.observe(terminalRef.current);
-      resizeObserverRef.current = resizeObserver;
+        const rect = container.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          // Container has dimensions, safe to open
+          xterm.open(container);
 
-      // Connect WebSocket
-      await wsClient.connect();
+          // Fit - defer to allow renderer to fully initialize
+          requestAnimationFrame(() => {
+            fitAddon.fit();
+          });
 
-      // Check if still mounted after connection completes
-      if (!isMountedRef.current) {
-        wsClient.close();
-        return;
-      }
+          // Create WebSocket client
+          const wsClient = new WebSocketClient({
+            cwd,
+            onConnected: (sid: string) => {
+              // Check if still mounted before updating state
+              if (!isMountedRef.current) return;
+              setIsConnected(true);
+              setSessionId(sid);
+              onConnected?.(sid);
+            },
+            onData: (data: string) => {
+              xterm.write(data);
+            },
+            onError: (errorMsg: string) => {
+              // Check if still mounted before updating state
+              if (!isMountedRef.current) return;
+              setError(errorMsg);
+              onError?.(errorMsg);
+            },
+            onExit: (code: number) => {
+              // Check if still mounted before updating state
+              if (!isMountedRef.current) return;
+              setIsConnected(false);
+              setSessionId(null);
+              onDisconnected?.();
+            },
+          });
+          wsClientRef.current = wsClient;
+
+          // Connect xterm input to WebSocket
+          xterm.onData((data: string) => {
+            wsClient.sendInput(data);
+          });
+
+          // Set up resize observer
+          const resizeObserver = new ResizeObserver(() => {
+            if (fitAddonRef.current && wsClientRef.current && isConnected) {
+              fitAddonRef.current.fit();
+              const { cols, rows } = xterm;
+              wsClientRef.current.resize(cols, rows);
+            }
+          });
+
+          resizeObserver.observe(container);
+          resizeObserverRef.current = resizeObserver;
+
+          // Connect WebSocket
+          await wsClient.connect();
+
+          // Check if still mounted after connection completes
+          if (!isMountedRef.current) {
+            wsClient.close();
+            return;
+          }
+        } else {
+          // Container not ready, wait and try again
+          await new Promise(resolve => requestAnimationFrame(resolve));
+          await openTerminalAndConnect();
+        }
+      };
+
+      await openTerminalAndConnect();
 
     } catch (err) {
       // Only handle error if still mounted

@@ -49,33 +49,56 @@ export function ReadOnlyTerminal({
     xterm.loadAddon(fitAddon);
     xterm.loadAddon(webLinksAddon);
 
-    // Open terminal in container
-    xterm.open(terminalRef.current);
-
-    // Write content
-    xterm.write(content);
-
-    // Fit to container
-    fitAddon.fit();
-
-    // Store references
+    // Store references early for cleanup
     xtermRef.current = xterm;
     fitAddonRef.current = fitAddon;
 
-    // Setup ResizeObserver for responsive sizing
-    const resizeObserver = new ResizeObserver(() => {
-      if (fitAddonRef.current) {
-        fitAddonRef.current.fit();
-      }
-    });
+    let resizeObserver: ResizeObserver | null = null;
+    let animationFrameId: number | null = null;
+    let isOpened = false;
 
-    if (terminalRef.current) {
-      resizeObserver.observe(terminalRef.current);
-    }
+    // Wait for container to have dimensions before opening
+    const openWhenReady = () => {
+      const container = terminalRef.current;
+      if (!container || isOpened) return;
+
+      const rect = container.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        // Container has dimensions, safe to open
+        xterm.open(container);
+        isOpened = true;
+
+        // Write content
+        xterm.write(content);
+
+        // Fit to container
+        requestAnimationFrame(() => {
+          fitAddon.fit();
+        });
+
+        // Setup ResizeObserver for responsive sizing
+        resizeObserver = new ResizeObserver(() => {
+          if (fitAddonRef.current) {
+            fitAddonRef.current.fit();
+          }
+        });
+        resizeObserver.observe(container);
+      } else {
+        // Container not ready, try again next frame
+        animationFrameId = requestAnimationFrame(openWhenReady);
+      }
+    };
+
+    openWhenReady();
 
     // Cleanup
     return () => {
-      resizeObserver.disconnect();
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
       xterm.dispose();
       xtermRef.current = null;
       fitAddonRef.current = null;
