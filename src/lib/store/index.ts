@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { ChatMessage, Session, ToolExecution, UsageStats } from '@/types/claude';
 import { v4 as uuidv4 } from 'uuid';
+import { createLogger } from '../logger';
+
+const log = createLogger('ChatStore');
 
 interface ChatStore {
   // Messages
@@ -113,7 +116,7 @@ export const useChatStore = create<ChatStore>()(
               });
             }
           } catch (error) {
-            console.error('Failed to load session messages:', error);
+            log.error('Failed to load session messages', { error });
             // Continue with empty state on error
             set({
               sessionId: session.id,

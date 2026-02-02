@@ -2,6 +2,9 @@ import { useState, useCallback } from 'react';
 import { useChatStore } from '@/lib/store';
 import { ChatMessage, MessageContent, SDKMessage } from '@/types/claude';
 import { v4 as uuidv4 } from 'uuid';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('ClaudeChat');
 
 export function useClaudeChat() {
   const {
@@ -185,7 +188,7 @@ export function useClaudeChat() {
                   }
                 }
               } catch (e) {
-                console.error('Failed to parse SSE message:', e);
+                log.error('Failed to parse SSE message', { error: e });
               }
             }
           }

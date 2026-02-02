@@ -5,6 +5,9 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { parseTelemetry } from '@/lib/telemetry';
+import { createServerLogger } from '@/lib/logger/server';
+
+const log = createServerLogger('ClaudeAPI');
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -150,7 +153,7 @@ export async function POST(req: NextRequest) {
                 }
               } catch (e) {
                 // Silently fail telemetry logging to not disrupt the response
-                console.error('Failed to log telemetry:', e);
+                log.error('Failed to log telemetry', { error: e });
               }
             }
 

@@ -4,6 +4,9 @@
  */
 
 import { TerminalClientMessage, TerminalServerMessage } from './types';
+import { createLogger } from '../logger';
+
+const log = createLogger('WebSocketClient');
 
 export type TerminalEventHandler = (data: string) => void;
 export type TerminalConnectedHandler = (sessionId: string) => void;
@@ -58,11 +61,22 @@ export class WebSocketClient {
       return 'ws://localhost:3001/terminal';
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname;
-    const port = process.env.NEXT_PUBLIC_TERMINAL_PORT || 3001;
+    // Use environment variable if set (for Codespaces/custom deployments)
+    const envUrl = process.env.NEXT_PUBLIC_TERMINAL_WS_URL;
+    if (envUrl) {
+      log.debug('Using env URL', { url: envUrl });
+      return envUrl.endsWith('/terminal') ? envUrl : `${envUrl}/terminal`;
+    }
 
-    return `${protocol}//${host}:${port}/terminal`;
+    // For localhost, always use ws:// (server doesn't support TLS)
+    const host = window.location.hostname;
+    const isLocalhost = host === 'localhost' || host === '127.0.0.1';
+    const protocol = isLocalhost ? 'ws:' : (window.location.protocol === 'https:' ? 'wss:' : 'ws:');
+    const port = 3001;
+
+    const url = `${protocol}//${host}:${port}/terminal`;
+    log.debug('Constructed URL', { url });
+    return url;
   }
 
   /**
@@ -72,10 +86,11 @@ export class WebSocketClient {
     return new Promise((resolve, reject) => {
       try {
         this.intentionallyClosed = false;
+        log.debug('Connecting', { url: this.url });
         this.ws = new WebSocket(this.url);
 
         this.ws.onopen = () => {
-          console.log('[WebSocketClient] Connected to terminal server');
+          log.info('Connected to terminal server');
           this.reconnectAttempts = 0;
         };
 
@@ -87,7 +102,7 @@ export class WebSocketClient {
               case 'connected':
                 if (message.id) {
                   this.sessionId = message.id;
-                  console.log(`[WebSocketClient] Session established: ${this.sessionId}`);
+                  log.info('Session established', { sessionId: this.sessionId });
                   this.onConnectedHandler?.(this.sessionId);
                   resolve(this.sessionId);
                 }
@@ -100,36 +115,52 @@ export class WebSocketClient {
                 break;
 
               case 'exit':
-                console.log(`[WebSocketClient] Terminal exited with code ${message.code}`);
+                log.info('Terminal exited', { code: message.code });
                 this.onExitHandler?.(message.code || 0);
                 this.close();
                 break;
 
               case 'error':
-                console.error('[WebSocketClient] Server error:', message.message);
+                log.error('Server error', { message: message.message });
                 this.onErrorHandler?.(message.message || 'Unknown error');
                 break;
 
               default:
-                console.warn('[WebSocketClient] Unknown message type:', (message as any).type);
+                log.warn('Unknown message type', { type: (message as any).type });
             }
           } catch (error) {
-            console.error('[WebSocketClient] Error parsing message:', error);
+            log.error('Error parsing message', { error });
           }
         };
 
-        this.ws.onerror = (error) => {
-          console.error('[WebSocketClient] WebSocket error:', error);
+        this.ws.onerror = (event) => {
+          // Ignore errors if we intentionally closed (e.g., React Strict Mode cleanup)
+          if (this.intentionallyClosed) {
+            log.debug('Ignoring error - connection was intentionally closed');
+            return;
+          }
+
+          // Browser WebSocket errors are intentionally vague for security
+          // Log what we can and check the close event for more info
+          log.error('WebSocket error', { url: this.url, readyState: this.ws?.readyState });
           this.onErrorHandler?.('WebSocket connection error');
-          reject(new Error('WebSocket connection error'));
+          reject(new Error(`WebSocket connection failed to ${this.url}`));
         };
 
         this.ws.onclose = (event) => {
-          console.log(`[WebSocketClient] Connection closed: ${event.code} ${event.reason}`);
+          log.info('Connection closed', { code: event.code, reason: event.reason });
+
+          // Skip reconnect logic for intentional closes
+          if (this.intentionallyClosed) {
+            log.debug('Connection intentionally closed');
+            this.ws = null;
+            return;
+          }
+
           this.handleClose();
         };
       } catch (error) {
-        console.error('[WebSocketClient] Error creating WebSocket:', error);
+        log.error('Error creating WebSocket', { error });
         reject(error);
       }
     });
@@ -145,15 +176,19 @@ export class WebSocketClient {
       this.reconnectAttempts++;
       const delay = this.reconnectInterval * Math.pow(2, this.reconnectAttempts - 1); // Exponential backoff
 
-      console.log(`[WebSocketClient] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+      log.info('Reconnecting', {
+        delay,
+        attempt: this.reconnectAttempts,
+        maxAttempts: this.maxReconnectAttempts,
+      });
 
       this.reconnectTimeout = setTimeout(() => {
         this.connect().catch((error) => {
-          console.error('[WebSocketClient] Reconnection failed:', error);
+          log.error('Reconnection failed', { error });
         });
       }, delay);
     } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('[WebSocketClient] Max reconnection attempts reached');
+      log.error('Max reconnection attempts reached');
       this.onErrorHandler?.('Failed to reconnect to terminal server');
     }
   }
@@ -163,7 +198,7 @@ export class WebSocketClient {
    */
   sendInput(data: string): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.error('[WebSocketClient] WebSocket not connected');
+      log.error('WebSocket not connected');
       return;
     }
 
@@ -180,7 +215,7 @@ export class WebSocketClient {
    */
   resize(cols: number, rows: number): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.error('[WebSocketClient] WebSocket not connected');
+      log.error('WebSocket not connected');
       return;
     }
 

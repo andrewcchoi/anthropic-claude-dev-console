@@ -9,9 +9,12 @@ import { WebSocketServer, WebSocket } from 'ws';
 import * as http from 'http';
 import { ptyManager } from '../src/lib/terminal/pty-manager';
 import { TerminalClientMessage, TerminalServerMessage } from '../src/lib/terminal/types';
+import { createServerLogger } from '../src/lib/logger/server';
+
+const log = createServerLogger('TerminalServer');
 
 const PORT = process.env.TERMINAL_PORT || 3001;
-const HOST = process.env.TERMINAL_HOST || 'localhost';
+const HOST = process.env.TERMINAL_HOST || '0.0.0.0';
 
 // Create HTTP server for health checks
 const httpServer = http.createServer((req, res) => {
@@ -38,7 +41,7 @@ const wss = new WebSocketServer({
 const connections = new Map<string, WebSocket>();
 
 wss.on('connection', (ws: WebSocket) => {
-  console.log('[TerminalServer] New WebSocket connection');
+  log.info('New WebSocket connection');
 
   // Spawn new PTY session
   const instance = ptyManager.spawn({
@@ -50,7 +53,7 @@ wss.on('connection', (ws: WebSocket) => {
   const sessionId = instance.id;
   connections.set(sessionId, ws);
 
-  console.log(`[TerminalServer] Created PTY session ${sessionId}`);
+  log.info('Created PTY session', { sessionId });
 
   // Send connected message
   const connectedMessage: TerminalServerMessage = {
@@ -72,7 +75,7 @@ wss.on('connection', (ws: WebSocket) => {
 
   // Handle PTY exit
   instance.pty.onExit(({ exitCode }: { exitCode: number }) => {
-    console.log(`[TerminalServer] PTY session ${sessionId} exited with code ${exitCode}`);
+    log.info('PTY session exited', { sessionId, exitCode });
 
     if (ws.readyState === WebSocket.OPEN) {
       const exitMessage: TerminalServerMessage = {
@@ -106,10 +109,10 @@ wss.on('connection', (ws: WebSocket) => {
           break;
 
         default:
-          console.warn(`[TerminalServer] Unknown message type: ${(message as any).type}`);
+          log.warn('Unknown message type', { type: (message as any).type, sessionId });
       }
     } catch (error) {
-      console.error('[TerminalServer] Error parsing message:', error);
+      log.error('Error parsing message', { error, sessionId });
       if (ws.readyState === WebSocket.OPEN) {
         const errorMessage: TerminalServerMessage = {
           type: 'error',
@@ -122,14 +125,14 @@ wss.on('connection', (ws: WebSocket) => {
 
   // Handle WebSocket close
   ws.on('close', () => {
-    console.log(`[TerminalServer] WebSocket closed for session ${sessionId}`);
+    log.info('WebSocket closed', { sessionId });
     connections.delete(sessionId);
     ptyManager.kill(sessionId);
   });
 
   // Handle WebSocket error
   ws.on('error', (error) => {
-    console.error(`[TerminalServer] WebSocket error for session ${sessionId}:`, error);
+    log.error('WebSocket error', { sessionId, error });
     connections.delete(sessionId);
     ptyManager.kill(sessionId);
   });
@@ -137,13 +140,13 @@ wss.on('connection', (ws: WebSocket) => {
 
 // Start server
 httpServer.listen(PORT, () => {
-  console.log(`[TerminalServer] WebSocket server listening on ws://${HOST}:${PORT}/terminal`);
-  console.log(`[TerminalServer] Health check available at http://${HOST}:${PORT}/health`);
+  log.info('WebSocket server listening', { url: `ws://${HOST}:${PORT}/terminal` });
+  log.info('Health check available', { url: `http://${HOST}:${PORT}/health` });
 });
 
 // Graceful shutdown
 process.on('SIGINT', () => {
-  console.log('\n[TerminalServer] Shutting down gracefully...');
+  log.info('Shutting down gracefully');
 
   // Close all WebSocket connections
   wss.clients.forEach((ws) => {
@@ -153,24 +156,24 @@ process.on('SIGINT', () => {
   // Close server
   wss.close(() => {
     httpServer.close(() => {
-      console.log('[TerminalServer] Server closed');
+      log.info('Server closed');
       process.exit(0);
     });
   });
 });
 
 process.on('SIGTERM', () => {
-  console.log('\n[TerminalServer] Received SIGTERM, shutting down...');
+  log.info('Received SIGTERM, shutting down');
   process.exit(0);
 });
 
 // Error handling
 process.on('uncaughtException', (error) => {
-  console.error('[TerminalServer] Uncaught exception:', error);
+  log.error('Uncaught exception', { error });
   process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('[TerminalServer] Unhandled rejection at:', promise, 'reason:', reason);
+  log.error('Unhandled rejection', { reason, promise });
   process.exit(1);
 });

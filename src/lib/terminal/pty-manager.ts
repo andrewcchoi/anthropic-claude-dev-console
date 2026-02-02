@@ -7,6 +7,9 @@ import * as pty from 'node-pty';
 import * as os from 'os';
 import * as path from 'path';
 import { PTYInstance, PTYSpawnOptions } from './types';
+import { createServerLogger } from '../logger/server';
+
+const log = createServerLogger('PTYManager');
 
 export class PTYManager {
   private sessions: Map<string, PTYInstance> = new Map();
@@ -49,7 +52,7 @@ export class PTYManager {
 
     this.sessions.set(id, instance);
 
-    console.log(`[PTYManager] Spawned PTY session ${id} in ${cwd} with shell ${shell}`);
+    log.info('Spawned PTY session', { id, cwd, shell });
 
     return instance;
   }
@@ -67,7 +70,7 @@ export class PTYManager {
   write(id: string, data: string): boolean {
     const instance = this.sessions.get(id);
     if (!instance) {
-      console.error(`[PTYManager] PTY session ${id} not found`);
+      log.error('PTY session not found', { id });
       return false;
     }
 
@@ -75,7 +78,7 @@ export class PTYManager {
       instance.pty.write(data);
       return true;
     } catch (error) {
-      console.error(`[PTYManager] Error writing to PTY ${id}:`, error);
+      log.error('Error writing to PTY', { id, error });
       return false;
     }
   }
@@ -86,16 +89,16 @@ export class PTYManager {
   resize(id: string, cols: number, rows: number): boolean {
     const instance = this.sessions.get(id);
     if (!instance) {
-      console.error(`[PTYManager] PTY session ${id} not found`);
+      log.error('PTY session not found', { id });
       return false;
     }
 
     try {
       instance.pty.resize(cols, rows);
-      console.log(`[PTYManager] Resized PTY ${id} to ${cols}x${rows}`);
+      log.debug('Resized PTY', { id, cols, rows });
       return true;
     } catch (error) {
-      console.error(`[PTYManager] Error resizing PTY ${id}:`, error);
+      log.error('Error resizing PTY', { id, error });
       return false;
     }
   }
@@ -106,17 +109,17 @@ export class PTYManager {
   kill(id: string): boolean {
     const instance = this.sessions.get(id);
     if (!instance) {
-      console.error(`[PTYManager] PTY session ${id} not found`);
+      log.error('PTY session not found', { id });
       return false;
     }
 
     try {
       instance.pty.kill();
       this.sessions.delete(id);
-      console.log(`[PTYManager] Killed PTY session ${id}`);
+      log.info('Killed PTY session', { id });
       return true;
     } catch (error) {
-      console.error(`[PTYManager] Error killing PTY ${id}:`, error);
+      log.error('Error killing PTY', { id, error });
       return false;
     }
   }
@@ -125,12 +128,12 @@ export class PTYManager {
    * Kill all PTY sessions
    */
   killAll(): void {
-    console.log(`[PTYManager] Killing all ${this.sessions.size} PTY sessions`);
+    log.info('Killing all PTY sessions', { count: this.sessions.size });
     for (const [id, instance] of this.sessions) {
       try {
         instance.pty.kill();
       } catch (error) {
-        console.error(`[PTYManager] Error killing PTY ${id}:`, error);
+        log.error('Error killing PTY', { id, error });
       }
     }
     this.sessions.clear();
