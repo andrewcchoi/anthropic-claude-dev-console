@@ -128,7 +128,11 @@ export const useChatStore = create<ChatStore>()(
       },
 
       saveCurrentSession: () => {
-        const { sessionId, sessions, messages } = get();
+        const { sessionId, sessions, messages, currentSession } = get();
+
+        // Already saved a session for this conversation - don't duplicate
+        if (currentSession) return;
+
         if (!sessionId || sessions.some((s) => s.id === sessionId)) return;
 
         const name =
