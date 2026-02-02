@@ -77,6 +77,8 @@ export function useClaudeChat() {
         let buffer = '';
         let currentContent: MessageContent[] = [];
         let currentTextBlock: MessageContent | null = null;
+        let toolInputBuffers: Record<number, string> = {}; // Track partial JSON per tool index
+        let toolIndexToId: Record<number, string> = {}; // Map event.index to tool ID
         let receivedSuccessResult = false;
 
         while (true) {
@@ -103,13 +105,56 @@ export function useClaudeChat() {
                 } else if (message.type === 'assistant') {
                   // Full assistant message (comes at end of stream)
                   if (message.message?.content) {
-                    currentContent = message.message.content.map((block: any) => ({
+                    // Process tool_use blocks FIRST - create tool executions
+                    for (const block of message.message.content) {
+                      if (block.type === 'tool_use' && block.id) {
+                        // Check if tool execution already exists
+                        const existingTool = useChatStore.getState().toolExecutions.find(t => t.id === block.id);
+                        if (!existingTool) {
+                          addToolExecution({
+                            id: block.id,
+                            name: block.name || 'unknown',
+                            input: block.input || {},
+                            status: 'pending',
+                            timestamp: Date.now(),
+                          });
+                        } else {
+                          // Update input if we now have it
+                          if (block.input && Object.keys(block.input).length > 0) {
+                            updateToolExecution(block.id, { input: block.input });
+                          }
+                        }
+                      }
+                    }
+
+                    // Preserve existing tool_use blocks from streaming
+                    const existingToolUseBlocks = currentContent.filter(c => c.type === 'tool_use');
+
+                    // Map incoming content (typically just text blocks)
+                    const incomingContent = message.message.content.map((block: any) => ({
                       type: block.type,
                       text: block.text,
                       id: block.id,
                       name: block.name,
                       input: block.input,
                     }));
+
+                    // Get tool_use blocks from incoming message
+                    const incomingToolUseBlocks = incomingContent.filter(c => c.type === 'tool_use');
+                    const incomingNonToolUse = incomingContent.filter(c => c.type !== 'tool_use');
+
+                    // Merge tool_use blocks: deduplicate by ID, prefer incoming data
+                    const toolUseById = new Map<string, any>();
+                    for (const block of existingToolUseBlocks) {
+                      if (block.id) toolUseById.set(block.id, block);
+                    }
+                    for (const block of incomingToolUseBlocks) {
+                      if (block.id) toolUseById.set(block.id, block);
+                    }
+                    const mergedToolUseBlocks = Array.from(toolUseById.values());
+
+                    currentContent = [...mergedToolUseBlocks, ...incomingNonToolUse];
+
                     updateMessage(assistantMessageId, {
                       content: currentContent,
                     });
@@ -142,13 +187,41 @@ export function useClaudeChat() {
                       updateMessage(assistantMessageId, {
                         content: [...currentContent],
                       });
+                    } else if (event.delta?.type === 'input_json_delta') {
+                      // Accumulate tool input JSON
+                      const index = event.index;
+                      if (index === undefined) continue;
+
+                      if (toolInputBuffers[index] === undefined) {
+                        toolInputBuffers[index] = '';
+                      }
+                      toolInputBuffers[index] += event.delta.partial_json || '';
+
+                      // Try to parse and update the tool execution
+                      try {
+                        const parsedInput = JSON.parse(toolInputBuffers[index]);
+                        // Use ID-based lookup instead of index
+                        const toolId = toolIndexToId[index];
+                        if (toolId) {
+                          updateToolExecution(toolId, { input: parsedInput });
+                        }
+                      } catch {
+                        // JSON not complete yet, continue accumulating
+                      }
                     }
                   } else if (event?.type === 'content_block_start') {
                     // New content block starting
                     if (event.content_block?.type === 'tool_use') {
                       const toolBlock = event.content_block;
+                      const toolId = toolBlock.id || `tool-${Date.now()}`;
+
+                      // Track which tool is at this index
+                      if (event.index !== undefined) {
+                        toolIndexToId[event.index] = toolId;
+                      }
+
                       addToolExecution({
-                        id: toolBlock.id || `tool-${Date.now()}`,
+                        id: toolId,
                         name: toolBlock.name || 'unknown',
                         input: toolBlock.input,
                         status: 'pending',
@@ -156,7 +229,7 @@ export function useClaudeChat() {
                       });
                       currentContent = [...currentContent, {
                         type: 'tool_use',
-                        id: toolBlock.id,
+                        id: toolId,
                         name: toolBlock.name,
                         input: toolBlock.input,
                       }];
@@ -206,9 +279,8 @@ export function useClaudeChat() {
         setIsStreaming(false);
         setCurrentMessageId(null);
 
-        const currentSession = useChatStore.getState().currentSession;
         log.debug('Stream completed', {
-          messageCount: currentSession?.messages?.length || useChatStore.getState().messages.length
+          messageCount: useChatStore.getState().messages.length
         });
       } catch (error: any) {
         setError(error.message || 'Failed to send message');

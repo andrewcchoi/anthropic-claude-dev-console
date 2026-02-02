@@ -5,6 +5,7 @@ import { useTerminal } from '@/hooks/useTerminal';
 import '@xterm/xterm/css/xterm.css';
 
 interface InteractiveTerminalProps {
+  cwd?: string;
   className?: string;
   onConnected?: (sessionId: string) => void;
   onDisconnected?: () => void;
@@ -12,6 +13,7 @@ interface InteractiveTerminalProps {
 }
 
 export function InteractiveTerminal({
+  cwd,
   className = '',
   onConnected,
   onDisconnected,
@@ -25,6 +27,7 @@ export function InteractiveTerminal({
     connect,
     disconnect,
   } = useTerminal({
+    cwd,
     onConnected,
     onDisconnected,
     onError,

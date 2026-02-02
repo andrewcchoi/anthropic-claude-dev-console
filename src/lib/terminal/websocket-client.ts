@@ -15,6 +15,7 @@ export type TerminalErrorHandler = (message: string) => void;
 
 export interface WebSocketClientOptions {
   url?: string;
+  cwd?: string;
   onData?: TerminalEventHandler;
   onConnected?: TerminalConnectedHandler;
   onExit?: TerminalExitHandler;
@@ -27,6 +28,7 @@ export interface WebSocketClientOptions {
 export class WebSocketClient {
   private ws: WebSocket | null = null;
   private url: string;
+  private cwd: string | undefined;
   private sessionId: string | null = null;
   private reconnect: boolean;
   private reconnectInterval: number;
@@ -43,6 +45,7 @@ export class WebSocketClient {
 
   constructor(options: WebSocketClientOptions = {}) {
     this.url = options.url || this.getDefaultUrl();
+    this.cwd = options.cwd;
     this.reconnect = options.reconnect ?? true;
     this.reconnectInterval = options.reconnectInterval || 1000;
     this.maxReconnectAttempts = options.maxReconnectAttempts || 5;
@@ -86,8 +89,14 @@ export class WebSocketClient {
     return new Promise((resolve, reject) => {
       try {
         this.intentionallyClosed = false;
-        log.debug('Connecting', { url: this.url });
-        this.ws = new WebSocket(this.url);
+
+        // Append cwd as query parameter if provided
+        const url = this.cwd
+          ? `${this.url}?cwd=${encodeURIComponent(this.cwd)}`
+          : this.url;
+
+        log.debug('Connecting', { url, cwd: this.cwd });
+        this.ws = new WebSocket(url);
 
         this.ws.onopen = () => {
           log.info('Connected to terminal server');

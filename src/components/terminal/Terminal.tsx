@@ -25,6 +25,7 @@ function TerminalSkeleton() {
 interface TerminalProps {
   mode?: 'readonly' | 'interactive';
   content?: string;
+  cwd?: string;
   className?: string;
   minHeight?: number;
   maxHeight?: number;
@@ -41,6 +42,7 @@ interface TerminalProps {
 export function Terminal({
   mode = 'readonly',
   content = '',
+  cwd,
   className = '',
   minHeight = 100,
   maxHeight = 400,
@@ -63,6 +65,7 @@ export function Terminal({
   if (mode === 'interactive') {
     return (
       <InteractiveTerminal
+        cwd={cwd}
         className={className}
         onConnected={onConnected}
         onDisconnected={onDisconnected}

@@ -6,6 +6,13 @@ import { createLogger } from '../logger';
 
 const log = createLogger('ChatStore');
 
+interface TerminalSession {
+  sessionId: string;
+  status: 'connecting' | 'connected' | 'disconnected' | 'error';
+  cwd?: string;
+  error?: string;
+}
+
 interface ChatStore {
   // Messages
   messages: ChatMessage[];
@@ -32,6 +39,12 @@ interface ChatStore {
   addToolExecution: (tool: ToolExecution) => void;
   updateToolExecution: (id: string, updates: Partial<ToolExecution>) => void;
   clearToolExecutions: () => void;
+
+  // Terminal sessions
+  terminalSessions: Map<string, TerminalSession>;
+  openTerminalSession: (toolId: string, cwd?: string) => void;
+  closeTerminalSession: (toolId: string) => void;
+  updateTerminalStatus: (toolId: string, status: TerminalSession['status'], error?: string) => void;
 
   // UI State
   isStreaming: boolean;
@@ -191,6 +204,38 @@ export const useChatStore = create<ChatStore>()(
           ),
         })),
       clearToolExecutions: () => set({ toolExecutions: [] }),
+
+      // Terminal sessions
+      terminalSessions: new Map(),
+      openTerminalSession: (toolId, cwd) =>
+        set((state) => {
+          const newSessions = new Map(state.terminalSessions);
+          newSessions.set(toolId, {
+            sessionId: `term-${toolId}`,
+            status: 'connecting',
+            cwd,
+          });
+          return { terminalSessions: newSessions };
+        }),
+      closeTerminalSession: (toolId) =>
+        set((state) => {
+          const newSessions = new Map(state.terminalSessions);
+          newSessions.delete(toolId);
+          return { terminalSessions: newSessions };
+        }),
+      updateTerminalStatus: (toolId, status, error) =>
+        set((state) => {
+          const newSessions = new Map(state.terminalSessions);
+          const existing = newSessions.get(toolId);
+          if (existing) {
+            newSessions.set(toolId, {
+              ...existing,
+              status,
+              error,
+            });
+          }
+          return { terminalSessions: newSessions };
+        }),
 
       // UI State
       isStreaming: false,

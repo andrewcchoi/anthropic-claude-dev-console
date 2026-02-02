@@ -2,12 +2,15 @@
 
 import { MessageContent as MessageContentType } from '@/types/claude';
 import { ToolExecution } from './ToolExecution';
+import { useChatStore } from '@/lib/store';
 
 interface MessageContentProps {
   content: MessageContentType[];
 }
 
 export function MessageContent({ content }: MessageContentProps) {
+  const toolExecutions = useChatStore((state) => state.toolExecutions);
+
   return (
     <div className="space-y-2">
       {content.map((block, index) => {
@@ -18,12 +21,18 @@ export function MessageContent({ content }: MessageContentProps) {
             </div>
           );
         } else if (block.type === 'tool_use') {
+          // Look up actual tool execution data from store
+          const toolExecution = toolExecutions.find(t => t.id === block.id);
+          const status = toolExecution?.status || 'pending';
+          const output = toolExecution?.output;
+
           return (
             <ToolExecution
               key={block.id || index}
               name={block.name || 'unknown'}
-              input={block.input}
-              status="pending"
+              input={toolExecution?.input ?? block.input}
+              status={status}
+              output={output}
             />
           );
         } else if (block.type === 'tool_result') {

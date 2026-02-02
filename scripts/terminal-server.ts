@@ -40,12 +40,29 @@ const wss = new WebSocketServer({
 // Track WebSocket connections
 const connections = new Map<string, WebSocket>();
 
-wss.on('connection', (ws: WebSocket) => {
+wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   log.info('New WebSocket connection');
+
+  // Parse cwd from query parameters
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const requestedCwd = url.searchParams.get('cwd');
+
+  // Validate and sanitize cwd
+  let cwd = process.env.HOME || '/workspace';
+  if (requestedCwd) {
+    // Basic path validation - ensure it doesn't contain dangerous patterns
+    const sanitized = requestedCwd.replace(/\.\./g, '').trim();
+    if (sanitized && !sanitized.includes('\0')) {
+      cwd = sanitized;
+      log.info('Using requested cwd', { cwd });
+    } else {
+      log.warn('Invalid cwd requested, using default', { requested: requestedCwd, default: cwd });
+    }
+  }
 
   // Spawn new PTY session
   const instance = ptyManager.spawn({
-    cwd: process.env.HOME || '/workspace',
+    cwd,
     cols: 80,
     rows: 24,
   });
@@ -53,7 +70,7 @@ wss.on('connection', (ws: WebSocket) => {
   const sessionId = instance.id;
   connections.set(sessionId, ws);
 
-  log.info('Created PTY session', { sessionId });
+  log.info('Created PTY session', { sessionId, cwd });
 
   // Send connected message
   const connectedMessage: TerminalServerMessage = {

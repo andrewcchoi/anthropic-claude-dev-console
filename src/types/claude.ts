@@ -34,6 +34,7 @@ export interface SDKMessage {
     delta?: {
       type: string;
       text?: string;
+      partial_json?: string;
     };
   };
   message?: {

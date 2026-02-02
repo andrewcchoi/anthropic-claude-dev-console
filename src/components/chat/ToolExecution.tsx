@@ -22,22 +22,49 @@ export function ToolExecution({
   status,
 }: ToolExecutionProps) {
   const [expanded, setExpanded] = useState(false);
+  const [viewMode, setViewMode] = useState<'readonly' | 'interactive'>('readonly');
 
   // Helper function to extract bash output from various formats
   const getBashOutput = (output: any): string | null => {
+    if (!output) return null;
     if (typeof output === 'string') return output;
-    if (output && typeof output === 'object') {
-      // Handle {stdout: "...", stderr: "..."} format
-      if (output.stdout) return output.stdout;
-      // Handle array format [{type: "text", text: "..."}]
-      if (Array.isArray(output)) {
-        return output
-          .filter((item: any) => item.type === 'text')
-          .map((item: any) => item.text)
-          .join('\n');
-      }
+
+    if (Array.isArray(output)) {
+      // Handle [{type: "text", text: "..."}] format
+      const textContent = output
+        .filter((item: any) => item.type === 'text')
+        .map((item: any) => item.text)
+        .join('\n');
+      if (textContent) return textContent;
     }
-    return null;
+
+    if (typeof output === 'object') {
+      // Handle {stdout: "...", stderr: "..."} format
+      if ('stdout' in output) return output.stdout || '';
+      if ('text' in output) return output.text || '';
+      // Fallback: stringify unknown object formats
+      return JSON.stringify(output, null, 2);
+    }
+
+    return String(output);
+  };
+
+  // Helper function to extract cwd from Bash tool input
+  const getCwd = (input: any): string => {
+    if (input && typeof input === 'object') {
+      return input.cwd || input.working_directory || '/workspace';
+    }
+    return '/workspace';
+  };
+
+  // Check if this is a Bash tool
+  const isBashTool = name === 'Bash' || name === 'bash';
+  const bashOutput = isBashTool ? getBashOutput(output) : null;
+  const cwd = isBashTool ? getCwd(input) : '/workspace';
+
+  // Handle toggle between readonly and interactive
+  const handleToggleInteractive = () => {
+    setViewMode((prev) => (prev === 'readonly' ? 'interactive' : 'readonly'));
   };
 
   const getStatusIcon = () => {
@@ -90,11 +117,43 @@ export function ToolExecution({
           </div>
           {output && (
             <div>
-              <div className="text-xs font-semibold text-gray-600 mb-1">
-                Output:
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-xs font-semibold text-gray-600">
+                  Output:
+                </div>
+                {isBashTool && bashOutput && status === 'success' && (
+                  <div className="flex gap-1">
+                    <button
+                      onClick={handleToggleInteractive}
+                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                        viewMode === 'readonly'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      Output
+                    </button>
+                    <button
+                      onClick={handleToggleInteractive}
+                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                        viewMode === 'interactive'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      Interactive ▶
+                    </button>
+                  </div>
+                )}
               </div>
-              {(name === 'Bash' || name === 'bash') && getBashOutput(output) ? (
-                <Terminal content={getBashOutput(output)!} minHeight={80} maxHeight={300} />
+              {isBashTool && bashOutput ? (
+                <Terminal
+                  mode={viewMode}
+                  content={bashOutput}
+                  cwd={cwd}
+                  minHeight={80}
+                  maxHeight={300}
+                />
               ) : (
                 <pre className="text-xs bg-white p-2 rounded overflow-x-auto border border-gray-200">
                   {typeof output === 'string'
