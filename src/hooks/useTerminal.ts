@@ -97,7 +97,7 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
 
       // Create WebSocket client
       const wsClient = new WebSocketClient({
-        url: 'ws://localhost:8080',
+        url: 'ws://localhost:3001/terminal',
         onConnected: (sid: string) => {
           setIsConnected(true);
           setSessionId(sid);
