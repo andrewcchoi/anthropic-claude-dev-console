@@ -3,6 +3,8 @@
  * Always outputs JSON format for production log aggregation
  */
 
+import { logStream } from './log-stream';
+
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 interface ServerLogEntry {
@@ -59,6 +61,11 @@ class ServerLogger {
 
     // Always JSON for server logs
     console.log(JSON.stringify(entry));
+
+    // Add to log stream if enabled
+    if (logStream.isEnabled()) {
+      logStream.add(entry);
+    }
   }
 
   public debug(module: string, message: string, data?: unknown, correlationId?: string): void {
