@@ -273,10 +273,129 @@ All caught errors are automatically logged to the structured logger with:
 - **Customizable:** Custom fallback UI per component
 - **Monitoring ready:** Error logs include full context
 
+## Phase 4: API Request Logging (COMPLETED)
+
+### Created Files
+
+1. **src/middleware.ts** - Next.js middleware for correlation IDs
+   - Generates unique correlation ID (UUID) per request
+   - Adds `x-correlation-id` header to requests and responses
+   - Adds `x-request-start` timestamp header
+   - Applied to all `/api/*` routes
+
+2. **src/lib/api/withLogging.ts** - API route wrapper with logging
+   - `withLogging()` - Wrapper for automatic request/response logging
+   - `createApiLogger()` - Create scoped logger with correlation ID
+   - `timeOperation()` - Time-specific operations within routes
+   - Logs request details (method, path, IP, query params)
+   - Logs response details (status, duration, errors)
+   - Automatic timing for all wrapped routes
+
+3. **src/app/api/example/route.ts** - Example API with logging
+   - Demonstrates withLogging usage
+   - Shows createApiLogger for scoped logs
+   - Shows timeOperation for operation timing
+
+### Features
+
+**Automatic Request/Response Logging:**
+```typescript
+import { withLogging } from '@/lib/api/withLogging';
+
+export const GET = withLogging(async (request: NextRequest) => {
+  // Handler code - logging is automatic
+  return NextResponse.json({ data: 'hello' });
+});
+```
+
+**Scoped Logger with Correlation ID:**
+```typescript
+import { createApiLogger } from '@/lib/api/withLogging';
+
+export const POST = async (request: NextRequest) => {
+  const log = createApiLogger(request, 'MyAPI');
+  log.info('Processing request'); // Includes correlation ID
+  return NextResponse.json({ ok: true });
+};
+```
+
+**Operation Timing:**
+```typescript
+import { timeOperation } from '@/lib/api/withLogging';
+
+export const POST = async (request: NextRequest) => {
+  const endTimer = timeOperation(request, 'DatabaseQuery');
+  await db.query(...);
+  endTimer(); // Logs duration with correlation ID
+};
+```
+
+### Logged Information
+
+**Request Log:**
+```json
+{
+  "timestamp": "2026-02-02T16:30:45.123Z",
+  "level": "info",
+  "module": "API",
+  "message": "Request received",
+  "data": {
+    "method": "POST",
+    "path": "/api/example",
+    "correlationId": "abc-123-def-456",
+    "userAgent": "Mozilla/5.0...",
+    "ip": "192.168.1.1",
+    "query": {}
+  },
+  "correlationId": "abc-123-def-456"
+}
+```
+
+**Response Log:**
+```json
+{
+  "timestamp": "2026-02-02T16:30:45.234Z",
+  "level": "info",
+  "module": "API",
+  "message": "Request completed",
+  "data": {
+    "method": "POST",
+    "path": "/api/example",
+    "correlationId": "abc-123-def-456",
+    "status": 200,
+    "durationMs": 111
+  },
+  "correlationId": "abc-123-def-456"
+}
+```
+
+### Response Headers
+
+All API responses include:
+- `x-correlation-id` - Unique request ID for tracing
+- `x-request-start` - Request start timestamp
+
+### Benefits
+
+- **Request tracing:** Unique ID per request for debugging
+- **Performance monitoring:** Automatic timing for all requests
+- **Error tracking:** Full context logged on failures
+- **Client visibility:** Correlation IDs in response headers
+- **Log aggregation ready:** Structured logs with correlation IDs
+
+### Verification Results
+
+✅ Build compiles successfully
+✅ Middleware adds correlation IDs
+✅ withLogging wrapper works correctly
+✅ createApiLogger includes correlation ID
+✅ timeOperation logs durations
+✅ Example API route demonstrates usage
+✅ Response headers include correlation ID
+
 ## Next Steps (Not Yet Implemented)
 
-- Phase 4: API Request Logging (correlation IDs, timing middleware)
-- Phase 5: Log Streaming (WebSocket log viewer)
+- Phase 5: Log Streaming (WebSocket log viewer - optional/low priority)
 
 ## Testing
 
