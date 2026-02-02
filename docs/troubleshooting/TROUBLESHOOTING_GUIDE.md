@@ -1,27 +1,29 @@
 # Troubleshooting Guide
 
 **Auto-generated from troubleshoot-recorder plugin**
-**Last updated:** 2026-01-27 14:45 UTC
-**Total problems documented:** 8
+**Last updated:** 2026-02-02 18:20 UTC
+**Total problems documented:** 10
 
 ---
 
 ## Executive Summary
 
-This guide documents 6 solved problems and 2 ongoing investigations captured during development.
+This guide documents 8 solved problems and 2 ongoing investigations captured during development.
 
 ### Quick Stats
 
 | Metric | Count |
 |--------|-------|
-| Total Problems | 8 |
-| Solved | 6 |
+| Total Problems | 10 |
+| Solved | 8 |
 | Under Investigation | 2 |
 | Total Attempts | 2 |
 
 ### Most Common Categories
 
 - **state-management:** 2
+- **logging:** 1
+- **react:** 1
 - **file-system:** 1
 - **logic:** 1
 - **unknown:** 1
@@ -41,6 +43,8 @@ This guide documents 6 solved problems and 2 ongoing investigations captured dur
 6. [Session conflict when resuming existing session](#problem-6-session-conflict-when-resuming-existing-)
 7. [UI flickers when switching sessions](#problem-7-ui-flickers-when-switching-sessions)
 8. [ANSI colors not displaying in Bash tool output](#problem-8-ansi-colors-not-displaying-in-bash-tool-output)
+9. [WebSocket connection race condition in React Strict Mode](#problem-9-websocket-connection-race-condition-in-react-strict-mode)
+10. [/logs page not showing logs after enableDebug()](#problem-10-logs-page-not-showing-logs-after-enabledebug)
 
 ---
 
@@ -525,6 +529,164 @@ The Claude CLI SSE stream includes multiple message types. Tool results come in 
 
 ---
 
+### Problem 9: WebSocket connection race condition in React Strict Mode
+
+**ID:** `prob_websocket_strictmode`
+**Category:** react
+**Subcategory:** strict-mode
+**Status:** solved
+**Created:** 2026-02-02T00:00:00Z
+**Resolved:** 2026-02-02T00:00:00Z
+
+#### Error Signature
+
+```
+WebSocket is closed before the connection is established
+WebSocket was closed abnormally (code 1006)
+```
+
+#### Root Cause
+
+React 18 Strict Mode double-invokes `useEffect` synchronously (mount → unmount → remount). When WebSocket connection starts immediately in `useEffect`, it gets closed mid-handshake during the cleanup phase, causing:
+1. Error fires from closed WebSocket
+2. Promise never resolves/rejects properly
+3. Connection state left inconsistent
+
+#### Solution
+
+Debounce the `connect()` call with `setTimeout(fn, 0)` to defer connection until after Strict Mode's synchronous cycle completes.
+
+**Code Changes:**
+
+- **File:** `/workspace/src/components/terminal/InteractiveTerminal.tsx`
+  - **Description:** Wrap connect() in setTimeout(0) with clearTimeout in cleanup
+  - **Before:**
+    ```typescript
+    useEffect(() => {
+      wsRef.current = new TerminalWebSocketClient(WS_URL);
+      const ws = wsRef.current;
+
+      ws.connect();
+
+      return () => {
+        ws.disconnect();
+      };
+    }, []);
+    ```
+  - **After:**
+    ```typescript
+    useEffect(() => {
+      wsRef.current = new TerminalWebSocketClient(WS_URL);
+      const ws = wsRef.current;
+
+      // Defer connection to avoid React Strict Mode double-invoke race
+      const timeoutId = setTimeout(() => {
+        ws.connect();
+      }, 0);
+
+      return () => {
+        clearTimeout(timeoutId);
+        ws.disconnect();
+      };
+    }, []);
+    ```
+
+**Verification Steps:**
+1. Open terminal in browser
+2. Check console shows single connection (not multiple attempts)
+3. No "WebSocket is closed before the connection is established" errors
+4. Terminal displays with green indicator and accepts input
+
+#### Lesson Learned
+
+**Key Insight:** Defer side effects that create persistent connections in React Strict Mode
+
+React 18 Strict Mode intentionally double-invokes effects to surface bugs. Synchronous connection attempts get caught mid-handshake by the cleanup phase. Using `setTimeout(fn, 0)` moves the connection to the next event loop tick, after Strict Mode's synchronous mount/unmount cycle completes.
+
+**Prevention Tips:**
+- Use `setTimeout(fn, 0)` for connection initiation in useEffect
+- Consider `useRef` to track connection state across Strict Mode cycles
+- Test with Strict Mode enabled during development
+- Be aware that WebSocket handshakes are async and can be interrupted by synchronous cleanup
+
+---
+
+### Problem 10: /logs page not showing logs after enableDebug()
+
+**ID:** `prob_logs_page`
+**Category:** logging
+**Subcategory:** architecture
+**Status:** solved
+**Created:** 2026-02-02T18:00:00Z
+**Resolved:** 2026-02-02T18:20:00Z
+
+#### Error Signature
+
+```
+/logs page shows "No logs" even after calling enableDebug() in browser console
+```
+
+#### Root Cause
+
+The `/logs` page displays logs from the **server-side** `logStream`, but the API route (`/api/claude/route.ts`) only had `log.error()` calls for telemetry failures. No `log.debug()` calls existed for normal API operations, so debug mode had nothing to display.
+
+**Architecture confusion:**
+| Logger Type | Output Location | Used By |
+|-------------|-----------------|---------|
+| `createLogger()` (client) | Browser console only | Hooks, stores, WebSocket client |
+| `createServerLogger()` (server) | Console + `logStream` → `/logs` page | API routes |
+
+The browser console showed debug logs because client-side code uses `createLogger()`. But the `/logs` page uses the server-side `logStream` which requires `createServerLogger()` calls.
+
+#### Solution
+
+Added `log.debug()` calls to `/api/claude/route.ts` at key lifecycle points
+
+**Code Changes:**
+
+- **File:** `/workspace/src/app/api/claude/route.ts`
+  - **Description:** Add debug logging for request lifecycle
+  - **Before:**
+    ```typescript
+    // Only log.error() for telemetry failures existed
+    ```
+  - **After:**
+    ```typescript
+    log.debug('Received chat request', { sessionId, cwd, promptLength: prompt.length });
+    log.debug('Spawning Claude CLI', { args, cwd: cwd || '/workspace' });
+    log.debug('CLI stdout chunk', { bytesReceived: chunk.length });
+    log.debug('CLI process closed', { exitCode: code, hadSuccess: receivedSuccessResult });
+    ```
+
+**Verification Steps:**
+1. Run `enableDebug()` in browser console
+2. Navigate to `/logs` page
+3. Send a chat message
+4. `/logs` should show: "Received chat request", "Spawning Claude CLI", "CLI stdout chunk", "CLI process closed"
+
+#### Lesson Learned
+
+**Key Insight:** The logging system has two separate paths - client logs go to browser console, server logs go to `/logs` page
+
+When debugging "no logs showing", first identify which logging path applies:
+- Browser console empty? → Check client-side `createLogger()` usage
+- `/logs` page empty? → Check server-side `createServerLogger()` usage and ensure debug calls exist
+
+**Prevention Tips:**
+- Add `log.debug()` calls at key lifecycle points when creating new API routes
+- Document which logger type each module uses
+- Test both browser console AND `/logs` page when verifying logging
+
+#### Related: Terminal Logging (By Design)
+
+Terminal interactions (keystrokes, output) are intentionally NOT logged to avoid flooding:
+- WebSocketClient only logs: connection, session established, exit, error
+- Does NOT log: input (every keystroke), output (every character), resize events
+
+This is by design - logging every terminal interaction would make both console and `/logs` page unusable.
+
+---
+
 
 ---
 
@@ -542,6 +704,8 @@ Quick lookup table for searching by error message:
 | Session conflict detected, regenerating session | `prob_resume_flag` | solved | cli-integration |
 |  | `prob_atomic_switch` | solved | state-management |
 | Terminal output shows escaped ANSI sequences like \033[31m instead of actual colors | `prob_ansi_colors` | solved | ui |
+| WebSocket is closed before the connection is established | `prob_websocket_strictmode` | solved | react |
+| /logs page shows "No logs" even after calling enableDebug() in browser console | `prob_logs_page` | solved | logging |
 
 ---
 
@@ -554,6 +718,7 @@ Files that were modified during troubleshooting:
 - `/workspace/src/lib/store/index.ts`
 - `/workspace/src/hooks/useClaudeChat.ts`
 - `/workspace/src/components/chat/ToolExecution.tsx`
+- `/workspace/src/components/terminal/InteractiveTerminal.tsx`
 - `store/useChatStore.ts`
 
 ---
@@ -580,6 +745,12 @@ Key insights from solved problems:
 
 **8. ANSI colors not displaying in Bash tool output**
 - All message types from Claude CLI must be handled, not just assistant and stream events
+
+**9. WebSocket connection race condition in React Strict Mode**
+- Defer side effects that create persistent connections in React Strict Mode
+
+**10. /logs page not showing logs after enableDebug()**
+- The logging system has two separate paths - client logs go to browser console, server logs go to `/logs` page
 
 
 ---
@@ -608,6 +779,14 @@ Steps to verify fixes are working:
 - [ ] Expand Bash tool execution panel
 - [ ] Output should show colored text in terminal (not escaped codes)
 - [ ] Test with `ls --color` or `git status`
+- [ ] Open terminal in browser
+- [ ] Check console shows single WebSocket connection (not multiple attempts)
+- [ ] No "WebSocket is closed before the connection is established" errors
+- [ ] Terminal displays with green indicator and accepts input
+- [ ] Run `enableDebug()` in browser console
+- [ ] Navigate to `/logs` page
+- [ ] Send a chat message
+- [ ] `/logs` should show: "Received chat request", "Spawning Claude CLI", "CLI stdout chunk", "CLI process closed"
 
 ---
 
