@@ -1,6 +1,7 @@
 'use client';
 
 import { ReadOnlyTerminal } from './ReadOnlyTerminal';
+import { InteractiveTerminal } from './InteractiveTerminal';
 
 interface TerminalProps {
   mode?: 'readonly' | 'interactive';
@@ -9,6 +10,9 @@ interface TerminalProps {
   minHeight?: number;
   maxHeight?: number;
   sessionId?: string;
+  onConnected?: (sessionId: string) => void;
+  onDisconnected?: () => void;
+  onError?: (error: string) => void;
 }
 
 /**
@@ -21,7 +25,10 @@ export function Terminal({
   className = '',
   minHeight = 100,
   maxHeight = 400,
-  sessionId
+  sessionId,
+  onConnected,
+  onDisconnected,
+  onError,
 }: TerminalProps) {
   if (mode === 'readonly') {
     return (
@@ -34,10 +41,16 @@ export function Terminal({
     );
   }
 
-  // Interactive mode will be implemented in Phase 3
-  return (
-    <div className="p-4 text-center text-gray-500">
-      Interactive terminal coming in Phase 3...
-    </div>
-  );
+  if (mode === 'interactive') {
+    return (
+      <InteractiveTerminal
+        className={className}
+        onConnected={onConnected}
+        onDisconnected={onDisconnected}
+        onError={onError}
+      />
+    );
+  }
+
+  return null;
 }
