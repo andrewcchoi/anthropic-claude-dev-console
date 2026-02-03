@@ -4,7 +4,7 @@ import { useChatStore } from '@/lib/store';
 import { ChevronDown, Cpu } from 'lucide-react';
 
 const AVAILABLE_MODELS = [
-  { value: '', label: 'Default', description: 'Use CLI default model' },
+  { value: 'opusplan', label: 'Opusplan', description: 'Most capable with planning' },
   { value: 'haiku', label: 'Haiku', description: 'Fast, economical' },
   { value: 'sonnet', label: 'Sonnet', description: 'Balanced performance' },
   { value: 'opus', label: 'Opus', description: 'Most capable' },
@@ -21,8 +21,8 @@ export function ModelSelector() {
       </label>
       <div className="relative">
         <select
-          value={preferredModel || ''}
-          onChange={(e) => setPreferredModel(e.target.value || null)}
+          value={preferredModel || 'opusplan'}
+          onChange={(e) => setPreferredModel(e.target.value)}
           disabled={isStreaming}
           className="w-full px-3 py-2 pr-8 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300 disabled:opacity-50 appearance-none cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
         >

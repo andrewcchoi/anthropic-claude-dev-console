@@ -68,7 +68,7 @@ export function useClaudeChat() {
             prompt,
             sessionId: currentSessionId,
             cwd,
-            model: preferredModel || undefined,
+            model: preferredModel || 'opusplan',
           }),
         });
 
