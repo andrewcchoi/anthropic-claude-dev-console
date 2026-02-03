@@ -65,6 +65,9 @@ interface ChatStore {
   setError: (error: string | null) => void;
   sidebarOpen: boolean;
   toggleSidebar: () => void;
+  rightPanelOpen: boolean;
+  toggleRightPanel: () => void;
+  setRightPanelOpen: (open: boolean) => void;
 
   // Usage tracking
   sessionUsage: UsageStats | null;
@@ -257,6 +260,9 @@ export const useChatStore = create<ChatStore>()(
       setError: (error) => set({ error }),
       sidebarOpen: true,
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+      rightPanelOpen: true,
+      toggleRightPanel: () => set((state) => ({ rightPanelOpen: !state.rightPanelOpen })),
+      setRightPanelOpen: (open) => set({ rightPanelOpen: open }),
 
       // Usage tracking
       sessionUsage: null,
