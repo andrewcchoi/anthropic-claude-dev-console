@@ -76,6 +76,7 @@ async function discoverSessions(quick: boolean = true): Promise<DiscoverResponse
             messageCount: entry.messageCount,
             modifiedAt: new Date(entry.modified).getTime(),
             createdAt: new Date(entry.created).getTime(),
+            gitBranch: entry.gitBranch || undefined,
           };
           sessions.push(session);
           if (session.modifiedAt > lastActivity) {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useChatStore } from '@/lib/store';
+import { formatRelativeTime } from '@/lib/utils/time';
 
 export function SessionList() {
   const [isClient, setIsClient] = useState(false);
@@ -54,13 +55,4 @@ export function SessionList() {
       ))}
     </div>
   );
-}
-
-function formatRelativeTime(timestamp: number): string {
-  const diff = Date.now() - timestamp;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
 }
