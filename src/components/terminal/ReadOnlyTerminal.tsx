@@ -73,6 +73,7 @@ export function ReadOnlyTerminal({
       if (!container || isOpened) return;
 
       const rect = container.getBoundingClientRect();
+
       if (rect.width > 0 && rect.height > 0) {
         // Container has dimensions, safe to open
         xterm.open(container);
@@ -126,7 +127,9 @@ export function ReadOnlyTerminal({
   // Effect 2: Content updates (runs when content changes)
   useEffect(() => {
     const xterm = xtermRef.current;
-    if (!xterm || !isInitialized) return;
+    if (!xterm || !isInitialized) {
+      return;
+    }
 
     // Incremental write: only write new content
     const newContent = content.slice(writtenLengthRef.current);
@@ -145,7 +148,7 @@ export function ReadOnlyTerminal({
         backgroundColor: terminalTheme.background
       }}
     >
-      <div ref={terminalRef} className="h-full" />
+      <div ref={terminalRef} className="h-full" style={{ minHeight: `${minHeight}px` }} />
     </div>
   );
 }

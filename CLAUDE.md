@@ -185,6 +185,23 @@ Execute per parallel_groups from C:
 - Zustand for client-side state management
 - CLI integration spawns `claude -p --verbose --output-format stream-json`
 
+#### Terminal Components
+Two distinct terminal components serve different purposes:
+
+| Component | Purpose | Reference As | Location |
+|-----------|---------|--------------|----------|
+| **ReadOnlyTerminal** | Display Bash tool output in chat messages | "Chat Output Terminal" or "ReadOnlyTerminal" | `src/components/terminal/ReadOnlyTerminal.tsx` |
+| **InteractiveTerminal** | Full interactive shell at `/terminal` page | "Standalone Terminal" or "InteractiveTerminal" | `src/components/terminal/InteractiveTerminal.tsx` |
+
+**Key Differences:**
+- ReadOnlyTerminal: Static content prop, no WebSocket, used in chat UI
+- InteractiveTerminal: WebSocket-connected PTY, bidirectional I/O, standalone page
+
+**When debugging:**
+- "Chat output not showing" → ReadOnlyTerminal issue
+- "/terminal page blank" or "WebSocket issues" → InteractiveTerminal issue
+- Always specify which component when reporting terminal bugs
+
 ### Learnings
 <!-- Updated during multi-agent execution -->
 
