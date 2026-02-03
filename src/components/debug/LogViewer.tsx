@@ -18,17 +18,17 @@ interface LogEntry {
 }
 
 const LOG_COLORS = {
-  debug: 'text-gray-500',
-  info: 'text-blue-400',
-  warn: 'text-yellow-400',
-  error: 'text-red-400',
+  debug: 'text-gray-400 dark:text-gray-500',
+  info: 'text-blue-600 dark:text-blue-400',
+  warn: 'text-yellow-600 dark:text-yellow-400',
+  error: 'text-red-600 dark:text-red-400',
 };
 
 const LOG_BG = {
-  debug: 'bg-gray-900/50',
-  info: 'bg-blue-900/20',
-  warn: 'bg-yellow-900/20',
-  error: 'bg-red-900/20',
+  debug: 'bg-gray-100 dark:bg-gray-900/50',
+  info: 'bg-blue-50 dark:bg-blue-900/20',
+  warn: 'bg-yellow-50 dark:bg-yellow-900/20',
+  error: 'bg-red-50 dark:bg-red-900/20',
 };
 
 export function LogViewer() {
@@ -104,11 +104,11 @@ export function LogViewer() {
 
   if (!debugEnabled) {
     return (
-      <div className="h-full flex items-center justify-center bg-gray-950 text-gray-500">
+      <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-950 text-gray-500 dark:text-gray-500">
         <div className="text-center">
           <p className="mb-2">Log viewer requires debug mode</p>
           <p className="text-sm">
-            Type <code className="text-green-400">enableDebug()</code> in the console
+            Type <code className="text-green-600 dark:text-green-400">enableDebug()</code> in the console
           </p>
         </div>
       </div>
@@ -116,23 +116,23 @@ export function LogViewer() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-950">
+    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950">
       {/* Header */}
-      <div className="flex-shrink-0 border-b border-gray-800 bg-gray-900/50 p-3">
+      <div className="flex-shrink-0 border-b border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900/50 p-3">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <h3 className="font-semibold text-gray-200">Log Viewer</h3>
+            <h3 className="font-semibold text-gray-800 dark:text-gray-200">Log Viewer</h3>
             <div className="flex items-center gap-2">
               <div
                 className={`w-2 h-2 rounded-full ${
                   connected ? 'bg-green-500' : 'bg-red-500'
                 }`}
               />
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-gray-500 dark:text-gray-500">
                 {connected ? 'Connected' : 'Disconnected'}
               </span>
             </div>
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-gray-500 dark:text-gray-500">
               {filteredLogs.length} / {logs.length} logs
             </span>
           </div>
@@ -142,7 +142,7 @@ export function LogViewer() {
             <select
               value={levelFilter}
               onChange={(e) => setLevelFilter(e.target.value)}
-              className="px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-gray-300"
+              className="px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded text-gray-700 dark:text-gray-300"
             >
               <option value="all">All Levels</option>
               <option value="debug">Debug</option>
@@ -157,7 +157,7 @@ export function LogViewer() {
               placeholder="Filter logs..."
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="px-2 py-1 text-xs bg-gray-800 border border-gray-700 rounded text-gray-300 placeholder-gray-500"
+              className="px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-500"
             />
 
             {/* Auto-scroll toggle */}
@@ -166,7 +166,7 @@ export function LogViewer() {
               className={`px-2 py-1 text-xs rounded ${
                 autoScroll
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300'
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
               }`}
             >
               Auto-scroll
@@ -175,7 +175,7 @@ export function LogViewer() {
             {/* Clear logs */}
             <button
               onClick={() => setLogs([])}
-              className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded"
+              className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded"
             >
               Clear
             </button>
@@ -186,36 +186,36 @@ export function LogViewer() {
       {/* Logs */}
       <div className="flex-1 overflow-auto p-2 space-y-1 font-mono text-xs">
         {filteredLogs.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-600">
+          <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-600">
             {logs.length === 0 ? 'No logs yet...' : 'No logs match filter'}
           </div>
         ) : (
           filteredLogs.map((log, index) => (
             <div
               key={index}
-              className={`p-2 rounded border border-gray-800 ${LOG_BG[log.level]}`}
+              className={`p-2 rounded border border-gray-300 dark:border-gray-800 ${LOG_BG[log.level]}`}
             >
               <div className="flex items-start gap-2">
-                <span className="text-gray-600">
+                <span className="text-gray-500 dark:text-gray-600">
                   {new Date(log.timestamp).toLocaleTimeString()}
                 </span>
                 <span className={`font-bold uppercase ${LOG_COLORS[log.level]}`}>
                   {log.level}
                 </span>
-                <span className="text-gray-400">[{log.module}]</span>
-                <span className="text-gray-200 flex-1">{log.message}</span>
+                <span className="text-gray-600 dark:text-gray-400">[{log.module}]</span>
+                <span className="text-gray-800 dark:text-gray-200 flex-1">{log.message}</span>
               </div>
               {log.correlationId && (
-                <div className="mt-1 text-gray-600">
+                <div className="mt-1 text-gray-500 dark:text-gray-600">
                   ID: {log.correlationId}
                 </div>
               )}
               {log.data !== undefined && (
                 <details className="mt-1">
-                  <summary className="cursor-pointer text-gray-500 hover:text-gray-400">
+                  <summary className="cursor-pointer text-gray-600 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-400">
                     Show data
                   </summary>
-                  <pre className="mt-1 text-gray-400 overflow-x-auto">
+                  <pre className="mt-1 text-gray-600 dark:text-gray-400 overflow-x-auto">
                     {JSON.stringify(log.data, null, 2)}
                   </pre>
                 </details>

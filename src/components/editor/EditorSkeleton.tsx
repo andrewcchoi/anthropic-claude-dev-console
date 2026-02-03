@@ -12,10 +12,10 @@ export function EditorSkeleton({ height = 200 }: EditorSkeletonProps) {
 
   return (
     <div
-      className="bg-gray-800 rounded animate-pulse flex items-center justify-center"
+      className="bg-gray-200 dark:bg-gray-800 rounded animate-pulse flex items-center justify-center"
       style={{ height: heightStyle }}
     >
-      <span className="text-gray-500 text-sm">Loading editor...</span>
+      <span className="text-gray-400 dark:text-gray-500 text-sm">Loading editor...</span>
     </div>
   );
 }

@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
-import { terminalTheme } from './TerminalTheme';
+import { terminalTheme, terminalLightTheme } from './TerminalTheme';
+import { useAppTheme } from '@/hooks/useAppTheme';
 import '@xterm/xterm/css/xterm.css';
 
 interface ReadOnlyTerminalProps {
@@ -24,6 +25,7 @@ export function ReadOnlyTerminal({
   minHeight = 100,
   maxHeight = 400
 }: ReadOnlyTerminalProps) {
+  const { resolvedTheme } = useAppTheme();
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -40,9 +42,12 @@ export function ReadOnlyTerminal({
   useEffect(() => {
     if (!terminalRef.current) return;
 
+    // Select theme based on resolved theme
+    const theme = resolvedTheme === 'light' ? terminalLightTheme : terminalTheme;
+
     // Initialize terminal
     const xterm = new XTerm({
-      theme: terminalTheme,
+      theme,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       fontSize: 12,
       lineHeight: 1.2,
@@ -122,7 +127,7 @@ export function ReadOnlyTerminal({
       setIsInitialized(false);
       writtenLengthRef.current = 0;
     };
-  }, []); // Empty deps: run once on mount
+  }, [resolvedTheme]); // Re-initialize when theme changes
 
   // Effect 2: Content updates (runs when content changes)
   useEffect(() => {
@@ -139,13 +144,15 @@ export function ReadOnlyTerminal({
     writtenLengthRef.current = content.length;
   }, [content, isInitialized]);
 
+  const theme = resolvedTheme === 'light' ? terminalLightTheme : terminalTheme;
+
   return (
     <div
-      className={`rounded border border-gray-600 overflow-hidden ${className}`}
+      className={`rounded border border-gray-300 dark:border-gray-600 overflow-hidden ${className}`}
       style={{
         minHeight: `${minHeight}px`,
         maxHeight: `${maxHeight}px`,
-        backgroundColor: terminalTheme.background
+        backgroundColor: theme.background
       }}
     >
       <div ref={terminalRef} className="h-full" style={{ minHeight: `${minHeight}px` }} />

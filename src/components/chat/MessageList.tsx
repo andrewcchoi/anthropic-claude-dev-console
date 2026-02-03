@@ -19,7 +19,7 @@ export function MessageList({ messages, isLoadingHistory }: MessageListProps) {
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
       {isLoadingHistory && (
-        <div className="flex h-full items-center justify-center text-gray-500">
+        <div className="flex h-full items-center justify-center text-gray-500 dark:text-gray-400">
           <div className="text-center">
             <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite] mb-2" />
             <p>Loading chat history...</p>
@@ -27,9 +27,9 @@ export function MessageList({ messages, isLoadingHistory }: MessageListProps) {
         </div>
       )}
       {!isLoadingHistory && messages.length === 0 && (
-        <div className="flex h-full items-center justify-center text-gray-500">
+        <div className="flex h-full items-center justify-center text-gray-500 dark:text-gray-400">
           <div className="text-center">
-            <h2 className="text-2xl font-semibold mb-2 text-gray-800">
+            <h2 className="text-2xl font-semibold mb-2 text-gray-800 dark:text-gray-200">
               Welcome to Claude Code UI
             </h2>
             <p>Start by asking a question or requesting assistance</p>
@@ -46,8 +46,8 @@ export function MessageList({ messages, isLoadingHistory }: MessageListProps) {
           <div
             className={`max-w-[80%] rounded-lg p-4 ${
               message.role === 'user'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-900'
+                ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
             }`}
           >
             <div className="text-xs font-semibold mb-2 uppercase opacity-70">

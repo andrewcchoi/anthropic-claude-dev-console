@@ -2,6 +2,7 @@
 
 import { useChatStore } from '@/lib/store';
 import { SessionList } from './SessionList';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 export function Sidebar() {
   const { sidebarOpen, toggleSidebar, startNewSession } = useChatStore();
@@ -14,7 +15,7 @@ export function Sidebar() {
     return (
       <button
         onClick={toggleSidebar}
-        className="fixed left-0 top-0 z-50 m-4 rounded-lg bg-blue-600 p-2 text-white hover:bg-blue-700"
+        className="fixed left-0 top-0 z-50 m-4 rounded-lg bg-blue-600 dark:bg-blue-500 p-2 text-white hover:bg-blue-700 dark:hover:bg-blue-600"
       >
         ☰
       </button>
@@ -22,36 +23,37 @@ export function Sidebar() {
   }
 
   return (
-    <div className="w-64 border-r border-gray-200 bg-gray-50 flex flex-col">
-      <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-        <h2 className="font-semibold text-gray-900">Claude Code UI</h2>
+    <div className="w-64 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex flex-col">
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+        <h2 className="font-semibold text-gray-900 dark:text-gray-100">Claude Code UI</h2>
         <button
           onClick={toggleSidebar}
-          className="text-gray-500 hover:text-gray-900"
+          className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
         >
           ✕
         </button>
       </div>
 
-      <div className="p-4">
+      <div className="p-4 space-y-2">
         <button
           onClick={handleNewChat}
-          className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          className="w-full rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600"
         >
           + New Chat
         </button>
+        <ThemeToggle />
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+        <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
           History
         </div>
         <SessionList />
       </div>
 
-      <div className="border-t border-gray-200 p-4 text-xs text-gray-500">
+      <div className="border-t border-gray-200 dark:border-gray-700 p-4 text-xs text-gray-500 dark:text-gray-400">
         <div>Working Directory:</div>
-        <div className="font-mono mt-1 truncate text-gray-700">/workspace</div>
+        <div className="font-mono mt-1 truncate text-gray-700 dark:text-gray-300">/workspace</div>
       </div>
     </div>
   );

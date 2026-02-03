@@ -9,7 +9,7 @@ export function UsageDisplay() {
 
   if (!sessionUsage) {
     return (
-      <div className="border-t border-gray-200 px-4 py-2 text-xs text-gray-500 font-mono">
+      <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-2 text-xs text-gray-500 dark:text-gray-400 font-mono">
         No usage data yet
       </div>
     );
@@ -37,31 +37,31 @@ export function UsageDisplay() {
   const totalTokens = sessionUsage.inputTokens + sessionUsage.outputTokens;
 
   return (
-    <div className="border-t border-gray-200 bg-gray-50">
+    <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full px-4 py-2 text-xs font-mono text-left hover:bg-gray-100 transition-colors"
+        className="w-full px-4 py-2 text-xs font-mono text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <span className="text-gray-700 font-semibold">
+            <span className="text-gray-700 dark:text-gray-300 font-semibold">
               {formatCost(sessionUsage.totalCost)}
             </span>
-            <span className="text-gray-600">
+            <span className="text-gray-600 dark:text-gray-400">
               {formatTokens(totalTokens)} tokens
             </span>
-            <span className="text-gray-500">
+            <span className="text-gray-500 dark:text-gray-400">
               {sessionUsage.requestCount} {sessionUsage.requestCount === 1 ? 'request' : 'requests'}
             </span>
           </div>
-          <span className="text-gray-400 text-[10px]">
+          <span className="text-gray-400 dark:text-gray-500 text-[10px]">
             {expanded ? '▼' : '▶'} {expanded ? 'Hide' : 'Show'} details
           </span>
         </div>
       </button>
 
       {expanded && (
-        <div className="px-4 pb-3 pt-1 text-xs font-mono space-y-1 text-gray-600 border-t border-gray-200 bg-white">
+        <div className="px-4 pb-3 pt-1 text-xs font-mono space-y-1 text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
           <div className="flex justify-between">
             <span>Input tokens:</span>
             <span>{formatTokens(sessionUsage.inputTokens)}</span>
@@ -74,7 +74,7 @@ export function UsageDisplay() {
             <span>Total duration:</span>
             <span>{formatDuration(sessionUsage.durationMs)}</span>
           </div>
-          <div className="flex justify-between pt-1 border-t border-gray-100 font-semibold">
+          <div className="flex justify-between pt-1 border-t border-gray-100 dark:border-gray-800 font-semibold">
             <span>Total cost:</span>
             <span>{formatCost(sessionUsage.totalCost)}</span>
           </div>

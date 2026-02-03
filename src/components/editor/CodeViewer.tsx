@@ -12,6 +12,7 @@ import {
   getFileSizeDisplay,
 } from '@/lib/utils/fileUtils';
 import type { EditorTheme } from './MonacoViewer';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 // Dynamically import Monaco to avoid SSR issues and reduce initial bundle size
 const MonacoViewer = dynamic(
@@ -43,8 +44,13 @@ interface CodeViewerProps {
  * Placeholder component for binary files
  */
 function BinaryFilePlaceholder({ filePath }: { filePath?: string }) {
+  const { resolvedTheme } = useAppTheme();
+  const isDark = resolvedTheme !== 'light';
+
   return (
-    <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-400 p-8">
+    <div className={`w-full h-full flex items-center justify-center p-8 ${
+      isDark ? 'bg-gray-800 text-gray-400' : 'bg-gray-100 text-gray-600'
+    }`}>
       <div className="text-center">
         <div className="text-4xl mb-4">📦</div>
         <div className="text-lg font-semibold mb-2">Binary File</div>
@@ -69,8 +75,13 @@ function LargeFileWarning({
   size: string;
   onShowAnyway: () => void;
 }) {
+  const { resolvedTheme } = useAppTheme();
+  const isDark = resolvedTheme !== 'light';
+
   return (
-    <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-300 p-8">
+    <div className={`w-full h-full flex items-center justify-center p-8 ${
+      isDark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-700'
+    }`}>
       <div className="text-center max-w-md">
         <div className="text-4xl mb-4">⚠️</div>
         <div className="text-lg font-semibold mb-2">Large File</div>
@@ -109,6 +120,7 @@ export function CodeViewer({
   const [showLargeFile, setShowLargeFile] = useState(false);
   const [monacoFailed, setMonacoFailed] = useState(false);
   const failureCountRef = useRef(0);
+  const { resolvedTheme } = useAppTheme();
 
   // Check for binary content and large files
   const isBinary = isBinaryExtension(filePath) || isBinaryContent(content);
@@ -140,12 +152,19 @@ export function CodeViewer({
 
   // If Monaco has failed repeatedly, show plain text fallback
   if (monacoFailed) {
+    const isDark = resolvedTheme !== 'light';
     return (
       <div className="w-full h-full flex flex-col">
-        <div className="bg-amber-500/10 border-b border-amber-500/20 text-amber-200 px-3 py-2 text-sm">
+        <div className={`border-b px-3 py-2 text-sm ${
+          isDark
+            ? 'bg-amber-500/10 border-amber-500/20 text-amber-200'
+            : 'bg-amber-50 border-amber-200 text-amber-900'
+        }`}>
           Editor unavailable. Showing plain text.
         </div>
-        <pre className="flex-1 overflow-auto bg-gray-800 text-gray-200 p-4 text-sm font-mono">
+        <pre className={`flex-1 overflow-auto p-4 text-sm font-mono ${
+          isDark ? 'bg-gray-800 text-gray-200' : 'bg-white text-gray-800'
+        }`}>
           {content}
         </pre>
       </div>

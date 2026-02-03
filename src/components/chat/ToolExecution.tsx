@@ -110,34 +110,34 @@ export function ToolExecution({
 
   return (
     <div
-      className={`mt-2 rounded border-l-4 ${getBorderColor()} border border-gray-300 bg-gray-50 overflow-hidden`}
+      className={`mt-2 rounded border-l-4 ${getBorderColor()} border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 overflow-hidden`}
     >
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full px-3 py-2 flex items-center justify-between hover:bg-gray-100 transition-colors"
+        className="w-full px-3 py-2 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
       >
         <div className="flex items-center gap-2">
           {getStatusIcon()}
-          <span className="font-mono text-sm font-semibold">{name}</span>
+          <span className="font-mono text-sm font-semibold text-gray-900 dark:text-gray-100">{name}</span>
         </div>
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-gray-500 dark:text-gray-400">
           {expanded ? '▼' : '▶'}
         </span>
       </button>
       {expanded && (
-        <div className="border-t px-3 py-2 space-y-2">
+        <div className="border-t border-gray-300 dark:border-gray-600 px-3 py-2 space-y-2">
           <div>
-            <div className="text-xs font-semibold text-gray-600 mb-1">
+            <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
               Input:
             </div>
-            <pre className="text-xs bg-white p-2 rounded overflow-x-auto border border-gray-200">
+            <pre className="text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-2 rounded overflow-x-auto border border-gray-200 dark:border-gray-700">
               {JSON.stringify(input, null, 2)}
             </pre>
           </div>
           {output && (
             <div>
               <div className="flex items-center justify-between mb-1">
-                <div className="text-xs font-semibold text-gray-600">
+                <div className="text-xs font-semibold text-gray-600 dark:text-gray-400">
                   Output:
                 </div>
                 {isBashTool && bashOutput && status === 'success' && (
@@ -147,7 +147,7 @@ export function ToolExecution({
                       className={`px-2 py-1 text-xs rounded transition-colors ${
                         viewMode === 'readonly'
                           ? 'bg-blue-500 text-white'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                       }`}
                     >
                       Output
@@ -157,7 +157,7 @@ export function ToolExecution({
                       className={`px-2 py-1 text-xs rounded transition-colors ${
                         viewMode === 'interactive'
                           ? 'bg-blue-500 text-white'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                       }`}
                     >
                       Interactive ▶
@@ -179,10 +179,10 @@ export function ToolExecution({
                   filePath={(input as ToolInput)?.file_path as string}
                   height={Math.min(400, output.split('\n').length * 19 + 16)}
                   showHeader={true}
-                  theme="dark"
+                  theme="auto"
                 />
               ) : (
-                <pre className="text-xs bg-white p-2 rounded overflow-x-auto border border-gray-200">
+                <pre className="text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-2 rounded overflow-x-auto border border-gray-200 dark:border-gray-700">
                   {typeof output === 'string'
                     ? output
                     : output instanceof Error

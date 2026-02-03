@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { DebugProvider } from '@/components/providers/DebugProvider';
 import { ErrorBoundary } from '@/components/error/ErrorBoundary';
+import { ThemeProvider } from '@/components/providers/ThemeProvider';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -62,9 +63,11 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: monacoErrorSuppressorScript }} />
       </head>
       <body className={inter.className}>
-        <DebugProvider>
-          <ErrorBoundary>{children}</ErrorBoundary>
-        </DebugProvider>
+        <ThemeProvider>
+          <DebugProvider>
+            <ErrorBoundary>{children}</ErrorBoundary>
+          </DebugProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

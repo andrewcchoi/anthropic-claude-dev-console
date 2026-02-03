@@ -3,6 +3,7 @@
 import Editor, { loader, useMonaco } from '@monaco-editor/react';
 import { useEffect, useState, useRef } from 'react';
 import { editorDarkTheme, editorLightTheme } from './editorTheme';
+import { useAppTheme } from '@/hooks/useAppTheme';
 
 // Use self-hosted Monaco to avoid tracking prevention warnings
 loader.config({
@@ -23,31 +24,6 @@ interface MonacoViewerProps {
   theme?: EditorTheme;
 }
 
-/**
- * Hook to detect system theme preference
- */
-function useSystemTheme(): 'light' | 'dark' {
-  const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>(() => {
-    if (typeof window !== 'undefined') {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    return 'dark';
-  });
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = (e: MediaQueryListEvent) => {
-      setSystemTheme(e.matches ? 'dark' : 'light');
-    };
-
-    mediaQuery.addEventListener('change', handler);
-    return () => mediaQuery.removeEventListener('change', handler);
-  }, []);
-
-  return systemTheme;
-}
 
 /**
  * Monaco Editor viewer component (read-only)
@@ -66,10 +42,17 @@ export function MonacoViewer({
   const editorRef = useRef<any>(null);
   const [copied, setCopied] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
-  const systemTheme = useSystemTheme();
+  const { resolvedTheme } = useAppTheme();
 
-  const effectiveTheme = theme === 'auto' ? systemTheme : theme;
+  const effectiveTheme = theme === 'auto' ? (resolvedTheme || 'dark') : theme;
   const monacoThemeName = effectiveTheme === 'light' ? 'claude-light' : 'claude-dark';
+
+  // Explicitly update Monaco theme when it changes (required for already-mounted editors)
+  useEffect(() => {
+    if (monaco) {
+      monaco.editor.setTheme(monacoThemeName);
+    }
+  }, [monaco, monacoThemeName]);
 
   const handleCopy = async () => {
     try {
@@ -104,7 +87,7 @@ export function MonacoViewer({
 
   if (initError) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-gray-800 text-amber-200 p-4">
+      <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 text-amber-700 dark:text-amber-200 p-4">
         <span>Editor initialization failed: {initError}</span>
       </div>
     );

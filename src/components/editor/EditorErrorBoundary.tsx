@@ -51,16 +51,16 @@ export class EditorErrorBoundary extends React.Component<
       const errorMessage = this.state.error ? serializeError(this.state.error) : 'Unknown error';
       return (
         <div className="w-full h-full flex flex-col">
-          <div className="bg-amber-500/10 border border-amber-500/20 text-amber-200 px-3 py-2 text-sm flex items-center justify-between">
+          <div className="bg-amber-100 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/20 text-amber-800 dark:text-amber-200 px-3 py-2 text-sm flex items-center justify-between">
             <span>⚠️ Editor failed to load: {errorMessage}</span>
             <button
               onClick={this.handleRetry}
-              className="px-2 py-1 text-xs bg-amber-500/20 hover:bg-amber-500/30 rounded transition-colors"
+              className="px-2 py-1 text-xs bg-amber-200 dark:bg-amber-500/20 hover:bg-amber-300 dark:hover:bg-amber-500/30 rounded transition-colors"
             >
               Retry
             </button>
           </div>
-          <pre className="flex-1 overflow-auto bg-gray-800 text-gray-200 p-4 text-sm font-mono">
+          <pre className="flex-1 overflow-auto bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 p-4 text-sm font-mono">
             {this.props.content}
           </pre>
         </div>
