@@ -3,19 +3,31 @@
 import React, { useEffect, useState } from 'react';
 import { X, ExternalLink, Copy } from 'lucide-react';
 import { useChatStore } from '@/lib/store';
-import { CodeViewer } from '@/components/editor/CodeViewer';
+import { MonacoViewer } from '@/components/editor/MonacoViewer';
+import { SelectionToolbar } from '@/components/editor/SelectionToolbar';
+import { useEditorSelection } from '@/hooks/useEditorSelection';
 import { Button } from '@/components/ui/button';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('FilePreviewPane');
 
 export function FilePreviewPane() {
-  const { selectedFile, setPreviewOpen, trackFileActivity, setPendingInputText } = useChatStore();
+  const { selectedFile, setPreviewOpen, trackFileActivity } = useChatStore();
   const [content, setContent] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isBinary, setIsBinary] = useState(false);
   const [isTooLarge, setIsTooLarge] = useState(false);
+
+  const {
+    selection,
+    toolbarPosition,
+    insertReference,
+    copyReference,
+    searchCodebase,
+    updateSelection,
+    clearSelection,
+  } = useEditorSelection();
 
   useEffect(() => {
     if (!selectedFile) return;
@@ -64,27 +76,51 @@ export function FilePreviewPane() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Escape to close
-      if (e.key === 'Escape') {
+      // Escape to close preview pane (but not selection toolbar - it handles its own Escape)
+      if (e.key === 'Escape' && !toolbarPosition) {
         setPreviewOpen(false);
-      }
-      // Ctrl/Cmd+Enter to insert reference
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        handleInsertReference();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedFile, setPreviewOpen]);
+  }, [toolbarPosition, setPreviewOpen]);
 
-  const handleInsertReference = () => {
+  // Clear selection when file changes
+  useEffect(() => {
+    clearSelection();
+  }, [selectedFile, clearSelection]);
+
+  // Monaco editor callbacks
+  const handleInsertReference = (text: string, startLine: number, endLine: number) => {
     if (!selectedFile) return;
+    const sel = { text, startLine, endLine, filePath: selectedFile };
+    insertReference(sel);
+  };
 
-    // Set pending input text that will be inserted into chat
-    const reference = `@${selectedFile}`;
-    setPendingInputText(reference);
+  const handleCopyReference = (text: string, startLine: number, endLine: number) => {
+    if (!selectedFile) return;
+    const sel = { text, startLine, endLine, filePath: selectedFile };
+    copyReference(sel);
+  };
+
+  const handleSearchCodebase = (text: string) => {
+    if (!selectedFile) return;
+    const sel = { text, startLine: 1, endLine: 1, filePath: selectedFile };
+    searchCodebase(sel);
+  };
+
+  const handleSelectionChange = (
+    text: string,
+    startLine: number,
+    endLine: number,
+    position: { x: number; y: number }
+  ) => {
+    if (!selectedFile) return;
+    updateSelection(
+      { text, startLine, endLine, filePath: selectedFile },
+      position
+    );
   };
 
   const handleOpenInNewTab = () => {
@@ -122,15 +158,6 @@ export function FilePreviewPane() {
           variant="outline"
           size="sm"
           className="flex items-center gap-1"
-          onClick={handleInsertReference}
-        >
-          <Copy className="w-3 h-3" />
-          Insert Reference
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="flex items-center gap-1"
           onClick={handleOpenInNewTab}
         >
           <ExternalLink className="w-3 h-3" />
@@ -159,13 +186,31 @@ export function FilePreviewPane() {
             )}
           </div>
         ) : (
-          <CodeViewer
+          <MonacoViewer
             content={content}
             language={getLanguageFromFilename(fileName)}
             height="100%"
+            filePath={selectedFile}
+            onInsertReference={handleInsertReference}
+            onCopyReference={handleCopyReference}
+            onSearchCodebase={handleSearchCodebase}
+            onSelectionChange={handleSelectionChange}
+            theme="auto"
           />
         )}
       </div>
+
+      {/* Selection Toolbar */}
+      {selection && toolbarPosition && (
+        <SelectionToolbar
+          position={toolbarPosition}
+          selection={selection}
+          onInsert={insertReference}
+          onCopy={copyReference}
+          onSearch={searchCodebase}
+          onClose={clearSelection}
+        />
+      )}
     </div>
   );
 }

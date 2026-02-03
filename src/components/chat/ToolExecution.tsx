@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { CodeViewer } from '@/components/editor';
+import { SelectionToolbar } from '@/components/editor/SelectionToolbar';
+import { useEditorSelection } from '@/hooks/useEditorSelection';
 import { serializeError } from '@/lib/utils/errorUtils';
 
 const Terminal = dynamic(
@@ -42,6 +44,53 @@ export function ToolExecution({
 }: ToolExecutionProps) {
   const [expanded, setExpanded] = useState(false);
   const [viewMode, setViewMode] = useState<'readonly' | 'interactive'>('readonly');
+
+  // Get file path for selection context
+  const filePath = (input as ToolInput)?.file_path as string | undefined;
+
+  // Use selection hook
+  const {
+    selection,
+    toolbarPosition,
+    insertReference,
+    copyReference,
+    searchCodebase,
+    updateSelection,
+    clearSelection,
+  } = useEditorSelection();
+
+  // Clear selection when panel is collapsed
+  useEffect(() => {
+    if (!expanded) {
+      clearSelection();
+    }
+  }, [expanded, clearSelection]);
+
+  // Callbacks for CodeViewer selection
+  const handleInsertReference = (text: string, startLine: number, endLine: number) => {
+    if (!filePath) return;
+    insertReference({ text, startLine, endLine, filePath });
+  };
+
+  const handleCopyReference = (text: string, startLine: number, endLine: number) => {
+    if (!filePath) return;
+    copyReference({ text, startLine, endLine, filePath });
+  };
+
+  const handleSearchCodebase = (text: string) => {
+    if (!filePath) return;
+    searchCodebase({ text, startLine: 1, endLine: 1, filePath });
+  };
+
+  const handleSelectionChange = (
+    text: string,
+    startLine: number,
+    endLine: number,
+    position: { x: number; y: number }
+  ) => {
+    if (!filePath) return;
+    updateSelection({ text, startLine, endLine, filePath }, position);
+  };
 
   // Helper function to extract bash output from various formats
   const getBashOutput = (output: ToolOutput | ToolOutput[] | string | undefined): string | null => {
@@ -180,6 +229,10 @@ export function ToolExecution({
                   height={Math.min(400, output.split('\n').length * 19 + 16)}
                   showHeader={true}
                   theme="auto"
+                  onInsertReference={handleInsertReference}
+                  onCopyReference={handleCopyReference}
+                  onSearchCodebase={handleSearchCodebase}
+                  onSelectionChange={handleSelectionChange}
                 />
               ) : (
                 <pre className="text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-2 rounded overflow-x-auto border border-gray-200 dark:border-gray-700">
@@ -193,6 +246,17 @@ export function ToolExecution({
             </div>
           )}
         </div>
+      )}
+      {/* Render toolbar when selection active */}
+      {selection && toolbarPosition && (
+        <SelectionToolbar
+          position={toolbarPosition}
+          selection={selection}
+          onInsert={insertReference}
+          onCopy={copyReference}
+          onSearch={searchCodebase}
+          onClose={clearSelection}
+        />
       )}
     </div>
   );

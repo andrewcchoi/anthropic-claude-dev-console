@@ -18,7 +18,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { attachments, addFiles, removeAttachment, clearAttachments } = useFileUpload();
-  const { pendingInputText, setPendingInputText } = useChatStore();
+  const { pendingInputText, setPendingInputText, searchQuery, setSearchQuery } = useChatStore();
 
   // Handle pending input text from file reference insertion
   useEffect(() => {
@@ -34,6 +34,16 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
       }, 0);
     }
   }, [pendingInputText, setPendingInputText]);
+
+  // Handle search query from code selection
+  useEffect(() => {
+    if (searchQuery) {
+      const searchMessage = `Search the codebase for: \`${searchQuery}\``;
+      setSearchQuery(null);
+      // Auto-send the search query
+      onSend(searchMessage);
+    }
+  }, [searchQuery, setSearchQuery, onSend]);
 
   const handleSend = () => {
     if (input.trim() && !disabled) {
