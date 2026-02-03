@@ -92,6 +92,8 @@ export interface UsageStats {
 
 export type Provider = 'anthropic' | 'bedrock' | 'vertex' | 'foundry';
 
+export type DefaultMode = 'default' | 'acceptEdits' | 'plan' | 'dontAsk' | 'bypassPermissions';
+
 export interface ProviderConfig {
   // API Keys
   anthropicApiKey?: string;

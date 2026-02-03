@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ChatMessage, Session, ToolExecution, UsageStats, Provider, ProviderConfig } from '@/types/claude';
+import { ChatMessage, Session, ToolExecution, UsageStats, Provider, ProviderConfig, DefaultMode } from '@/types/claude';
 import { v4 as uuidv4 } from 'uuid';
 import { createLogger } from '../logger';
 
@@ -45,6 +45,10 @@ interface ChatStore {
   providerConfig: ProviderConfig;
   setProvider: (provider: Provider) => void;
   setProviderConfig: (config: Partial<ProviderConfig>) => void;
+
+  // Default mode selection
+  defaultMode: DefaultMode;
+  setDefaultMode: (mode: DefaultMode) => void;
 
   // Tool executions
   toolExecutions: ToolExecution[];
@@ -300,6 +304,10 @@ export const useChatStore = create<ChatStore>()(
       setProviderConfig: (config) => set((state) => ({
         providerConfig: { ...state.providerConfig, ...config }
       })),
+
+      // Default mode selection
+      defaultMode: 'plan',
+      setDefaultMode: (mode) => set({ defaultMode: mode }),
     }),
     {
       name: 'claude-code-sessions',
@@ -310,6 +318,7 @@ export const useChatStore = create<ChatStore>()(
         preferredModel: state.preferredModel,
         provider: state.provider,
         providerConfig: state.providerConfig,
+        defaultMode: state.defaultMode,
       }),
     }
   )

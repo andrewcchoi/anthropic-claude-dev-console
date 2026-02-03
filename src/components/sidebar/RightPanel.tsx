@@ -5,6 +5,7 @@ import { Settings, X } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { ModelSelector } from '@/components/ui/ModelSelector';
 import { ProviderSelector } from '@/components/ui/ProviderSelector';
+import { DefaultModeSelector } from '@/components/ui/DefaultModeSelector';
 
 export function RightPanel() {
   const { rightPanelOpen, toggleRightPanel } = useChatStore();
@@ -48,6 +49,7 @@ export function RightPanel() {
           <ThemeToggle />
           <ProviderSelector />
           <ModelSelector />
+          <DefaultModeSelector />
         </div>
       </div>
     </div>
