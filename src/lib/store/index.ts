@@ -34,6 +34,15 @@ interface ChatStore {
   deleteSession: (sessionId: string) => void;
   saveCurrentSession: () => void;
 
+  // Session cache for preserving messages when switching
+  sessionCache: Map<string, {
+    messages: ChatMessage[];
+    toolExecutions: ToolExecution[];
+    timestamp: number;
+  }>;
+  cacheCurrentSession: () => void;
+  getCachedSession: (id: string) => { messages: ChatMessage[]; toolExecutions: ToolExecution[] } | null;
+
   // Model selection
   currentModel: string | null;
   setCurrentModel: (model: string | null) => void;
@@ -123,6 +132,11 @@ export const useChatStore = create<ChatStore>()(
         set((state) => ({ sessions: [...state.sessions, session] })),
 
       startNewSession: () => {
+        const currentId = get().sessionId;
+        if (currentId) {
+          get().cacheCurrentSession();
+        }
+
         const newSessionId = uuidv4();
         log.debug('Starting new session', { id: newSessionId });
         set({
@@ -140,7 +154,35 @@ export const useChatStore = create<ChatStore>()(
         const currentId = get().sessionId;
         const localSession = get().sessions.find((s) => s.id === id);
 
+        // Cache current session before switching
+        if (currentId && currentId !== id) {
+          get().cacheCurrentSession();
+        }
+
         log.debug('Switching session', { from: currentId, to: id, projectId, hasLocal: !!localSession });
+
+        // Check cache first
+        const cached = get().getCachedSession(id);
+        if (cached) {
+          log.debug('Restored session from cache', { id, messages: cached.messages.length });
+          const session = localSession || {
+            id,
+            name: 'Cached Session',
+            created_at: Date.now(),
+            updated_at: Date.now(),
+            cwd: '/workspace',
+          };
+          set({
+            sessionId: id,
+            currentSession: session,
+            messages: cached.messages,
+            toolExecutions: cached.toolExecutions,
+            sessionUsage: null,
+            isLoadingHistory: false,
+          });
+          return;
+        }
+
         set({ isLoadingHistory: true });
 
         try {
@@ -363,6 +405,35 @@ export const useChatStore = create<ChatStore>()(
       // Default mode selection
       defaultMode: 'plan',
       setDefaultMode: (mode) => set({ defaultMode: mode }),
+
+      // Session cache
+      sessionCache: new Map(),
+
+      cacheCurrentSession: () => {
+        const { sessionId, messages, toolExecutions, sessionCache } = get();
+        if (!sessionId || messages.length === 0) return;
+
+        const newCache = new Map(sessionCache);
+        newCache.set(sessionId, {
+          messages,
+          toolExecutions,
+          timestamp: Date.now(),
+        });
+
+        // LRU: Keep max 5 sessions
+        if (newCache.size > 5) {
+          const oldest = [...newCache.entries()]
+            .sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
+          newCache.delete(oldest[0]);
+        }
+
+        set({ sessionCache: newCache });
+      },
+
+      getCachedSession: (id) => {
+        const cached = get().sessionCache.get(id);
+        return cached ? { messages: cached.messages, toolExecutions: cached.toolExecutions } : null;
+      },
 
       // File browser
       expandedFolders: new Set<string>(),

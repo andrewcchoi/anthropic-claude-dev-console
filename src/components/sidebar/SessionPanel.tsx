@@ -7,11 +7,12 @@ import { SessionSearch } from './SessionSearch';
 import { RefreshButton } from './RefreshButton';
 import { ProjectList } from './ProjectList';
 import { CurrentSessionItem } from './CurrentSessionItem';
+import { UISessionItem } from './UISessionItem';
 
 const STALE_THRESHOLD = 60000; // 60 seconds
 
 export function SessionPanel() {
-  const { startNewSession } = useChatStore();
+  const { startNewSession, sessions: uiSessions, sessionId } = useChatStore();
   const { discoverSessions, lastDiscoveryTime, isDiscovering, projects } = useSessionDiscoveryStore();
 
   useEffect(() => {
@@ -44,6 +45,23 @@ export function SessionPanel() {
       <div className="flex-1 overflow-y-auto p-4">
         {/* Current Session section */}
         <CurrentSessionItem />
+
+        {/* UI Sessions section - only if there are multiple */}
+        {uiSessions.length > 1 && (
+          <div className="mt-4">
+            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+              Recent Chats
+            </div>
+            <div className="space-y-1">
+              {uiSessions
+                .filter(s => s.id !== sessionId) // Exclude current (shown in CurrentSessionItem)
+                .slice(0, 5) // Limit to 5
+                .map(session => (
+                  <UISessionItem key={session.id} session={session} />
+                ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex items-center justify-between mb-3 mt-4">
           <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
