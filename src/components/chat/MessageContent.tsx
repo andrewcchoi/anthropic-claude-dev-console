@@ -2,6 +2,7 @@
 
 import { MessageContent as MessageContentType } from '@/types/claude';
 import { ToolExecution } from './ToolExecution';
+import { ImageThumbnail } from './ImageThumbnail';
 import { useChatStore } from '@/lib/store';
 
 interface MessageContentProps {
@@ -19,6 +20,14 @@ export function MessageContent({ content }: MessageContentProps) {
             <div key={index} className="whitespace-pre-wrap">
               {block.text}
             </div>
+          );
+        } else if (block.type === 'image' && block.source) {
+          return (
+            <ImageThumbnail
+              key={index}
+              path={block.source.path}
+              originalName={block.source.originalName}
+            />
           );
         } else if (block.type === 'tool_use') {
           // Look up actual tool execution data from store

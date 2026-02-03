@@ -97,3 +97,6 @@ next-env.d.ts
 
 # Self-hosted Monaco Editor (copied from node_modules)
 public/monaco-editor/
+
+# File uploads
+.claude-uploads/
