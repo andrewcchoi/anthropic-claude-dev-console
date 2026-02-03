@@ -51,12 +51,15 @@ export function useClaudeChat() {
       setError(null);
 
       try {
-        // Get fresh sessionId and preferredModel from store to avoid stale closure
+        // Get fresh sessionId, preferredModel, provider, and providerConfig from store to avoid stale closure
         const currentSessionId = useChatStore.getState().sessionId;
         const preferredModel = useChatStore.getState().preferredModel;
+        const provider = useChatStore.getState().provider;
+        const providerConfig = useChatStore.getState().providerConfig;
         log.debug('Sending message', {
           sessionId: currentSessionId,
           model: preferredModel,
+          provider,
           contentLength: prompt.length
         });
 
@@ -69,6 +72,8 @@ export function useClaudeChat() {
             sessionId: currentSessionId,
             cwd,
             model: preferredModel || 'opusplan',
+            provider,
+            providerConfig,
           }),
         });
 

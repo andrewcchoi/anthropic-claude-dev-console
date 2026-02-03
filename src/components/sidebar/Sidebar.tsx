@@ -4,6 +4,7 @@ import { useChatStore } from '@/lib/store';
 import { SessionList } from './SessionList';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { ModelSelector } from '@/components/ui/ModelSelector';
+import { ProviderSelector } from '@/components/ui/ProviderSelector';
 
 export function Sidebar() {
   const { sidebarOpen, toggleSidebar, startNewSession, currentModel } = useChatStore();
@@ -43,6 +44,10 @@ export function Sidebar() {
           + New Chat
         </button>
         <ThemeToggle />
+      </div>
+
+      <div className="border-t border-gray-200 dark:border-gray-700">
+        <ProviderSelector />
       </div>
 
       <div className="border-t border-gray-200 dark:border-gray-700">

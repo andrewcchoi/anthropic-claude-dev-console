@@ -17,12 +17,13 @@ const TELEMETRY_LOG = '/workspace/logs/telemetry.jsonl';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { prompt, sessionId, cwd, model } = body;
+    const { prompt, sessionId, cwd, model, provider, providerConfig } = body;
 
     log.debug('Received chat request', {
       sessionId,
       cwd,
       model,
+      provider,
       promptLength: prompt.length
     });
 
@@ -66,15 +67,58 @@ export async function POST(req: NextRequest) {
             args.push('--model', model);
           }
 
+          // Build environment based on provider (with API key authentication)
+          const env = { ...process.env };
+
+          if (provider === 'anthropic') {
+            // Anthropic direct API
+            if (providerConfig?.anthropicApiKey) {
+              env.ANTHROPIC_API_KEY = providerConfig.anthropicApiKey;
+            }
+          } else if (provider === 'bedrock') {
+            // AWS Bedrock
+            env.CLAUDE_CODE_USE_BEDROCK = '1';
+            if (providerConfig?.awsAccessKeyId) {
+              env.AWS_ACCESS_KEY_ID = providerConfig.awsAccessKeyId;
+            }
+            if (providerConfig?.awsSecretAccessKey) {
+              env.AWS_SECRET_ACCESS_KEY = providerConfig.awsSecretAccessKey;
+            }
+            if (providerConfig?.awsRegion) {
+              env.AWS_REGION = providerConfig.awsRegion;
+            }
+          } else if (provider === 'vertex') {
+            // Google Vertex AI (uses gcloud auth, not API key)
+            env.CLAUDE_CODE_USE_VERTEX = '1';
+            if (providerConfig?.vertexRegion) {
+              env.CLOUD_ML_REGION = providerConfig.vertexRegion;
+            }
+            if (providerConfig?.vertexProjectId) {
+              env.ANTHROPIC_VERTEX_PROJECT_ID = providerConfig.vertexProjectId;
+            }
+          } else if (provider === 'foundry') {
+            // Azure Foundry
+            env.CLAUDE_CODE_USE_FOUNDRY = '1';
+            if (providerConfig?.foundryApiKey) {
+              env.ANTHROPIC_FOUNDRY_API_KEY = providerConfig.foundryApiKey;
+            }
+            if (providerConfig?.foundryResource) {
+              env.ANTHROPIC_FOUNDRY_RESOURCE = providerConfig.foundryResource;
+            }
+          }
+
           // Spawn Claude CLI process
           log.debug('Spawning Claude CLI', {
             args,
-            cwd: cwd || '/workspace'
+            cwd: cwd || '/workspace',
+            provider,
+            hasCustomEnv: provider !== 'anthropic'
           });
 
           const claude = spawn('claude', args, {
             cwd: cwd || '/workspace',
             stdio: ['pipe', 'pipe', 'pipe'],
+            env,
           });
 
           let stderrBuffer = '';

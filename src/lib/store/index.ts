@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ChatMessage, Session, ToolExecution, UsageStats } from '@/types/claude';
+import { ChatMessage, Session, ToolExecution, UsageStats, Provider, ProviderConfig } from '@/types/claude';
 import { v4 as uuidv4 } from 'uuid';
 import { createLogger } from '../logger';
 
@@ -39,6 +39,12 @@ interface ChatStore {
   setCurrentModel: (model: string | null) => void;
   preferredModel: string | null;
   setPreferredModel: (model: string | null) => void;
+
+  // Provider selection
+  provider: Provider;
+  providerConfig: ProviderConfig;
+  setProvider: (provider: Provider) => void;
+  setProviderConfig: (config: Partial<ProviderConfig>) => void;
 
   // Tool executions
   toolExecutions: ToolExecution[];
@@ -280,6 +286,14 @@ export const useChatStore = create<ChatStore>()(
       setCurrentModel: (model) => set({ currentModel: model }),
       preferredModel: null,
       setPreferredModel: (model) => set({ preferredModel: model }),
+
+      // Provider selection
+      provider: 'anthropic',
+      providerConfig: {},
+      setProvider: (provider) => set({ provider }),
+      setProviderConfig: (config) => set((state) => ({
+        providerConfig: { ...state.providerConfig, ...config }
+      })),
     }),
     {
       name: 'claude-code-sessions',
@@ -288,6 +302,8 @@ export const useChatStore = create<ChatStore>()(
         // sessionId: state.sessionId, // Don't persist - prevents conflicts
         currentSession: state.currentSession,
         preferredModel: state.preferredModel,
+        provider: state.provider,
+        providerConfig: state.providerConfig,
       }),
     }
   )
