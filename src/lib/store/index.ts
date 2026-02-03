@@ -29,7 +29,7 @@ interface ChatStore {
   setCurrentSession: (session: Session | null) => void;
   addSession: (session: Session) => void;
   startNewSession: () => void;
-  switchSession: (sessionId: string) => Promise<void>;
+  switchSession: (sessionId: string, projectId?: string) => Promise<void>;
   updateSessionName: (sessionId: string, name: string) => void;
   deleteSession: (sessionId: string) => void;
   saveCurrentSession: () => void;
@@ -136,25 +136,38 @@ export const useChatStore = create<ChatStore>()(
         });
       },
 
-      switchSession: async (id) => {
+      switchSession: async (id, projectId) => {
         const currentId = get().sessionId;
         const session = get().sessions.find((s) => s.id === id);
         if (session) {
-          log.debug('Switching session', { from: currentId, to: id });
+          log.debug('Switching session', { from: currentId, to: id, projectId });
           // Set loading state but DON'T clear messages yet
           set({ isLoadingHistory: true });
 
           try {
-            // Fetch messages from CLI session file
-            const response = await fetch(`/api/sessions/${id}/messages`);
+            // Fetch messages and tool executions from CLI session file
+            const url = projectId
+              ? `/api/sessions/${id}/messages?project=${encodeURIComponent(projectId)}`
+              : `/api/sessions/${id}/messages`;
+            const response = await fetch(url);
             if (response.ok) {
-              const messages: ChatMessage[] = await response.json();
+              const data = await response.json();
+
+              // Handle both old format (array) and new format (object)
+              const messages: ChatMessage[] = Array.isArray(data) ? data : data.messages;
+              const toolExecutions: ToolExecution[] = Array.isArray(data) ? [] : (data.toolExecutions || []);
+
+              log.debug('Loaded session data', {
+                messages: messages.length,
+                toolExecutions: toolExecutions.length
+              });
+
               // Atomic update - switch everything at once
               set({
                 sessionId: session.id,
                 currentSession: session,
                 messages,
-                toolExecutions: [],
+                toolExecutions,
                 sessionUsage: null,
                 isLoadingHistory: false,
               });
