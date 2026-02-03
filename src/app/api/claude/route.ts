@@ -17,11 +17,12 @@ const TELEMETRY_LOG = '/workspace/logs/telemetry.jsonl';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { prompt, sessionId, cwd } = body;
+    const { prompt, sessionId, cwd, model } = body;
 
     log.debug('Received chat request', {
       sessionId,
       cwd,
+      model,
       promptLength: prompt.length
     });
 
@@ -55,7 +56,14 @@ export async function POST(req: NextRequest) {
               args.push('--resume', sessionId);  // Resume existing session
             } else {
               args.push('--session-id', sessionId);  // Create new session
+              // Add model flag for new sessions only
+              if (model) {
+                args.push('--model', model);
+              }
             }
+          } else if (model) {
+            // No session ID but model specified
+            args.push('--model', model);
           }
 
           // Spawn Claude CLI process

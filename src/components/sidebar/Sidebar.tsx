@@ -3,9 +3,10 @@
 import { useChatStore } from '@/lib/store';
 import { SessionList } from './SessionList';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { ModelSelector } from '@/components/ui/ModelSelector';
 
 export function Sidebar() {
-  const { sidebarOpen, toggleSidebar, startNewSession } = useChatStore();
+  const { sidebarOpen, toggleSidebar, startNewSession, currentModel } = useChatStore();
 
   const handleNewChat = () => {
     startNewSession();
@@ -44,6 +45,10 @@ export function Sidebar() {
         <ThemeToggle />
       </div>
 
+      <div className="border-t border-gray-200 dark:border-gray-700">
+        <ModelSelector />
+      </div>
+
       <div className="flex-1 overflow-y-auto p-4">
         <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
           History
@@ -52,6 +57,14 @@ export function Sidebar() {
       </div>
 
       <div className="border-t border-gray-200 dark:border-gray-700 p-4 text-xs text-gray-500 dark:text-gray-400">
+        {currentModel && (
+          <div className="mb-3">
+            <div>Model:</div>
+            <div className="font-mono mt-1 text-gray-700 dark:text-gray-300">
+              {currentModel}
+            </div>
+          </div>
+        )}
         <div>Working Directory:</div>
         <div className="font-mono mt-1 truncate text-gray-700 dark:text-gray-300">/workspace</div>
       </div>

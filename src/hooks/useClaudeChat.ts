@@ -51,10 +51,12 @@ export function useClaudeChat() {
       setError(null);
 
       try {
-        // Get fresh sessionId from store to avoid stale closure
+        // Get fresh sessionId and preferredModel from store to avoid stale closure
         const currentSessionId = useChatStore.getState().sessionId;
+        const preferredModel = useChatStore.getState().preferredModel;
         log.debug('Sending message', {
           sessionId: currentSessionId,
+          model: preferredModel,
           contentLength: prompt.length
         });
 
@@ -62,7 +64,12 @@ export function useClaudeChat() {
         const response = await fetch('/api/claude', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt, sessionId: currentSessionId, cwd }),
+          body: JSON.stringify({
+            prompt,
+            sessionId: currentSessionId,
+            cwd,
+            model: preferredModel || undefined,
+          }),
         });
 
         if (!response.ok) {
@@ -98,6 +105,13 @@ export function useClaudeChat() {
 
                 // Handle different message types from Claude CLI
                 if (message.type === 'system') {
+                  // Handle system.init message specifically
+                  if (message.subtype === 'init') {
+                    // Capture current model from CLI
+                    if (message.model) {
+                      useChatStore.getState().setCurrentModel(message.model);
+                    }
+                  }
                   // Store session ID
                   if (message.session_id) {
                     setSessionId(message.session_id);

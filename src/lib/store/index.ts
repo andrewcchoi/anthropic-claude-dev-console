@@ -34,6 +34,12 @@ interface ChatStore {
   deleteSession: (sessionId: string) => void;
   saveCurrentSession: () => void;
 
+  // Model selection
+  currentModel: string | null;
+  setCurrentModel: (model: string | null) => void;
+  preferredModel: string | null;
+  setPreferredModel: (model: string | null) => void;
+
   // Tool executions
   toolExecutions: ToolExecution[];
   addToolExecution: (tool: ToolExecution) => void;
@@ -95,6 +101,7 @@ export const useChatStore = create<ChatStore>()(
           toolExecutions: [],
           sessionUsage: null,
           error: null,
+          currentModel: null,
         });
       },
 
@@ -267,6 +274,12 @@ export const useChatStore = create<ChatStore>()(
           };
         }),
       resetUsage: () => set({ sessionUsage: null }),
+
+      // Model selection
+      currentModel: null,
+      setCurrentModel: (model) => set({ currentModel: model }),
+      preferredModel: null,
+      setPreferredModel: (model) => set({ preferredModel: model }),
     }),
     {
       name: 'claude-code-sessions',
@@ -274,6 +287,7 @@ export const useChatStore = create<ChatStore>()(
         sessions: state.sessions,
         // sessionId: state.sessionId, // Don't persist - prevents conflicts
         currentSession: state.currentSession,
+        preferredModel: state.preferredModel,
       }),
     }
   )
