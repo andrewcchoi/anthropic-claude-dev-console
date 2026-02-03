@@ -22,6 +22,10 @@ interface MonacoViewerProps {
   filePath?: string;
   showHeader?: boolean;
   theme?: EditorTheme;
+  onInsertReference?: (text: string, startLine: number, endLine: number) => void;
+  onCopyReference?: (text: string, startLine: number, endLine: number) => void;
+  onSearchCodebase?: (text: string) => void;
+  onSelectionChange?: (text: string, startLine: number, endLine: number, position: { x: number; y: number }) => void;
 }
 
 
@@ -37,6 +41,10 @@ export function MonacoViewer({
   filePath,
   showHeader = false,
   theme = 'dark',
+  onInsertReference,
+  onCopyReference,
+  onSearchCodebase,
+  onSelectionChange,
 }: MonacoViewerProps) {
   const monaco = useMonaco();
   const editorRef = useRef<any>(null);
@@ -83,6 +91,129 @@ export function MonacoViewer({
       console.warn('Failed to define Monaco themes:', error);
     }
   };
+
+  // Helper to get selection info
+  const getSelectionInfo = (editor: any) => {
+    const selection = editor.getSelection();
+    if (!selection || selection.isEmpty()) return null;
+
+    const text = editor.getModel()?.getValueInRange(selection);
+    if (!text) return null;
+
+    return {
+      text,
+      startLine: selection.startLineNumber,
+      endLine: selection.endLineNumber,
+    };
+  };
+
+  // Register Monaco actions and selection listener
+  useEffect(() => {
+    if (!editorRef.current || !monaco) return;
+
+    const editor = editorRef.current;
+    const disposables: any[] = [];
+
+    // Register Insert Reference action
+    if (onInsertReference) {
+      const insertAction = editor.addAction({
+        id: 'insert-reference-to-chat',
+        label: 'Insert Reference to Chat',
+        keybindings: [
+          monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyI,
+        ],
+        contextMenuGroupId: 'navigation',
+        contextMenuOrder: 1,
+        run: (ed: any) => {
+          const info = getSelectionInfo(ed);
+          if (info) {
+            onInsertReference(info.text, info.startLine, info.endLine);
+          }
+        },
+      });
+      disposables.push(insertAction);
+    }
+
+    // Register Copy Reference action
+    if (onCopyReference) {
+      const copyAction = editor.addAction({
+        id: 'copy-reference',
+        label: 'Copy Reference',
+        keybindings: [
+          monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyC,
+        ],
+        contextMenuGroupId: 'navigation',
+        contextMenuOrder: 2,
+        run: (ed: any) => {
+          const info = getSelectionInfo(ed);
+          if (info) {
+            onCopyReference(info.text, info.startLine, info.endLine);
+          }
+        },
+      });
+      disposables.push(copyAction);
+    }
+
+    // Register Search Codebase action
+    if (onSearchCodebase) {
+      const searchAction = editor.addAction({
+        id: 'search-codebase',
+        label: 'Search Codebase',
+        keybindings: [
+          monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyS,
+        ],
+        contextMenuGroupId: 'navigation',
+        contextMenuOrder: 3,
+        run: (ed: any) => {
+          const info = getSelectionInfo(ed);
+          if (info) {
+            onSearchCodebase(info.text);
+          }
+        },
+      });
+      disposables.push(searchAction);
+    }
+
+    // Listen for selection changes to show toolbar
+    if (onSelectionChange) {
+      const selectionDisposable = editor.onDidChangeCursorSelection((e: any) => {
+        const selection = e.selection;
+        if (!selection || selection.isEmpty()) {
+          // Clear toolbar when selection is empty
+          return;
+        }
+
+        const text = editor.getModel()?.getValueInRange(selection);
+        if (!text) return;
+
+        // Get position for toolbar
+        const endPosition = selection.getEndPosition();
+        const coords = editor.getScrolledVisiblePosition(endPosition);
+        if (!coords) return;
+
+        const editorDom = editor.getDomNode();
+        if (!editorDom) return;
+
+        const rect = editorDom.getBoundingClientRect();
+        const position = {
+          x: rect.left + coords.left,
+          y: rect.top + coords.top + coords.height + 5,
+        };
+
+        onSelectionChange(
+          text,
+          selection.startLineNumber,
+          selection.endLineNumber,
+          position
+        );
+      });
+      disposables.push(selectionDisposable);
+    }
+
+    return () => {
+      disposables.forEach((d) => d?.dispose?.());
+    };
+  }, [monaco, onInsertReference, onCopyReference, onSearchCodebase, onSelectionChange]);
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -154,7 +285,7 @@ export function MonacoViewer({
             hideCursorInOverviewRuler: true,
             overviewRulerBorder: false,
             renderLineHighlight: 'none',
-            contextmenu: false,
+            contextmenu: true,
             links: false,
             find: {
               addExtraSpaceOnTop: false,

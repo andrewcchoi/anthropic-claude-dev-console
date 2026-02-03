@@ -69,12 +69,14 @@ interface ChatStore {
   fileActivity: Map<string, 'read' | 'modified'>;
   sidebarTab: 'sessions' | 'files';
   pendingInputText: string | null;
+  searchQuery: string | null;
   toggleFolder: (path: string) => void;
   selectFile: (path: string | null) => void;
   setPreviewOpen: (open: boolean) => void;
   trackFileActivity: (path: string, type: 'read' | 'modified') => void;
   setSidebarTab: (tab: 'sessions' | 'files') => void;
   setPendingInputText: (text: string | null) => void;
+  setSearchQuery: (query: string | null) => void;
   clearExpandedFolders: () => void;
   expandFolders: (paths: string[]) => void;
 
@@ -332,6 +334,7 @@ export const useChatStore = create<ChatStore>()(
       fileActivity: new Map<string, 'read' | 'modified'>(),
       sidebarTab: 'sessions',
       pendingInputText: null,
+      searchQuery: null,
       toggleFolder: (path) =>
         set((state) => {
           const newExpanded = new Set(state.expandedFolders);
@@ -352,6 +355,7 @@ export const useChatStore = create<ChatStore>()(
         }),
       setSidebarTab: (tab) => set({ sidebarTab: tab }),
       setPendingInputText: (text) => set({ pendingInputText: text }),
+      setSearchQuery: (query) => set({ searchQuery: query }),
       clearExpandedFolders: () => set({ expandedFolders: new Set<string>() }),
       expandFolders: (paths) => set({ expandedFolders: new Set(paths) }),
     }),
