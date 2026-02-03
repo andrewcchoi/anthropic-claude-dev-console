@@ -49,6 +49,7 @@ export function MonacoViewer({
   const monaco = useMonaco();
   const editorRef = useRef<any>(null);
   const [copied, setCopied] = useState(false);
+  const [editorReady, setEditorReady] = useState(false);
   const { resolvedTheme } = useAppTheme();
 
   const effectiveTheme = theme === 'auto' ? (resolvedTheme || 'dark') : theme;
@@ -213,7 +214,7 @@ export function MonacoViewer({
     return () => {
       disposables.forEach((d) => d?.dispose?.());
     };
-  }, [monaco, onInsertReference, onCopyReference, onSearchCodebase, onSelectionChange]);
+  }, [monaco, editorReady, onInsertReference, onCopyReference, onSearchCodebase, onSelectionChange]);
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -263,6 +264,7 @@ export function MonacoViewer({
           beforeMount={handleEditorWillMount}
           onMount={(editor) => {
             editorRef.current = editor;
+            setEditorReady(true);
           }}
           options={{
             readOnly: true,
