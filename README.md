@@ -104,6 +104,19 @@ npm start
 - ✅ Responsive sidebar
 - ✅ Auto-scroll to latest message
 
+## Troubleshooting
+
+If you encounter issues during development:
+
+- **General Issues**: See [docs/troubleshooting/TROUBLESHOOTING_GUIDE.md](docs/troubleshooting/TROUBLESHOOTING_GUIDE.md)
+- **Monaco Editor Errors**: See [docs/troubleshooting/MONACO_ERROR_SUPPRESSION.md](docs/troubleshooting/MONACO_ERROR_SUPPRESSION.md)
+- **Terminal Issues**: See [docs/troubleshooting/TERMINAL_DEBUGGING_SESSION.md](docs/troubleshooting/TERMINAL_DEBUGGING_SESSION.md)
+
+Common issues:
+- "[object Object]" in Next.js overlay → Monaco error suppression working as intended
+- Session conflicts → Check CLI flags (--resume vs --session-id)
+- WebSocket errors → React Strict Mode double-invocation (setTimeout fix applied)
+
 ## Future Enhancements
 
 - [ ] Session history and search

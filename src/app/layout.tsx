@@ -11,7 +11,18 @@ export const metadata: Metadata = {
   description: 'Browser interface for Claude Code',
 };
 
-// Inline script to suppress Monaco errors before Next.js devtools loads
+/**
+ * Inline script to suppress Monaco Editor errors in Next.js dev overlay.
+ *
+ * This runs BEFORE Next.js devtools initializes to catch Monaco error objects
+ * (e.g., {type: 'cancelation'}) before they appear as "[object Object]" in the overlay.
+ *
+ * @see /docs/troubleshooting/MONACO_ERROR_SUPPRESSION.md for:
+ * - How this works and why it's needed
+ * - Troubleshooting steps if errors still appear
+ * - How to temporarily disable for debugging
+ * - How to adjust error patterns
+ */
 const monacoErrorSuppressorScript = `
 (function() {
   window.addEventListener('unhandledrejection', function(event) {
