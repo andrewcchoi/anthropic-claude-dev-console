@@ -68,11 +68,13 @@ interface ChatStore {
   previewOpen: boolean;
   fileActivity: Map<string, 'read' | 'modified'>;
   sidebarTab: 'sessions' | 'files';
+  pendingInputText: string | null;
   toggleFolder: (path: string) => void;
   selectFile: (path: string | null) => void;
   setPreviewOpen: (open: boolean) => void;
   trackFileActivity: (path: string, type: 'read' | 'modified') => void;
   setSidebarTab: (tab: 'sessions' | 'files') => void;
+  setPendingInputText: (text: string | null) => void;
 
   // UI State
   isStreaming: boolean;
@@ -327,6 +329,7 @@ export const useChatStore = create<ChatStore>()(
       previewOpen: false,
       fileActivity: new Map<string, 'read' | 'modified'>(),
       sidebarTab: 'sessions',
+      pendingInputText: null,
       toggleFolder: (path) =>
         set((state) => {
           const newExpanded = new Set(state.expandedFolders);
@@ -346,6 +349,7 @@ export const useChatStore = create<ChatStore>()(
           return { fileActivity: newActivity };
         }),
       setSidebarTab: (tab) => set({ sidebarTab: tab }),
+      setPendingInputText: (text) => set({ pendingInputText: text }),
     }),
     {
       name: 'claude-code-sessions',

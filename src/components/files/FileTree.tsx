@@ -13,7 +13,7 @@ const log = createLogger('FileTree');
 const WORKSPACE_ROOT = '/workspace';
 
 export function FileTree() {
-  const [items, setItems] = useState<FileItem[]>([]);
+  const [directoryContents, setDirectoryContents] = useState<Map<string, FileItem[]>>(new Map());
   const [gitStatus, setGitStatus] = useState<GitStatus>({
     isGitRepo: false,
     modified: [],
@@ -21,6 +21,7 @@ export function FileTree() {
     ignored: [],
   });
   const [loading, setLoading] = useState(false);
+  const [loadingDirs, setLoadingDirs] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<{
     position: { x: number; y: number };
     item: FileItem;
@@ -35,22 +36,33 @@ export function FileTree() {
     setPreviewOpen,
   } = useChatStore();
 
-  const loadDirectory = useCallback(async (path: string = WORKSPACE_ROOT) => {
+  const loadDirectory = useCallback(async (path: string) => {
+    // Skip if already loaded
+    if (directoryContents.has(path)) return;
+
     try {
-      setLoading(true);
+      setLoadingDirs((prev) => new Set(prev).add(path));
       const response = await fetch(`/api/files?path=${encodeURIComponent(path)}`);
       if (response.ok) {
         const data = await response.json();
-        setItems(data.items || []);
+        setDirectoryContents((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(path, data.items || []);
+          return newMap;
+        });
       } else {
         log.error('Failed to load directory', { path, status: response.status });
       }
     } catch (error) {
       log.error('Error loading directory', { path, error });
     } finally {
-      setLoading(false);
+      setLoadingDirs((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(path);
+        return newSet;
+      });
     }
-  }, []);
+  }, [directoryContents]);
 
   const loadGitStatus = useCallback(async (path: string = WORKSPACE_ROOT) => {
     try {
@@ -65,9 +77,9 @@ export function FileTree() {
   }, []);
 
   useEffect(() => {
-    loadDirectory();
+    loadDirectory(WORKSPACE_ROOT);
     loadGitStatus();
-  }, [loadDirectory, loadGitStatus]);
+  }, []);
 
   const handleContextMenu = (e: React.MouseEvent, item: FileItem) => {
     e.preventDefault();
@@ -87,8 +99,8 @@ export function FileTree() {
       });
 
       if (response.ok) {
-        await loadDirectory();
-        await loadGitStatus();
+        refreshDirectory(parentPath);
+        loadGitStatus();
       } else {
         const data = await response.json();
         alert(`Failed to create file: ${data.error}`);
@@ -112,7 +124,7 @@ export function FileTree() {
       });
 
       if (response.ok) {
-        await loadDirectory();
+        refreshDirectory(parentPath);
       } else {
         const data = await response.json();
         alert(`Failed to create folder: ${data.error}`);
@@ -128,6 +140,8 @@ export function FileTree() {
     if (!newName || newName === item.name) return;
 
     const newPath = item.path.replace(/[^/]+$/, newName);
+    const parentPath = item.path.substring(0, item.path.lastIndexOf('/'));
+
     try {
       const response = await fetch(`/api/files/${encodeURIComponent(item.path.replace(WORKSPACE_ROOT + '/', ''))}`, {
         method: 'PATCH',
@@ -136,8 +150,8 @@ export function FileTree() {
       });
 
       if (response.ok) {
-        await loadDirectory();
-        await loadGitStatus();
+        refreshDirectory(parentPath);
+        loadGitStatus();
       } else {
         const data = await response.json();
         alert(`Failed to rename: ${data.error}`);
@@ -151,14 +165,16 @@ export function FileTree() {
   const handleDelete = async (item: FileItem) => {
     if (!confirm(`Are you sure you want to delete "${item.name}"?`)) return;
 
+    const parentPath = item.path.substring(0, item.path.lastIndexOf('/'));
+
     try {
       const response = await fetch(`/api/files/${encodeURIComponent(item.path.replace(WORKSPACE_ROOT + '/', ''))}`, {
         method: 'DELETE',
       });
 
       if (response.ok) {
-        await loadDirectory();
-        await loadGitStatus();
+        refreshDirectory(parentPath);
+        loadGitStatus();
         if (selectedFile === item.path) {
           selectFile(null);
           setPreviewOpen(false);
@@ -178,8 +194,28 @@ export function FileTree() {
     setPreviewOpen(true);
   };
 
+  const handleToggleFolder = (item: FileItem) => {
+    const isExpanded = expandedFolders.has(item.path);
+    toggleFolder(item.path);
+
+    // Load directory contents if expanding and not already loaded
+    if (!isExpanded && !directoryContents.has(item.path)) {
+      loadDirectory(item.path);
+    }
+  };
+
   const handleCollapseAll = () => {
     expandedFolders.clear();
+  };
+
+  const refreshDirectory = (dirPath: string) => {
+    // Clear cached contents for the directory to force reload
+    setDirectoryContents((prev) => {
+      const newMap = new Map(prev);
+      newMap.delete(dirPath);
+      return newMap;
+    });
+    loadDirectory(dirPath);
   };
 
   const renderTree = (items: FileItem[], level: number = 0): React.ReactNode => {
@@ -187,6 +223,9 @@ export function FileTree() {
       const isExpanded = expandedFolders.has(item.path);
       const isSelected = selectedFile === item.path;
       const activityType = fileActivity.get(item.path);
+      const isDirectory = item.type === 'directory';
+      const childItems = isDirectory ? directoryContents.get(item.path) : undefined;
+      const isLoadingDir = loadingDirs.has(item.path);
 
       return (
         <div key={item.path}>
@@ -197,15 +236,33 @@ export function FileTree() {
             isSelected={isSelected}
             gitStatus={gitStatus}
             activityType={activityType}
-            onToggle={() => toggleFolder(item.path)}
+            onToggle={() => handleToggleFolder(item)}
             onSelect={() => handleFileSelect(item)}
             onContextMenu={handleContextMenu}
           />
-          {/* Lazy loading would be implemented here for expanded directories */}
+          {/* Render child items if directory is expanded */}
+          {isDirectory && isExpanded && (
+            <>
+              {isLoadingDir ? (
+                <div style={{ paddingLeft: `${(level + 1) * 12 + 8}px` }} className="text-xs text-gray-500 py-1">
+                  Loading...
+                </div>
+              ) : childItems && childItems.length > 0 ? (
+                renderTree(childItems, level + 1)
+              ) : childItems && childItems.length === 0 ? (
+                <div style={{ paddingLeft: `${(level + 1) * 12 + 8}px` }} className="text-xs text-gray-500 py-1">
+                  Empty folder
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
       );
     });
   };
+
+  const rootItems = directoryContents.get(WORKSPACE_ROOT) || [];
+  const isLoadingRoot = loadingDirs.has(WORKSPACE_ROOT);
 
   return (
     <div className="flex flex-col h-full">
@@ -213,18 +270,18 @@ export function FileTree() {
         onNewFile={() => handleNewFile(WORKSPACE_ROOT)}
         onNewFolder={() => handleNewFolder(WORKSPACE_ROOT)}
         onRefresh={() => {
-          loadDirectory();
+          refreshDirectory(WORKSPACE_ROOT);
           loadGitStatus();
         }}
         onCollapseAll={handleCollapseAll}
       />
       <div className="flex-1 overflow-y-auto">
-        {loading ? (
+        {isLoadingRoot ? (
           <div className="p-4 text-sm text-gray-500">Loading...</div>
-        ) : items.length === 0 ? (
+        ) : rootItems.length === 0 ? (
           <div className="p-4 text-sm text-gray-500">No files found</div>
         ) : (
-          renderTree(items)
+          renderTree(rootItems)
         )}
       </div>
       <FileContextMenu

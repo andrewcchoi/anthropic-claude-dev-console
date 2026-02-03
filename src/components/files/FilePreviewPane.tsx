@@ -10,7 +10,7 @@ import { createLogger } from '@/lib/logger';
 const log = createLogger('FilePreviewPane');
 
 export function FilePreviewPane() {
-  const { selectedFile, setPreviewOpen, trackFileActivity } = useChatStore();
+  const { selectedFile, setPreviewOpen, trackFileActivity, setPendingInputText } = useChatStore();
   const [content, setContent] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,13 +61,30 @@ export function FilePreviewPane() {
     loadFile();
   }, [selectedFile, trackFileActivity]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape to close
+      if (e.key === 'Escape') {
+        setPreviewOpen(false);
+      }
+      // Ctrl/Cmd+Enter to insert reference
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        handleInsertReference();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedFile, setPreviewOpen]);
+
   const handleInsertReference = () => {
     if (!selectedFile) return;
 
-    // Copy to clipboard with instruction
+    // Set pending input text that will be inserted into chat
     const reference = `@${selectedFile}`;
-    navigator.clipboard.writeText(reference);
-    alert(`Copied "${reference}" to clipboard. Paste in chat to reference this file.`);
+    setPendingInputText(reference);
   };
 
   const handleOpenInNewTab = () => {
