@@ -1,7 +1,7 @@
 'use client';
 
 import { useChatStore } from '@/lib/store';
-import { Settings, X } from 'lucide-react';
+import { Settings, X, Terminal, ExternalLink } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { ModelSelector } from '@/components/ui/ModelSelector';
 import { ProviderSelector } from '@/components/ui/ProviderSelector';
@@ -50,6 +50,19 @@ export function RightPanel() {
           <ProviderSelector />
           <ModelSelector />
           <DefaultModeSelector />
+
+          {/* Open Terminal Button */}
+          <button
+            onClick={() => window.open('/terminal', '_blank')}
+            aria-label="Open terminal in new tab"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Terminal className="h-4 w-4" />
+              <span className="text-sm font-medium">Open Terminal</span>
+            </div>
+            <ExternalLink className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </div>
