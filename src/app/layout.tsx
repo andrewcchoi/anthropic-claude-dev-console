@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { DebugProvider } from '@/components/providers/DebugProvider';
 import { ErrorBoundary } from '@/components/error/ErrorBoundary';
+import { MonacoErrorSuppressor } from '@/components/editor/MonacoErrorSuppressor';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -19,6 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
+        <MonacoErrorSuppressor />
         <DebugProvider>
           <ErrorBoundary>{children}</ErrorBoundary>
         </DebugProvider>
