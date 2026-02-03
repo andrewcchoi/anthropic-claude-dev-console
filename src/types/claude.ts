@@ -89,3 +89,20 @@ export interface UsageStats {
   durationMs: number;
   requestCount: number;      // Number of requests in session
 }
+
+export type Provider = 'anthropic' | 'bedrock' | 'vertex' | 'foundry';
+
+export type DefaultMode = 'default' | 'acceptEdits' | 'plan' | 'dontAsk' | 'bypassPermissions';
+
+export interface ProviderConfig {
+  // API Keys
+  anthropicApiKey?: string;
+  awsAccessKeyId?: string;
+  awsSecretAccessKey?: string;
+  foundryApiKey?: string;
+  // Config
+  awsRegion?: string;
+  vertexRegion?: string;
+  vertexProjectId?: string;
+  foundryResource?: string;
+}

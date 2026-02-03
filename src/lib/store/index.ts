@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ChatMessage, Session, ToolExecution, UsageStats } from '@/types/claude';
+import { ChatMessage, Session, ToolExecution, UsageStats, Provider, ProviderConfig, DefaultMode } from '@/types/claude';
 import { v4 as uuidv4 } from 'uuid';
 import { createLogger } from '../logger';
 
@@ -34,6 +34,22 @@ interface ChatStore {
   deleteSession: (sessionId: string) => void;
   saveCurrentSession: () => void;
 
+  // Model selection
+  currentModel: string | null;
+  setCurrentModel: (model: string | null) => void;
+  preferredModel: string | null;
+  setPreferredModel: (model: string | null) => void;
+
+  // Provider selection
+  provider: Provider;
+  providerConfig: ProviderConfig;
+  setProvider: (provider: Provider) => void;
+  setProviderConfig: (config: Partial<ProviderConfig>) => void;
+
+  // Default mode selection
+  defaultMode: DefaultMode;
+  setDefaultMode: (mode: DefaultMode) => void;
+
   // Tool executions
   toolExecutions: ToolExecution[];
   addToolExecution: (tool: ToolExecution) => void;
@@ -53,6 +69,9 @@ interface ChatStore {
   setError: (error: string | null) => void;
   sidebarOpen: boolean;
   toggleSidebar: () => void;
+  rightPanelOpen: boolean;
+  toggleRightPanel: () => void;
+  setRightPanelOpen: (open: boolean) => void;
 
   // Usage tracking
   sessionUsage: UsageStats | null;
@@ -95,6 +114,7 @@ export const useChatStore = create<ChatStore>()(
           toolExecutions: [],
           sessionUsage: null,
           error: null,
+          currentModel: null,
         });
       },
 
@@ -244,6 +264,9 @@ export const useChatStore = create<ChatStore>()(
       setError: (error) => set({ error }),
       sidebarOpen: true,
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+      rightPanelOpen: true,
+      toggleRightPanel: () => set((state) => ({ rightPanelOpen: !state.rightPanelOpen })),
+      setRightPanelOpen: (open) => set({ rightPanelOpen: open }),
 
       // Usage tracking
       sessionUsage: null,
@@ -267,6 +290,24 @@ export const useChatStore = create<ChatStore>()(
           };
         }),
       resetUsage: () => set({ sessionUsage: null }),
+
+      // Model selection
+      currentModel: null,
+      setCurrentModel: (model) => set({ currentModel: model }),
+      preferredModel: null,
+      setPreferredModel: (model) => set({ preferredModel: model }),
+
+      // Provider selection
+      provider: 'anthropic',
+      providerConfig: {},
+      setProvider: (provider) => set({ provider }),
+      setProviderConfig: (config) => set((state) => ({
+        providerConfig: { ...state.providerConfig, ...config }
+      })),
+
+      // Default mode selection
+      defaultMode: 'plan',
+      setDefaultMode: (mode) => set({ defaultMode: mode }),
     }),
     {
       name: 'claude-code-sessions',
@@ -274,6 +315,10 @@ export const useChatStore = create<ChatStore>()(
         sessions: state.sessions,
         // sessionId: state.sessionId, // Don't persist - prevents conflicts
         currentSession: state.currentSession,
+        preferredModel: state.preferredModel,
+        provider: state.provider,
+        providerConfig: state.providerConfig,
+        defaultMode: state.defaultMode,
       }),
     }
   )
