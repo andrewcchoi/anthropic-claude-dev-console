@@ -8,12 +8,29 @@ const Terminal = dynamic(
   { ssr: false }
 );
 
+interface ToolInput {
+  command?: string;
+  cwd?: string;
+  working_directory?: string;
+  [key: string]: unknown;
+}
+
+interface ToolOutput {
+  stdout?: string;
+  stderr?: string;
+  text?: string;
+  type?: string;
+  [key: string]: unknown;
+}
+
 interface ToolExecutionProps {
   name: string;
-  input: any;
-  output?: any;
+  input: ToolInput | string;
+  output?: ToolOutput | ToolOutput[] | string;
   status: 'pending' | 'success' | 'error';
 }
+
+const BASH_TOOL_NAMES = ['Bash', 'bash'] as const;
 
 export function ToolExecution({
   name,
@@ -25,15 +42,15 @@ export function ToolExecution({
   const [viewMode, setViewMode] = useState<'readonly' | 'interactive'>('readonly');
 
   // Helper function to extract bash output from various formats
-  const getBashOutput = (output: any): string | null => {
+  const getBashOutput = (output: ToolOutput | ToolOutput[] | string | undefined): string | null => {
     if (!output) return null;
     if (typeof output === 'string') return output;
 
     if (Array.isArray(output)) {
       // Handle [{type: "text", text: "..."}] format
       const textContent = output
-        .filter((item: any) => item.type === 'text')
-        .map((item: any) => item.text)
+        .filter((item) => item.type === 'text')
+        .map((item) => item.text)
         .join('\n');
       if (textContent) return textContent;
     }
@@ -50,7 +67,7 @@ export function ToolExecution({
   };
 
   // Helper function to extract cwd from Bash tool input
-  const getCwd = (input: any): string => {
+  const getCwd = (input: ToolInput | string): string => {
     if (input && typeof input === 'object') {
       return input.cwd || input.working_directory || '/workspace';
     }
@@ -58,7 +75,7 @@ export function ToolExecution({
   };
 
   // Check if this is a Bash tool
-  const isBashTool = name === 'Bash' || name === 'bash';
+  const isBashTool = BASH_TOOL_NAMES.includes(name as typeof BASH_TOOL_NAMES[number]);
   const bashOutput = isBashTool ? getBashOutput(output) : null;
   const cwd = isBashTool ? getCwd(input) : '/workspace';
 

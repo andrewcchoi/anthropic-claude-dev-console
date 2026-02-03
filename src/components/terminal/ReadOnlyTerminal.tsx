@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { Terminal as XTerm } from 'xterm';
+import { useEffect, useRef, useState } from 'react';
+import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { terminalTheme } from './TerminalTheme';
+import '@xterm/xterm/css/xterm.css';
 
 interface ReadOnlyTerminalProps {
   content: string;
@@ -26,7 +27,16 @@ export function ReadOnlyTerminal({
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const writtenLengthRef = useRef<number>(0);
+  const contentRef = useRef(content);
 
+  // Keep contentRef in sync with content prop
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
+
+  // Effect 1: Terminal initialization (runs once on mount)
   useEffect(() => {
     if (!terminalRef.current) return;
 
@@ -68,8 +78,14 @@ export function ReadOnlyTerminal({
         xterm.open(container);
         isOpened = true;
 
-        // Write content
-        xterm.write(content);
+        // Write initial content immediately after opening to avoid race condition
+        // Content that arrives before initialization would be missed otherwise
+        if (contentRef.current) {
+          xterm.write(contentRef.current);
+          writtenLengthRef.current = contentRef.current.length;
+        }
+
+        setIsInitialized(true); // Signal ready for incremental updates
 
         // Fit to container
         requestAnimationFrame(() => {
@@ -102,8 +118,23 @@ export function ReadOnlyTerminal({
       xterm.dispose();
       xtermRef.current = null;
       fitAddonRef.current = null;
+      setIsInitialized(false);
+      writtenLengthRef.current = 0;
     };
-  }, [content]);
+  }, []); // Empty deps: run once on mount
+
+  // Effect 2: Content updates (runs when content changes)
+  useEffect(() => {
+    const xterm = xtermRef.current;
+    if (!xterm || !isInitialized) return;
+
+    // Incremental write: only write new content
+    const newContent = content.slice(writtenLengthRef.current);
+    if (newContent.length > 0) {
+      xterm.write(newContent);
+    }
+    writtenLengthRef.current = content.length;
+  }, [content, isInitialized]);
 
   return (
     <div
@@ -111,7 +142,7 @@ export function ReadOnlyTerminal({
       style={{
         minHeight: `${minHeight}px`,
         maxHeight: `${maxHeight}px`,
-        backgroundColor: '#1f2937'
+        backgroundColor: terminalTheme.background
       }}
     >
       <div ref={terminalRef} className="h-full" />

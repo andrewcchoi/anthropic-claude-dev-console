@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, RefObject } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
-import { SearchAddon } from '@xterm/addon-search';
 import { WebSocketClient } from '@/lib/terminal/websocket-client';
+import { terminalTheme } from '@/components/terminal/TerminalTheme';
 
 interface UseTerminalOptions {
   cwd?: string;
@@ -32,8 +32,15 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
   const isMountedRef = useRef(true);
 
   const [isConnected, setIsConnected] = useState(false);
+  const isConnectedRef = useRef(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Helper to update both state and ref for isConnected
+  const setConnectedState = (connected: boolean) => {
+    isConnectedRef.current = connected;
+    setIsConnected(connected);
+  };
 
   // Cleanup function
   const cleanup = () => {
@@ -78,27 +85,24 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
         disableStdin: false,
         fontSize: 14,
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-        theme: {
-          background: '#1e1e1e',
-          foreground: '#d4d4d4',
-          cursor: '#ffffff',
-        },
+        theme: terminalTheme,
       });
 
       // Load addons
       const fitAddon = new FitAddon();
       const webLinksAddon = new WebLinksAddon();
-      const searchAddon = new SearchAddon();
 
       xterm.loadAddon(fitAddon);
       xterm.loadAddon(webLinksAddon);
-      xterm.loadAddon(searchAddon);
 
       // Store refs early
       xtermRef.current = xterm;
       fitAddonRef.current = fitAddon;
 
       // Wait for container to have dimensions before opening
+      const MAX_OPEN_RETRIES = 50;
+      let retryCount = 0;
+
       const openTerminalAndConnect = async () => {
         const container = terminalRef.current;
         if (!container) {
@@ -121,12 +125,12 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
             onConnected: (sid: string) => {
               // Check if still mounted before updating state
               if (!isMountedRef.current) return;
-              setIsConnected(true);
+              setConnectedState(true);
               setSessionId(sid);
               onConnected?.(sid);
             },
             onData: (data: string) => {
-              xterm.write(data);
+              xtermRef.current?.write(data);
             },
             onError: (errorMsg: string) => {
               // Check if still mounted before updating state
@@ -137,7 +141,7 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
             onExit: (code: number) => {
               // Check if still mounted before updating state
               if (!isMountedRef.current) return;
-              setIsConnected(false);
+              setConnectedState(false);
               setSessionId(null);
               onDisconnected?.();
             },
@@ -151,9 +155,9 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
 
           // Set up resize observer
           const resizeObserver = new ResizeObserver(() => {
-            if (fitAddonRef.current && wsClientRef.current && isConnected) {
+            if (fitAddonRef.current && wsClientRef.current && isConnectedRef.current) {
               fitAddonRef.current.fit();
-              const { cols, rows } = xterm;
+              const { cols, rows } = xtermRef.current ?? { cols: 80, rows: 24 };
               wsClientRef.current.resize(cols, rows);
             }
           });
@@ -170,7 +174,12 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
             return;
           }
         } else {
-          // Container not ready, wait and try again
+          // Container not ready, check retry limit
+          retryCount++;
+          if (retryCount > MAX_OPEN_RETRIES) {
+            throw new Error('Terminal container never received dimensions after ' + MAX_OPEN_RETRIES + ' attempts');
+          }
+          // Wait and try again
           await new Promise(resolve => requestAnimationFrame(resolve));
           await openTerminalAndConnect();
         }
@@ -191,7 +200,7 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
 
   // Disconnect function
   const disconnect = () => {
-    setIsConnected(false);
+    setConnectedState(false);
     setSessionId(null);
     cleanup();
   };

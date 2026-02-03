@@ -74,5 +74,7 @@ export function Terminal({
     );
   }
 
-  return null;
+  // Exhaustive check: if we reach here, mode is neither 'readonly' nor 'interactive'
+  const _exhaustiveCheck: never = mode;
+  return _exhaustiveCheck;
 }

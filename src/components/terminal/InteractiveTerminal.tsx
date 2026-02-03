@@ -36,16 +36,22 @@ export function InteractiveTerminal({
   // Auto-connect on mount with debounce to avoid React Strict Mode race condition
   // Strict Mode: mount → unmount → remount happens synchronously
   // setTimeout(0) defers connect() until after this cycle completes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
+    let isCancelled = false;
+
     const timeoutId = setTimeout(() => {
-      connect();
+      if (!isCancelled) {
+        connect();
+      }
     }, 0);
 
     return () => {
+      isCancelled = true;
       clearTimeout(timeoutId);
       disconnect();
     };
-  }, []);
+  }, []); // connect/disconnect are stable refs from useTerminal
 
   return (
     <div className={`relative h-full w-full ${className}`}>
