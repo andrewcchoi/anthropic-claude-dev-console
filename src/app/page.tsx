@@ -11,6 +11,10 @@ export default function Home() {
   const { messages, sendMessage, isStreaming } = useClaudeChat();
   const { error, sidebarOpen, isLoadingHistory } = useChatStore();
 
+  const handleSend = (message: string, attachments?: any) => {
+    sendMessage(message, undefined, attachments);
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-white dark:bg-gray-900">
       <Sidebar />
@@ -22,7 +26,7 @@ export default function Home() {
         )}
         <MessageList messages={messages} isLoadingHistory={isLoadingHistory} />
         <UsageDisplay />
-        <ChatInput onSend={sendMessage} disabled={isStreaming} />
+        <ChatInput onSend={handleSend} disabled={isStreaming} />
       </div>
     </div>
   );

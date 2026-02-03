@@ -44,7 +44,7 @@ export interface SDKMessage {
   };
 }
 
-export type ContentBlockType = 'text' | 'tool_use' | 'tool_result';
+export type ContentBlockType = 'text' | 'tool_use' | 'tool_result' | 'image';
 
 export interface MessageContent {
   type: ContentBlockType;
@@ -55,6 +55,7 @@ export interface MessageContent {
   content?: string | any[];
   tool_use_id?: string;
   is_error?: boolean;
+  source?: { type: 'file'; path: string; originalName: string };
 }
 
 export interface ChatMessage {

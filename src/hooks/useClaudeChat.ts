@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useChatStore } from '@/lib/store';
 import { ChatMessage, MessageContent, SDKMessage } from '@/types/claude';
+import { FileAttachment } from '@/types/upload';
 import { v4 as uuidv4 } from 'uuid';
 import { createLogger } from '@/lib/logger';
 import { serializeError } from '@/lib/utils/errorUtils';
@@ -26,12 +27,62 @@ export function useClaudeChat() {
   const [currentMessageId, setCurrentMessageId] = useState<string | null>(null);
 
   const sendMessage = useCallback(
-    async (prompt: string, cwd?: string) => {
+    async (prompt: string, cwd?: string, attachments?: FileAttachment[]) => {
+      let enhancedPrompt = prompt;
+      let userMessageContent: MessageContent[] = [{ type: 'text', text: prompt }];
+
+      // Handle file attachments
+      if (attachments && attachments.length > 0) {
+        try {
+          // Upload files to server
+          const formData = new FormData();
+          attachments.forEach((att) => formData.append('files', att.file));
+          formData.append('sessionId', useChatStore.getState().sessionId || uuidv4());
+
+          const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!uploadResponse.ok) {
+            throw new Error('Failed to upload files');
+          }
+
+          const uploadResult = await uploadResponse.json();
+
+          // Build enhanced prompt with file references
+          const fileReferences = uploadResult.files
+            .map((file: any) => `- ${file.originalName}: Read the file at ${file.savedPath}`)
+            .join('\n');
+
+          enhancedPrompt = `${prompt}\n\n[Attached files - please read them using the Read tool:]\n${fileReferences}`;
+
+          // Add image content blocks for display
+          uploadResult.files.forEach((file: any) => {
+            const attachment = attachments.find((att) => att.name === file.originalName);
+            if (attachment?.isImage) {
+              userMessageContent.push({
+                type: 'image',
+                source: {
+                  type: 'file',
+                  path: file.savedPath,
+                  originalName: file.originalName,
+                },
+              });
+            }
+          });
+        } catch (error) {
+          log.error('Failed to upload attachments', { error });
+          setError('Failed to upload attachments');
+          return;
+        }
+      }
+
       // Add user message
       const userMessage: ChatMessage = {
         id: `user-${Date.now()}`,
         role: 'user',
-        content: [{ type: 'text', text: prompt }],
+        content: userMessageContent,
         timestamp: Date.now(),
       };
       addMessage(userMessage);
@@ -65,7 +116,7 @@ export function useClaudeChat() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            prompt,
+            prompt: enhancedPrompt,
             sessionId: currentSessionId,
             cwd,
             model: preferredModel || 'opusplan',
