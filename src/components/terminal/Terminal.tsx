@@ -1,93 +1,80 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { Terminal as XTerm } from 'xterm';
-import { FitAddon } from '@xterm/addon-fit';
-import { WebLinksAddon } from '@xterm/addon-web-links';
-import { terminalTheme } from './TerminalTheme';
+import dynamic from 'next/dynamic';
+
+// Dynamically import terminal components with SSR disabled
+// xterm uses browser globals (self, window) that don't exist during SSR
+const ReadOnlyTerminal = dynamic(
+  () => import('./ReadOnlyTerminal').then(mod => ({ default: mod.ReadOnlyTerminal })),
+  { ssr: false, loading: () => <TerminalSkeleton /> }
+);
+
+const InteractiveTerminal = dynamic(
+  () => import('./InteractiveTerminal').then(mod => ({ default: mod.InteractiveTerminal })),
+  { ssr: false, loading: () => <TerminalSkeleton /> }
+);
+
+function TerminalSkeleton() {
+  return (
+    <div className="h-full w-full bg-gray-900 rounded animate-pulse flex items-center justify-center">
+      <span className="text-gray-500 text-sm">Loading terminal...</span>
+    </div>
+  );
+}
 
 interface TerminalProps {
-  content: string;
+  mode?: 'readonly' | 'interactive';
+  content?: string;
+  cwd?: string;
   className?: string;
   minHeight?: number;
   maxHeight?: number;
+  sessionId?: string;
+  onConnected?: (sessionId: string) => void;
+  onDisconnected?: () => void;
+  onError?: (error: string) => void;
 }
 
+/**
+ * Terminal facade component
+ * Routes to ReadOnlyTerminal or InteractiveTerminal based on mode
+ */
 export function Terminal({
-  content,
+  mode = 'readonly',
+  content = '',
+  cwd,
   className = '',
   minHeight = 100,
-  maxHeight = 400
+  maxHeight = 400,
+  sessionId,
+  onConnected,
+  onDisconnected,
+  onError,
 }: TerminalProps) {
-  const terminalRef = useRef<HTMLDivElement>(null);
-  const xtermRef = useRef<XTerm | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
+  if (mode === 'readonly') {
+    return (
+      <ReadOnlyTerminal
+        content={content}
+        className={className}
+        minHeight={minHeight}
+        maxHeight={maxHeight}
+      />
+    );
+  }
 
-  useEffect(() => {
-    if (!terminalRef.current) return;
+  if (mode === 'interactive') {
+    return (
+      <InteractiveTerminal
+        cwd={cwd}
+        className={className}
+        onConnected={onConnected}
+        onDisconnected={onDisconnected}
+        onError={onError}
+      />
+    );
+  }
 
-    // Initialize terminal
-    const xterm = new XTerm({
-      theme: terminalTheme,
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-      fontSize: 12,
-      lineHeight: 1.2,
-      cursorBlink: false,
-      disableStdin: true, // Read-only
-      allowTransparency: false,
-      convertEol: true,
-    });
-
-    // Initialize addons
-    const fitAddon = new FitAddon();
-    const webLinksAddon = new WebLinksAddon();
-
-    xterm.loadAddon(fitAddon);
-    xterm.loadAddon(webLinksAddon);
-
-    // Open terminal in container
-    xterm.open(terminalRef.current);
-
-    // Write content
-    xterm.write(content);
-
-    // Fit to container
-    fitAddon.fit();
-
-    // Store references
-    xtermRef.current = xterm;
-    fitAddonRef.current = fitAddon;
-
-    // Setup ResizeObserver for responsive sizing
-    const resizeObserver = new ResizeObserver(() => {
-      if (fitAddonRef.current) {
-        fitAddonRef.current.fit();
-      }
-    });
-
-    if (terminalRef.current) {
-      resizeObserver.observe(terminalRef.current);
-    }
-
-    // Cleanup
-    return () => {
-      resizeObserver.disconnect();
-      xterm.dispose();
-      xtermRef.current = null;
-      fitAddonRef.current = null;
-    };
-  }, [content]);
-
-  return (
-    <div
-      className={`rounded border border-gray-600 overflow-hidden ${className}`}
-      style={{
-        minHeight: `${minHeight}px`,
-        maxHeight: `${maxHeight}px`,
-        backgroundColor: '#1f2937'
-      }}
-    >
-      <div ref={terminalRef} className="h-full" />
-    </div>
-  );
+  // Exhaustive check: if we reach here, mode is neither 'readonly' nor 'interactive'
+  const _exhaustiveCheck: never = mode;
+  return _exhaustiveCheck;
 }

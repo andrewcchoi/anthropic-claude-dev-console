@@ -74,7 +74,7 @@
   "postAttachCommand": "",
   "waitFor": "postCreateCommand",
 
-  "forwardPorts": [8000, 3000, 5432, 6379],
+  "forwardPorts": [8000, 3000, 3001, 5432, 6379],
 
   // GitHub Codespaces configuration
   // See: https://docs.github.com/en/codespaces/setting-up-your-project-for-codespaces
@@ -86,6 +86,7 @@
   "portsAttributes": {
     "8000": { "label": "App", "onAutoForward": "notify" },
     "3000": { "label": "Frontend", "onAutoForward": "notify" },
+    "3001": { "label": "Terminal WS", "onAutoForward": "silent" },
     "5432": { "label": "PostgreSQL", "onAutoForward": "silent" },
     "6379": { "label": "Redis", "onAutoForward": "silent" }
   },

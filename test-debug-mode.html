@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Debug Mode Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #1e1e1e;
+      color: #e0e0e0;
+    }
+    h1 {
+      color: #3b82f6;
+    }
+    .status {
+      padding: 12px 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+      font-weight: bold;
+    }
+    .status.enabled {
+      background: #22c55e;
+      color: white;
+    }
+    .status.disabled {
+      background: #6b7280;
+      color: white;
+    }
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 5px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    .instructions {
+      background: #2a2a2a;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+      border-left: 4px solid #3b82f6;
+    }
+    code {
+      background: #1a1a1a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #22c55e;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔧 Debug Mode Test</h1>
+
+  <div class="status" id="status">
+    Loading...
+  </div>
+
+  <div>
+    <button onclick="enableDebug()">Enable Debug Mode</button>
+    <button onclick="disableDebug()">Disable Debug Mode</button>
+    <button onclick="toggleDebug()">Toggle Debug Mode</button>
+    <button onclick="checkStatus()">Check Status</button>
+  </div>
+
+  <div class="instructions">
+    <h3>Instructions:</h3>
+    <ol>
+      <li>Open the browser console (F12)</li>
+      <li>Click the buttons above to test debug mode</li>
+      <li>You can also type commands directly in the console:
+        <ul>
+          <li><code>enableDebug()</code></li>
+          <li><code>disableDebug()</code></li>
+          <li><code>toggleDebug()</code></li>
+        </ul>
+      </li>
+      <li>Check localStorage to see the DEBUG_MODE key</li>
+    </ol>
+  </div>
+
+  <script type="module">
+    // Simple inline debug utilities for testing
+    const DEBUG_KEY = 'DEBUG_MODE';
+
+    function isDebugEnabled() {
+      return localStorage.getItem(DEBUG_KEY) === 'true';
+    }
+
+    function enableDebug() {
+      localStorage.setItem(DEBUG_KEY, 'true');
+      console.log(
+        '%c✓ Debug mode enabled',
+        'background: #22c55e; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold;'
+      );
+      updateStatus();
+    }
+
+    function disableDebug() {
+      localStorage.removeItem(DEBUG_KEY);
+      console.log(
+        '%c✓ Debug mode disabled',
+        'background: #ef4444; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold;'
+      );
+      updateStatus();
+    }
+
+    function toggleDebug() {
+      if (isDebugEnabled()) {
+        disableDebug();
+      } else {
+        enableDebug();
+      }
+    }
+
+    function updateStatus() {
+      const statusEl = document.getElementById('status');
+      const enabled = isDebugEnabled();
+
+      statusEl.textContent = `Debug Mode: ${enabled ? 'ENABLED ✓' : 'DISABLED'}`;
+      statusEl.className = `status ${enabled ? 'enabled' : 'disabled'}`;
+    }
+
+    function checkStatus() {
+      const enabled = isDebugEnabled();
+      console.log(`Debug mode is ${enabled ? 'ENABLED' : 'DISABLED'}`);
+      console.log(`localStorage.DEBUG_MODE = ${localStorage.getItem(DEBUG_KEY)}`);
+      updateStatus();
+    }
+
+    // Make functions global
+    window.enableDebug = enableDebug;
+    window.disableDebug = disableDebug;
+    window.toggleDebug = toggleDebug;
+    window.checkStatus = checkStatus;
+
+    // Show welcome message
+    console.log(
+      '%c🔧 Debug Mode Test',
+      'background: #3b82f6; color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 14px;'
+    );
+    console.log('%cAvailable commands:', 'color: #6b7280;');
+    console.log('%c  enableDebug()', 'color: #22c55e; font-weight: bold;');
+    console.log('%c  disableDebug()', 'color: #ef4444; font-weight: bold;');
+    console.log('%c  toggleDebug()', 'color: #f59e0b; font-weight: bold;');
+    console.log('%c  checkStatus()', 'color: #3b82f6; font-weight: bold;');
+
+    // Initial status update
+    updateStatus();
+  </script>
+</body>
+</html>

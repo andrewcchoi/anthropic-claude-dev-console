@@ -5,6 +5,9 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { parseTelemetry } from '@/lib/telemetry';
+import { createServerLogger } from '@/lib/logger/server';
+
+const log = createServerLogger('ClaudeAPI');
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,6 +18,12 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { prompt, sessionId, cwd } = body;
+
+    log.debug('Received chat request', {
+      sessionId,
+      cwd,
+      promptLength: prompt.length
+    });
 
     if (!prompt) {
       return new Response(
@@ -50,6 +59,11 @@ export async function POST(req: NextRequest) {
           }
 
           // Spawn Claude CLI process
+          log.debug('Spawning Claude CLI', {
+            args,
+            cwd: cwd || '/workspace'
+          });
+
           const claude = spawn('claude', args, {
             cwd: cwd || '/workspace',
             stdio: ['pipe', 'pipe', 'pipe'],
@@ -63,6 +77,8 @@ export async function POST(req: NextRequest) {
 
           // Handle stdout (JSON stream)
           claude.stdout.on('data', (chunk: Buffer) => {
+            log.debug('CLI stdout chunk', { bytesReceived: chunk.length });
+
             const data = chunk.toString();
             const lines = data.split('\n');
 
@@ -134,6 +150,11 @@ export async function POST(req: NextRequest) {
 
           // Handle process completion
           claude.on('close', async (code) => {
+            log.debug('CLI process closed', {
+              exitCode: code,
+              hadSuccess: receivedSuccessResult
+            });
+
             // Parse and log telemetry if we captured any
             if (telemetryBuffer) {
               try {
@@ -150,7 +171,7 @@ export async function POST(req: NextRequest) {
                 }
               } catch (e) {
                 // Silently fail telemetry logging to not disrupt the response
-                console.error('Failed to log telemetry:', e);
+                log.error('Failed to log telemetry', { error: e });
               }
             }
 

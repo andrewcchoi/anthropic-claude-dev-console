@@ -1,4 +1,4 @@
-import { ITheme } from 'xterm';
+import { ITheme } from '@xterm/xterm';
 
 export const terminalTheme: ITheme = {
   background: '#1f2937', // gray-800

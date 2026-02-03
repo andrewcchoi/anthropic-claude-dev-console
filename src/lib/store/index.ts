@@ -2,6 +2,16 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { ChatMessage, Session, ToolExecution, UsageStats } from '@/types/claude';
 import { v4 as uuidv4 } from 'uuid';
+import { createLogger } from '../logger';
+
+const log = createLogger('ChatStore');
+
+interface TerminalSession {
+  sessionId: string;
+  status: 'connecting' | 'connected' | 'disconnected' | 'error';
+  cwd?: string;
+  error?: string;
+}
 
 interface ChatStore {
   // Messages
@@ -29,6 +39,12 @@ interface ChatStore {
   addToolExecution: (tool: ToolExecution) => void;
   updateToolExecution: (id: string, updates: Partial<ToolExecution>) => void;
   clearToolExecutions: () => void;
+
+  // Terminal sessions
+  terminalSessions: Map<string, TerminalSession>;
+  openTerminalSession: (toolId: string, cwd?: string) => void;
+  closeTerminalSession: (toolId: string) => void;
+  updateTerminalStatus: (toolId: string, status: TerminalSession['status'], error?: string) => void;
 
   // UI State
   isStreaming: boolean;
@@ -71,6 +87,7 @@ export const useChatStore = create<ChatStore>()(
 
       startNewSession: () => {
         const newSessionId = uuidv4();
+        log.debug('Starting new session', { id: newSessionId });
         set({
           sessionId: newSessionId,
           currentSession: null,
@@ -82,8 +99,10 @@ export const useChatStore = create<ChatStore>()(
       },
 
       switchSession: async (id) => {
+        const currentId = get().sessionId;
         const session = get().sessions.find((s) => s.id === id);
         if (session) {
+          log.debug('Switching session', { from: currentId, to: id });
           // Set loading state but DON'T clear messages yet
           set({ isLoadingHistory: true });
 
@@ -113,7 +132,7 @@ export const useChatStore = create<ChatStore>()(
               });
             }
           } catch (error) {
-            console.error('Failed to load session messages:', error);
+            log.error('Failed to load session messages', { error });
             // Continue with empty state on error
             set({
               sessionId: session.id,
@@ -134,6 +153,8 @@ export const useChatStore = create<ChatStore>()(
         if (currentSession) return;
 
         if (!sessionId || sessions.some((s) => s.id === sessionId)) return;
+
+        log.debug('Saving session', { id: sessionId });
 
         const name =
           messages.find((m) => m.role === 'user')?.content?.[0]?.text?.slice(0, 50) ||
@@ -183,6 +204,38 @@ export const useChatStore = create<ChatStore>()(
           ),
         })),
       clearToolExecutions: () => set({ toolExecutions: [] }),
+
+      // Terminal sessions
+      terminalSessions: new Map(),
+      openTerminalSession: (toolId, cwd) =>
+        set((state) => {
+          const newSessions = new Map(state.terminalSessions);
+          newSessions.set(toolId, {
+            sessionId: `term-${toolId}`,
+            status: 'connecting',
+            cwd,
+          });
+          return { terminalSessions: newSessions };
+        }),
+      closeTerminalSession: (toolId) =>
+        set((state) => {
+          const newSessions = new Map(state.terminalSessions);
+          newSessions.delete(toolId);
+          return { terminalSessions: newSessions };
+        }),
+      updateTerminalStatus: (toolId, status, error) =>
+        set((state) => {
+          const newSessions = new Map(state.terminalSessions);
+          const existing = newSessions.get(toolId);
+          if (existing) {
+            newSessions.set(toolId, {
+              ...existing,
+              status,
+              error,
+            });
+          }
+          return { terminalSessions: newSessions };
+        }),
 
       // UI State
       isStreaming: false,
