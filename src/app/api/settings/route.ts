@@ -5,15 +5,14 @@ import { homedir } from 'os';
 import { join } from 'path';
 
 // Helper to read and parse settings file
-async function readSettingsFile(path: string): Promise<Record<string, string> | null> {
+async function readSettingsFile(path: string): Promise<Record<string, unknown> | null> {
   if (!existsSync(path)) {
     return null;
   }
 
   try {
     const content = await readFile(path, 'utf-8');
-    const settings = JSON.parse(content);
-    return settings.env || {};
+    return JSON.parse(content);
   } catch (error) {
     console.error(`Failed to read settings from ${path}:`, error);
     return null;
@@ -70,44 +69,40 @@ function extractProviderConfig(env: Record<string, string>): Record<string, stri
 
 export async function GET() {
   // Settings priority: project > user
-  const projectSettingsPath = join(process.cwd(), '.claude', 'settings.json');
-  const userSettingsPath = join(homedir(), '.claude', 'settings.json');
+  const projectSettingsPath = join(process.cwd(), '.claude', 'settings.local.json');
+  const userSettingsPath = join(homedir(), '.claude', 'settings.local.json');
 
   // Read both settings files
-  const [projectEnv, userEnv] = await Promise.all([
+  const [projectSettings, userSettings] = await Promise.all([
     readSettingsFile(projectSettingsPath),
     readSettingsFile(userSettingsPath),
   ]);
 
   // If neither exists, return defaults
-  if (!projectEnv && !userEnv) {
+  if (!projectSettings && !userSettings) {
     return NextResponse.json({
       provider: 'anthropic',
       providerConfig: {},
-      source: 'default'
+      source: 'default',
+      settings: {}
     });
   }
 
-  // Detect provider: project takes precedence, otherwise use user
-  let provider: string;
-  let source: string;
+  // Shallow merge: project top-level keys override user completely
+  const mergedSettings = { ...userSettings, ...projectSettings };
 
-  if (projectEnv && detectProvider(projectEnv) !== 'anthropic') {
-    // Project has explicit provider setting
-    provider = detectProvider(projectEnv);
-    source = 'project';
-  } else if (userEnv) {
-    // Fall back to user provider
-    provider = detectProvider(userEnv);
-    source = projectEnv ? 'project' : 'user';
-  } else {
-    provider = 'anthropic';
-    source = 'project';
-  }
+  // Extract env for provider detection
+  const env = (mergedSettings.env || {}) as Record<string, string>;
+  const provider = detectProvider(env);
+  const providerConfig = extractProviderConfig(env);
 
-  // Merge env vars for config extraction: project settings override user settings
-  const mergedEnv = { ...userEnv, ...projectEnv };
-  const providerConfig = extractProviderConfig(mergedEnv);
+  // Determine source
+  const source = projectSettings ? 'project' : (userSettings ? 'user' : 'default');
 
-  return NextResponse.json({ provider, providerConfig, source });
+  return NextResponse.json({
+    provider,
+    providerConfig,
+    source,
+    settings: mergedSettings
+  });
 }
