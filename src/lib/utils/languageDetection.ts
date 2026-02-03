@@ -30,7 +30,6 @@ const extensionToLanguage: Record<string, string> = {
   mdx: 'markdown',
   html: 'html',
   htm: 'html',
-  xml: 'xml',
   svg: 'xml',
 
   // Stylesheets

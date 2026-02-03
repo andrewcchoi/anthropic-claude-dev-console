@@ -6,7 +6,7 @@
 import * as pty from 'node-pty';
 import * as os from 'os';
 import * as path from 'path';
-import { PTYInstance, PTYSpawnOptions } from './types';
+import { PTYInstance, PTYSpawnOptions } from '@/types/terminal';
 import { createServerLogger } from '../logger/server';
 
 const log = createServerLogger('PTYManager');

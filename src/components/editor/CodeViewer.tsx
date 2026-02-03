@@ -119,21 +119,12 @@ export function CodeViewer({
   // All hooks must be called before any conditional returns
   const [showLargeFile, setShowLargeFile] = useState(false);
   const [monacoFailed, setMonacoFailed] = useState(false);
-  const failureCountRef = useRef(0);
   const { resolvedTheme } = useAppTheme();
 
   // Check for binary content and large files
   const isBinary = isBinaryExtension(filePath) || isBinaryContent(content);
   const isLarge = isLargeFile(content);
   const detectedLanguage = language || (filePath ? detectLanguage(filePath) : 'plaintext');
-
-  // Track Monaco failures - if it fails multiple times, fall back permanently
-  const handleMonacoError = () => {
-    failureCountRef.current += 1;
-    if (failureCountRef.current >= 2) {
-      setMonacoFailed(true);
-    }
-  };
 
   // Conditional rendering based on checks
   if (isBinary) {

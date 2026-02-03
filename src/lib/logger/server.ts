@@ -4,17 +4,7 @@
  */
 
 import { logStream } from './log-stream';
-
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
-
-interface ServerLogEntry {
-  timestamp: string;
-  level: LogLevel;
-  module: string;
-  message: string;
-  data?: unknown;
-  correlationId?: string;
-}
+import { type LogLevel, type LogEntry as ServerLogEntry } from '@/types/logger';
 
 const LOG_LEVELS: Record<LogLevel, number> = {
   debug: 0,

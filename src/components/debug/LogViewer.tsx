@@ -7,15 +7,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useDebug } from '../providers/DebugProvider';
-
-interface LogEntry {
-  timestamp: string;
-  level: 'debug' | 'info' | 'warn' | 'error';
-  module: string;
-  message: string;
-  data?: unknown;
-  correlationId?: string;
-}
+import { type LogEntry } from '@/types/logger';
 
 const LOG_COLORS = {
   debug: 'text-gray-400 dark:text-gray-500',

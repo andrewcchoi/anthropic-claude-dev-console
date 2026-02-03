@@ -3,7 +3,7 @@
  * Browser-side WebSocket connection management
  */
 
-import { TerminalClientMessage, TerminalServerMessage } from './types';
+import { TerminalClientMessage, TerminalServerMessage } from '@/types/terminal';
 import { createLogger } from '../logger';
 
 const log = createLogger('WebSocketClient');

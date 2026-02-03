@@ -8,7 +8,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import * as http from 'http';
 import { ptyManager } from '../src/lib/terminal/pty-manager';
-import { TerminalClientMessage, TerminalServerMessage } from '../src/lib/terminal/types';
+import { TerminalClientMessage, TerminalServerMessage } from '../src/types/terminal';
 import { createServerLogger } from '../src/lib/logger/server';
 
 const log = createServerLogger('TerminalServer');

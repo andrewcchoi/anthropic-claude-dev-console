@@ -39,9 +39,9 @@ export function MessageContent({ content }: MessageContentProps) {
             <ToolExecution
               key={block.id || index}
               name={block.name || 'unknown'}
-              input={toolExecution?.input ?? block.input}
+              input={(toolExecution?.input ?? block.input ?? {}) as Record<string, unknown>}
               status={status}
-              output={output}
+              output={output as any}
             />
           );
         } else if (block.type === 'tool_result') {

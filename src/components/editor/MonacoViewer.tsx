@@ -41,7 +41,6 @@ export function MonacoViewer({
   const monaco = useMonaco();
   const editorRef = useRef<any>(null);
   const [copied, setCopied] = useState(false);
-  const [initError, setInitError] = useState<string | null>(null);
   const { resolvedTheme } = useAppTheme();
 
   const effectiveTheme = theme === 'auto' ? (resolvedTheme || 'dark') : theme;
@@ -84,14 +83,6 @@ export function MonacoViewer({
       console.warn('Failed to define Monaco themes:', error);
     }
   };
-
-  if (initError) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 text-amber-700 dark:text-amber-200 p-4">
-        <span>Editor initialization failed: {initError}</span>
-      </div>
-    );
-  }
 
   return (
     <div className="w-full h-full flex flex-col">

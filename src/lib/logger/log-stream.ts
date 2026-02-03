@@ -4,15 +4,7 @@
  */
 
 import { EventEmitter } from 'events';
-
-export interface LogEntry {
-  timestamp: string;
-  level: 'debug' | 'info' | 'warn' | 'error';
-  module: string;
-  message: string;
-  data?: unknown;
-  correlationId?: string;
-}
+import { type LogEntry } from '@/types/logger';
 
 class LogStream extends EventEmitter {
   private logs: LogEntry[] = [];

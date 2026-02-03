@@ -29,7 +29,7 @@ export interface SDKMessage {
       text?: string;
       id?: string;
       name?: string;
-      input?: any;
+      input?: Record<string, unknown>;
     };
     delta?: {
       type: string;
@@ -40,7 +40,10 @@ export interface SDKMessage {
   message?: {
     content?: MessageContent[];
     model?: string;
-    usage?: any;
+    usage?: {
+      input_tokens: number;
+      output_tokens: number;
+    };
   };
 }
 
@@ -51,8 +54,8 @@ export interface MessageContent {
   text?: string;
   id?: string;
   name?: string;
-  input?: any;
-  content?: string | any[];
+  input?: Record<string, unknown>;
+  content?: string | unknown[];
   tool_use_id?: string;
   is_error?: boolean;
   source?: { type: 'file'; path: string; originalName: string };
@@ -77,8 +80,8 @@ export interface Session {
 export interface ToolExecution {
   id: string;
   name: string;
-  input: any;
-  output?: any;
+  input: Record<string, unknown>;
+  output?: unknown;
   status: 'pending' | 'success' | 'error';
   timestamp: number;
 }

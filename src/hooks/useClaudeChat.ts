@@ -294,7 +294,7 @@ export function useClaudeChat() {
                       addToolExecution({
                         id: toolId,
                         name: toolBlock.name || 'unknown',
-                        input: toolBlock.input,
+                        input: toolBlock.input || {},
                         status: 'pending',
                         timestamp: Date.now(),
                       });
