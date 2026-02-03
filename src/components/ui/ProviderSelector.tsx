@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useChatStore } from '@/lib/store';
 import { ChevronDown, Cloud } from 'lucide-react';
 
@@ -15,6 +16,36 @@ const inputClass = "mt-2 w-full px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-
 
 export function ProviderSelector() {
   const { provider, setProvider, providerConfig, setProviderConfig, isStreaming } = useChatStore();
+  const [loaded, setLoaded] = useState(false);
+
+  // Prepopulate from CLI settings on mount (only if no localStorage values)
+  useEffect(() => {
+    async function loadSettings() {
+      // Skip if already loaded or if localStorage has provider config
+      const hasExistingConfig = Object.keys(providerConfig).length > 0;
+      if (loaded || hasExistingConfig) return;
+
+      try {
+        const response = await fetch('/api/settings');
+        if (response.ok) {
+          const { provider: cliProvider, providerConfig: cliConfig } = await response.json();
+
+          // Only populate if CLI has config we don't have
+          if (cliProvider && cliProvider !== 'anthropic') {
+            setProvider(cliProvider);
+          }
+          if (cliConfig && Object.keys(cliConfig).length > 0) {
+            setProviderConfig(cliConfig);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load CLI settings:', error);
+      } finally {
+        setLoaded(true);
+      }
+    }
+    loadSettings();
+  }, [loaded, providerConfig, setProvider, setProviderConfig]);
 
   return (
     <div className="px-3 py-2">
