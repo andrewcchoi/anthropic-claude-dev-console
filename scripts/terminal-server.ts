@@ -48,7 +48,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   const requestedCwd = url.searchParams.get('cwd');
 
   // Validate and sanitize cwd
-  let cwd = process.env.HOME || '/workspace';
+  let cwd = '/workspace';
   if (requestedCwd) {
     // Basic path validation - ensure it doesn't contain dangerous patterns
     const sanitized = requestedCwd.replace(/\.\./g, '').trim();
