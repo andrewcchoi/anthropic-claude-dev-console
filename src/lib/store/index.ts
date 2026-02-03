@@ -75,6 +75,8 @@ interface ChatStore {
   trackFileActivity: (path: string, type: 'read' | 'modified') => void;
   setSidebarTab: (tab: 'sessions' | 'files') => void;
   setPendingInputText: (text: string | null) => void;
+  clearExpandedFolders: () => void;
+  expandFolders: (paths: string[]) => void;
 
   // UI State
   isStreaming: boolean;
@@ -350,6 +352,8 @@ export const useChatStore = create<ChatStore>()(
         }),
       setSidebarTab: (tab) => set({ sidebarTab: tab }),
       setPendingInputText: (text) => set({ pendingInputText: text }),
+      clearExpandedFolders: () => set({ expandedFolders: new Set<string>() }),
+      expandFolders: (paths) => set({ expandedFolders: new Set(paths) }),
     }),
     {
       name: 'claude-code-sessions',

@@ -11,6 +11,7 @@ import { createLogger } from '@/lib/logger';
 const log = createLogger('FileTree');
 
 const WORKSPACE_ROOT = '/workspace';
+const DEFAULT_EXPAND_DEPTH = 2;
 
 export function FileTree() {
   const [directoryContents, setDirectoryContents] = useState<Map<string, FileItem[]>>(new Map());
@@ -22,6 +23,7 @@ export function FileTree() {
   });
   const [loading, setLoading] = useState(false);
   const [loadingDirs, setLoadingDirs] = useState<Set<string>>(new Set());
+  const [isExpandingAll, setIsExpandingAll] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     position: { x: number; y: number };
     item: FileItem;
@@ -34,35 +36,88 @@ export function FileTree() {
     toggleFolder,
     selectFile,
     setPreviewOpen,
+    clearExpandedFolders,
+    expandFolders,
   } = useChatStore();
 
-  const loadDirectory = useCallback(async (path: string) => {
-    // Skip if already loaded
-    if (directoryContents.has(path)) return;
+  const loadDirectory = useCallback(async (path: string, force: boolean = false) => {
+    // Get current directoryContents from state
+    setDirectoryContents((currentContents) => {
+      // Skip if already loaded (unless forced)
+      if (!force && currentContents.has(path)) return currentContents;
 
-    try {
+      // Start loading
       setLoadingDirs((prev) => new Set(prev).add(path));
-      const response = await fetch(`/api/files?path=${encodeURIComponent(path)}`);
-      if (response.ok) {
-        const data = await response.json();
-        setDirectoryContents((prev) => {
-          const newMap = new Map(prev);
-          newMap.set(path, data.items || []);
-          return newMap;
-        });
-      } else {
-        log.error('Failed to load directory', { path, status: response.status });
-      }
-    } catch (error) {
-      log.error('Error loading directory', { path, error });
-    } finally {
-      setLoadingDirs((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(path);
-        return newSet;
+
+      // Perform async load
+      (async () => {
+        try {
+          const response = await fetch(`/api/files?path=${encodeURIComponent(path)}`);
+          if (response.ok) {
+            const data = await response.json();
+            setDirectoryContents((prev) => {
+              const newMap = new Map(prev);
+              newMap.set(path, data.items || []);
+              return newMap;
+            });
+          } else {
+            log.error('Failed to load directory', { path, status: response.status });
+          }
+        } catch (error) {
+          log.error('Error loading directory', { path, error });
+        } finally {
+          setLoadingDirs((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(path);
+            return newSet;
+          });
+        }
+      })();
+
+      return currentContents;
+    });
+  }, []);
+
+  // Promise-based version of loadDirectory for use in async/await flows
+  const loadDirectoryAsync = useCallback(async (path: string, force: boolean = false): Promise<void> => {
+    return new Promise((resolve) => {
+      setDirectoryContents((currentContents) => {
+        if (!force && currentContents.has(path)) {
+          resolve();
+          return currentContents;
+        }
+
+        setLoadingDirs((prev) => new Set(prev).add(path));
+
+        (async () => {
+          try {
+            const response = await fetch(`/api/files?path=${encodeURIComponent(path)}`);
+            if (response.ok) {
+              const data = await response.json();
+              setDirectoryContents((prev) => {
+                const newMap = new Map(prev);
+                newMap.set(path, data.items || []);
+                return newMap;
+              });
+            } else {
+              log.error('Failed to load directory', { path, status: response.status });
+            }
+          } catch (error) {
+            log.error('Error loading directory', { path, error });
+          } finally {
+            setLoadingDirs((prev) => {
+              const newSet = new Set(prev);
+              newSet.delete(path);
+              return newSet;
+            });
+            resolve();
+          }
+        })();
+
+        return currentContents;
       });
-    }
-  }, [directoryContents]);
+    });
+  }, []);
 
   const loadGitStatus = useCallback(async (path: string = WORKSPACE_ROOT) => {
     try {
@@ -204,8 +259,116 @@ export function FileTree() {
     }
   };
 
-  const handleCollapseAll = () => {
-    expandedFolders.clear();
+  // Helper to get all directory paths from directoryContents
+  const getAllDirectoryPaths = useCallback((): string[] => {
+    const paths: string[] = [];
+    const collectPaths = (items: FileItem[]) => {
+      items.forEach((item) => {
+        if (item.type === 'directory') {
+          paths.push(item.path);
+          const children = directoryContents.get(item.path);
+          if (children) {
+            collectPaths(children);
+          }
+        }
+      });
+    };
+    const rootItems = directoryContents.get(WORKSPACE_ROOT);
+    if (rootItems) {
+      collectPaths(rootItems);
+    }
+    return paths;
+  }, [directoryContents]);
+
+  // Helper to get directory paths up to a specific depth
+  const getDirectoryPathsToDepth = useCallback((maxDepth: number): string[] => {
+    const paths: string[] = [];
+
+    const collectPaths = (items: FileItem[], currentDepth: number) => {
+      if (currentDepth >= maxDepth) return;
+
+      items.forEach((item) => {
+        if (item.type === 'directory') {
+          paths.push(item.path);
+          const children = directoryContents.get(item.path);
+          if (children) {
+            collectPaths(children, currentDepth + 1);
+          }
+        }
+      });
+    };
+
+    const rootItems = directoryContents.get(WORKSPACE_ROOT);
+    if (rootItems) {
+      collectPaths(rootItems, 0);
+    }
+    return paths;
+  }, [directoryContents]);
+
+  // Determine if all directories (up to default depth) are currently expanded
+  const isAllExpanded = useCallback(() => {
+    const dirsAtDepth = getDirectoryPathsToDepth(DEFAULT_EXPAND_DEPTH);
+    if (dirsAtDepth.length === 0) return false;
+    return dirsAtDepth.every((path) => expandedFolders.has(path));
+  }, [getDirectoryPathsToDepth, expandedFolders]);
+
+  // Load multiple directories with concurrency limiting
+  const loadDirectoriesThrottled = useCallback(async (
+    paths: string[],
+    concurrency = 3
+  ): Promise<void> => {
+    const queue = [...paths];
+    const active = new Set<Promise<void>>();
+
+    const loadNext = async () => {
+      if (queue.length === 0) return;
+      const path = queue.shift()!;
+      const promise = loadDirectoryAsync(path).finally(() => {
+        active.delete(promise);
+      });
+      active.add(promise);
+    };
+
+    // Initial batch
+    while (active.size < concurrency && queue.length > 0) {
+      await loadNext();
+    }
+
+    // Process remaining as slots free up
+    while (active.size > 0) {
+      await Promise.race(active);
+      while (active.size < concurrency && queue.length > 0) {
+        await loadNext();
+      }
+    }
+  }, [loadDirectoryAsync]);
+
+  const handleToggleExpandCollapse = async () => {
+    // Prevent double-click while expanding
+    if (isExpandingAll) return;
+
+    if (isAllExpanded()) {
+      // Collapse all - instant, no loading needed
+      clearExpandedFolders();
+    } else {
+      setIsExpandingAll(true);
+
+      try {
+        // Get directories only to depth limit
+        const dirsToExpand = getDirectoryPathsToDepth(DEFAULT_EXPAND_DEPTH);
+
+        // Expand UI immediately for responsive feel
+        expandFolders(dirsToExpand);
+
+        // Load unloaded directories with throttling
+        const unloadedDirs = dirsToExpand.filter(p => !directoryContents.has(p));
+        if (unloadedDirs.length > 0) {
+          await loadDirectoriesThrottled(unloadedDirs, 3);
+        }
+      } finally {
+        setIsExpandingAll(false);
+      }
+    }
   };
 
   const refreshDirectory = (dirPath: string) => {
@@ -215,7 +378,7 @@ export function FileTree() {
       newMap.delete(dirPath);
       return newMap;
     });
-    loadDirectory(dirPath);
+    loadDirectory(dirPath, true);  // Force reload
   };
 
   const renderTree = (items: FileItem[], level: number = 0): React.ReactNode => {
@@ -273,7 +436,9 @@ export function FileTree() {
           refreshDirectory(WORKSPACE_ROOT);
           loadGitStatus();
         }}
-        onCollapseAll={handleCollapseAll}
+        onToggleExpandCollapse={handleToggleExpandCollapse}
+        isAllExpanded={isAllExpanded()}
+        isLoading={isExpandingAll}
       />
       <div className="flex-1 overflow-y-auto">
         {isLoadingRoot ? (
