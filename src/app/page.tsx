@@ -4,6 +4,7 @@ import { useClaudeChat } from '@/hooks/useClaudeChat';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { MessageList } from '@/components/chat/MessageList';
 import { Sidebar } from '@/components/sidebar/Sidebar';
+import { RightPanel } from '@/components/sidebar/RightPanel';
 import { UsageDisplay } from '@/components/usage/UsageDisplay';
 import { useChatStore } from '@/lib/store';
 
@@ -24,6 +25,7 @@ export default function Home() {
         <UsageDisplay />
         <ChatInput onSend={sendMessage} disabled={isStreaming} />
       </div>
+      <RightPanel />
     </div>
   );
 }
