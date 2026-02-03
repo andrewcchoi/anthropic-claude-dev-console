@@ -284,10 +284,10 @@ Instead of implementing provider SDKs directly in the Next.js app, the applicati
 
 **Gate:** ✅ Working plugin with automatic problem tracking
 
-### Phase 6: Future Enhancements ⏳ NOT STARTED
+### Phase 6: Future Enhancements ⏳ IN PROGRESS
 
 **Tasks (Parallel):**
-- [ ] Terminal emulator (xterm.js integration)
+- [x] Terminal emulator (xterm.js integration) - Implemented: ReadOnlyTerminal for chat output, InteractiveTerminal for standalone shell
 - [ ] Code viewer (Monaco Editor)
 - [ ] Dark/light theme toggle
 - [ ] Provider selector UI

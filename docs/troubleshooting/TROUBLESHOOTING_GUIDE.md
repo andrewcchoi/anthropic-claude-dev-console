@@ -37,7 +37,6 @@ This guide documents 8 solved problems and 2 ongoing investigations captured dur
 
 1. [ENOENT error in telemetry logging](#problem-1-enoent-error-in-telemetry-logging)
 2. [TypeScript build failure with undefined telemetry](#problem-2-typescript-build-failure-with-undefined-)
-3. [Session ID already in use error on new chat](#problem-3-session-id-already-in-use-error-on-new-c)
 4. [Session ID already in use error on new chat](#problem-4-session-id-already-in-use-error-on-new-c)
 5. [User messages disappear when switching sessions](#problem-5-user-messages-disappear-when-switching-s)
 6. [Session conflict when resuming existing session](#problem-6-session-conflict-when-resuming-existing-)
@@ -133,15 +132,6 @@ typeerror: cannot read property 'telemetry' of undefined
 **Attempt 1** (2026-01-27T10:12:00Z)
 - **Description:** Added null check for telemetry object
 - **Outcome:** partial
-
----
-
-### Problem 3: Session ID already in use error on new chat
-
-**ID:** `prob_ac67e87c`  
-**Category:** unknown  
-**Status:** investigating  
-**Created:** 2026-01-28T04:19:40+00:00  
 
 ---
 

@@ -1,34 +1,22 @@
-# Implementation Archive
+# Archive
 
-This directory contains historical implementation notes and summaries created during the development of the Claude Code UI web application.
+This directory contains historical documentation that is no longer actively maintained but preserved for reference.
 
-## Contents
+## Archived Documentation
 
-These documents were created as working notes during the implementation process:
+### Terminal Enhancement Records
+- **TERMINAL_DEBUGGING_BUG4.md** - Resolved terminal bug documentation (Bug #4)
+- **TERMINAL_TEST_RESULTS.md** - Terminal implementation test results
+- **terminal-code-review-FINAL.md** - Final code review with architecture decisions for terminal feature
+- **MANUAL_BROWSER_TEST.md** - Manual testing guide for terminal functionality
 
-### Core Implementation Docs
-- `IMPLEMENTATION_COMPLETE.md` - Final implementation summary
-- `IMPLEMENTATION_SUMMARY.md` - Overall implementation details
-- `SESSION_MANAGEMENT_IMPLEMENTATION.md` - Session management implementation notes
-- `PYTHON_SUPPORT_IMPLEMENTATION.md` - Python support implementation details
+### Reference Guides
+- **CLI_TROUBLESHOOTING_GUIDE.md** - Comprehensive troubleshooting patterns (1,591 lines) - valuable historical reference
+- **SECURITY_FIXES.md** - Security audit documentation - important to retain
+- **TELEMETRY_DATA_EXPLAINED.md** - Reference for CLI telemetry format
 
-### Bug Fixes & Testing
-- `BUG_FIX_SUMMARY.md` - Summary of bugs fixed during development
-- `SECURITY_FIXES.md` - Security-related fixes
-- `SESSION_MANAGEMENT_TEST.md` - Session management testing notes
-- `TEST_GENERATION_COMPLETE.md` - Test generation completion notes
-- `TEST_RESULTS.md` - Test results and verification
+## Why These Are Archived
 
-### Troubleshooting
-- `CLI_TROUBLESHOOTING_GUIDE.md` - CLI integration troubleshooting
-- `TROUBLESHOOT_RECORDER_SUMMARY.md` - Troubleshoot recorder plugin summary
-- `TELEMETRY_DATA_EXPLAINED.md` - Telemetry data structure explanation
-- `TELEMETRY_LOG.md` - Telemetry logging details
+These documents represent completed work, resolved issues, or historical context that may be useful for understanding past decisions but is no longer part of active development workflows.
 
-## Note
-
-These documents served their purpose during active development. For current documentation, see:
-- `/CLAUDE.md` - Project instructions for Claude Code
-- `/PLAN.md` - Architecture and implementation plan
-- `/README.md` - Main project readme
-- `/docs/troubleshooting/TROUBLESHOOTING_GUIDE.md` - Auto-generated troubleshooting guide
+For current troubleshooting documentation, see `/docs/troubleshooting/`.

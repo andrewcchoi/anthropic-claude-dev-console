@@ -1,5 +1,5 @@
 ---
-name: environment-collector
+identifier: environment-collector
 description: Captures environment metadata when a session starts
 type: background
 triggers:
