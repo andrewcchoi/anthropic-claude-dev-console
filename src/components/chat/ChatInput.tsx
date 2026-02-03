@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useRef, KeyboardEvent, DragEvent } from 'react';
+import { useState, useRef, useEffect, KeyboardEvent, DragEvent } from 'react';
 import { Paperclip } from 'lucide-react';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { AttachmentPreview } from './AttachmentPreview';
 import { FileAttachment } from '@/types/upload';
+import { useChatStore } from '@/lib/store';
 
 interface ChatInputProps {
   onSend: (message: string, attachments?: FileAttachment[]) => void;
@@ -14,8 +15,25 @@ interface ChatInputProps {
 export function ChatInput({ onSend, disabled }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { attachments, addFiles, removeAttachment, clearAttachments } = useFileUpload();
+  const { pendingInputText, setPendingInputText } = useChatStore();
+
+  // Handle pending input text from file reference insertion
+  useEffect(() => {
+    if (pendingInputText) {
+      setInput((prev) => {
+        const newValue = prev ? `${prev} ${pendingInputText}` : pendingInputText;
+        return newValue;
+      });
+      setPendingInputText(null);
+      // Focus the textarea
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 0);
+    }
+  }, [pendingInputText, setPendingInputText]);
 
   const handleSend = () => {
     if (input.trim() && !disabled) {
@@ -114,6 +132,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
           </button>
 
           <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}

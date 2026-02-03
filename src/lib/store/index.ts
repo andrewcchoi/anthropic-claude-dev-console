@@ -62,6 +62,22 @@ interface ChatStore {
   closeTerminalSession: (toolId: string) => void;
   updateTerminalStatus: (toolId: string, status: TerminalSession['status'], error?: string) => void;
 
+  // File browser
+  expandedFolders: Set<string>;
+  selectedFile: string | null;
+  previewOpen: boolean;
+  fileActivity: Map<string, 'read' | 'modified'>;
+  sidebarTab: 'sessions' | 'files';
+  pendingInputText: string | null;
+  toggleFolder: (path: string) => void;
+  selectFile: (path: string | null) => void;
+  setPreviewOpen: (open: boolean) => void;
+  trackFileActivity: (path: string, type: 'read' | 'modified') => void;
+  setSidebarTab: (tab: 'sessions' | 'files') => void;
+  setPendingInputText: (text: string | null) => void;
+  clearExpandedFolders: () => void;
+  expandFolders: (paths: string[]) => void;
+
   // UI State
   isStreaming: boolean;
   setIsStreaming: (streaming: boolean) => void;
@@ -308,6 +324,36 @@ export const useChatStore = create<ChatStore>()(
       // Default mode selection
       defaultMode: 'plan',
       setDefaultMode: (mode) => set({ defaultMode: mode }),
+
+      // File browser
+      expandedFolders: new Set<string>(),
+      selectedFile: null,
+      previewOpen: false,
+      fileActivity: new Map<string, 'read' | 'modified'>(),
+      sidebarTab: 'sessions',
+      pendingInputText: null,
+      toggleFolder: (path) =>
+        set((state) => {
+          const newExpanded = new Set(state.expandedFolders);
+          if (newExpanded.has(path)) {
+            newExpanded.delete(path);
+          } else {
+            newExpanded.add(path);
+          }
+          return { expandedFolders: newExpanded };
+        }),
+      selectFile: (path) => set({ selectedFile: path }),
+      setPreviewOpen: (open) => set({ previewOpen: open }),
+      trackFileActivity: (path, type) =>
+        set((state) => {
+          const newActivity = new Map(state.fileActivity);
+          newActivity.set(path, type);
+          return { fileActivity: newActivity };
+        }),
+      setSidebarTab: (tab) => set({ sidebarTab: tab }),
+      setPendingInputText: (text) => set({ pendingInputText: text }),
+      clearExpandedFolders: () => set({ expandedFolders: new Set<string>() }),
+      expandFolders: (paths) => set({ expandedFolders: new Set(paths) }),
     }),
     {
       name: 'claude-code-sessions',
@@ -319,6 +365,7 @@ export const useChatStore = create<ChatStore>()(
         provider: state.provider,
         providerConfig: state.providerConfig,
         defaultMode: state.defaultMode,
+        sidebarTab: state.sidebarTab,
       }),
     }
   )
