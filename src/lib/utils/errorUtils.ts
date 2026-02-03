@@ -17,9 +17,17 @@ export function serializeError(error: unknown): string {
     if (typeof obj.message === 'string') return obj.message;
     if (typeof obj.msg === 'string') return obj.msg;
     try {
-      return JSON.stringify(error);
+      const json = JSON.stringify(error);
+      // Avoid just returning "{}" for empty objects
+      return json === '{}' ? 'Unknown error (empty object)' : json;
     } catch {
-      return String(error);
+      // String(error) on an object gives "[object Object]" - not useful
+      // Try to extract any available info
+      const keys = Object.keys(obj);
+      if (keys.length > 0) {
+        return `Error object with keys: ${keys.join(', ')}`;
+      }
+      return 'Unknown error (unserializable)';
     }
   }
   return String(error);
