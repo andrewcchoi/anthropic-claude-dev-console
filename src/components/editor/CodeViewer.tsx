@@ -38,6 +38,14 @@ interface CodeViewerProps {
   showHeader?: boolean;
   /** Theme selection: 'light', 'dark', or 'auto' (default: 'dark') */
   theme?: EditorTheme;
+  /** Optional callback for insert reference action */
+  onInsertReference?: (text: string, startLine: number, endLine: number) => void;
+  /** Optional callback for copy reference action */
+  onCopyReference?: (text: string, startLine: number, endLine: number) => void;
+  /** Optional callback for search codebase action */
+  onSearchCodebase?: (text: string) => void;
+  /** Optional callback when selection changes */
+  onSelectionChange?: (text: string, startLine: number, endLine: number, position: { x: number; y: number }) => void;
 }
 
 /**
@@ -115,6 +123,10 @@ export function CodeViewer({
   showLineNumbers = true,
   showHeader = false,
   theme = 'dark',
+  onInsertReference,
+  onCopyReference,
+  onSearchCodebase,
+  onSelectionChange,
 }: CodeViewerProps) {
   // All hooks must be called before any conditional returns
   const [showLargeFile, setShowLargeFile] = useState(false);
@@ -172,6 +184,10 @@ export function CodeViewer({
         filePath={filePath}
         showHeader={showHeader}
         theme={theme}
+        onInsertReference={onInsertReference}
+        onCopyReference={onCopyReference}
+        onSearchCodebase={onSearchCodebase}
+        onSelectionChange={onSelectionChange}
       />
     </EditorErrorBoundary>
   );
