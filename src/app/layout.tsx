@@ -11,6 +11,35 @@ export const metadata: Metadata = {
   description: 'Browser interface for Claude Code',
 };
 
+// Inline script to suppress Monaco errors before Next.js devtools loads
+const monacoErrorSuppressorScript = `
+(function() {
+  window.addEventListener('unhandledrejection', function(event) {
+    var reason = event.reason;
+    if (reason && typeof reason === 'object') {
+      // Monaco cancelation error: {type: 'cancelation', msg: '...'}
+      if (reason.type === 'cancelation') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
+      // Check for Monaco-related error messages
+      var message = reason.message || reason.msg || '';
+      if (typeof message === 'string' && (
+        message.indexOf('monaco') !== -1 ||
+        message.indexOf('Monaco') !== -1 ||
+        message.indexOf('editor') !== -1 ||
+        message.indexOf('Loading chunk') !== -1
+      )) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
+    }
+  }, true); // Use capture phase to run first
+})();
+`;
+
 export default function RootLayout({
   children,
 }: {
@@ -18,6 +47,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: monacoErrorSuppressorScript }} />
+      </head>
       <body className={inter.className}>
         <DebugProvider>
           <ErrorBoundary>{children}</ErrorBoundary>

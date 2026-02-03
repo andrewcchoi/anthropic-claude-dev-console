@@ -1,23 +1,21 @@
 # Troubleshooting Documentation
 
-**Last Updated**: 2026-01-27
-**Total Problems Solved**: 3
+**Last Updated**: 2026-02-02
+**Total Problems Solved**: 10
 
 ## Statistics
 
-- Test failures: 1
-- Build errors: 1
-- Runtime errors: 1
-- Lint issues: 1
-
-## Browse by Category
-
-- [Test Failures](by-category/test.md) - 1 problems
-- [Build Errors](by-category/build.md) - 1 problems
-- [Runtime Errors](by-category/runtime.md) - 1 problems
+- Total problems documented: 10
+- Solved: 8
+- Under Investigation: 2
+- Total solution attempts: 2
 
 ## Quick Links
 
-- [Recent Problems](recent.md) - Last 20 solved problems
-- [Full Guide](TROUBLESHOOTING_GUIDE.md) - Complete documentation
+- [Full Guide](TROUBLESHOOTING_GUIDE.md) - Complete documentation with all problems and solutions
+- [Terminal Debugging Session](TERMINAL_DEBUGGING_SESSION.md) - Detailed debugging walkthrough
 - [JSON Export](_data/problems.json) - Machine-readable data
+
+## Documentation Structure
+
+This directory contains troubleshooting documentation generated and maintained by the troubleshoot-recorder plugin. Problems are automatically captured when errors occur, and solutions are recorded when they're resolved.

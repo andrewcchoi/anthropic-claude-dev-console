@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
+import { CodeViewer } from '@/components/editor';
+import { serializeError } from '@/lib/utils/errorUtils';
 
 const Terminal = dynamic(
   () => import('../terminal').then((mod) => mod.Terminal),
@@ -171,10 +173,20 @@ export function ToolExecution({
                   minHeight={80}
                   maxHeight={300}
                 />
+              ) : (name === 'Read' || name === 'Edit') && typeof output === 'string' ? (
+                <CodeViewer
+                  content={output}
+                  filePath={(input as ToolInput)?.file_path as string}
+                  height={Math.min(400, output.split('\n').length * 19 + 16)}
+                  showHeader={true}
+                  theme="dark"
+                />
               ) : (
                 <pre className="text-xs bg-white p-2 rounded overflow-x-auto border border-gray-200">
                   {typeof output === 'string'
                     ? output
+                    : output instanceof Error
+                    ? serializeError(output)
                     : JSON.stringify(output, null, 2)}
                 </pre>
               )}

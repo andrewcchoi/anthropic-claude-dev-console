@@ -3,6 +3,7 @@ import { useChatStore } from '@/lib/store';
 import { ChatMessage, MessageContent, SDKMessage } from '@/types/claude';
 import { v4 as uuidv4 } from 'uuid';
 import { createLogger } from '@/lib/logger';
+import { serializeError } from '@/lib/utils/errorUtils';
 
 const log = createLogger('ClaudeChat');
 
@@ -254,7 +255,7 @@ export function useClaudeChat() {
                       });
                     }
                   } else if (message.subtype === 'error' || message.is_error) {
-                    setError(message.error || 'Unknown error');
+                    setError(serializeError(message.error));
                   }
                 } else if (message.type === 'session_locked') {
                   // Session ID conflict - generate new session and retry
@@ -264,7 +265,7 @@ export function useClaudeChat() {
                 } else if (message.type === 'error') {
                   // Only show errors if we haven't received a successful result
                   if (!receivedSuccessResult) {
-                    setError(message.error || 'Unknown error');
+                    setError(serializeError(message.error));
                   }
                 }
               } catch (e) {
@@ -283,7 +284,7 @@ export function useClaudeChat() {
           messageCount: useChatStore.getState().messages.length
         });
       } catch (error: any) {
-        setError(error.message || 'Failed to send message');
+        setError(serializeError(error));
         setIsStreaming(false);
         updateMessage(assistantMessageId, { isStreaming: false });
         setCurrentMessageId(null);

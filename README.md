@@ -1,6 +1,6 @@
 # Claude Code Browser UI
 
-A browser-based interface for interacting with Claude Code using the official `@anthropic-ai/claude-agent-sdk`.
+A browser-based interface for interacting with Claude Code using the Claude CLI as a subprocess.
 
 ## Features
 
@@ -34,7 +34,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 Browser → Next.js (localhost:3000)
     ↓ SSE Stream
 Next.js API Route (/api/claude)
-    ↓ SDK query()
+    ↓ spawn('claude', ['-p', '--output-format', 'stream-json'])
 Claude Code CLI (local subprocess)
 ```
 
@@ -74,10 +74,10 @@ src/
 
 ## Technology Stack
 
-- **Framework**: Next.js 14+ (App Router)
-- **UI**: React 18 + Tailwind CSS
-- **State**: Zustand
-- **Claude**: @anthropic-ai/claude-agent-sdk
+- **Framework**: Next.js 16 (App Router)
+- **UI**: React 19 + Tailwind CSS v4
+- **State**: Zustand with localStorage persistence
+- **Claude**: CLI subprocess integration
 - **TypeScript**: Full type safety
 
 ## Development
