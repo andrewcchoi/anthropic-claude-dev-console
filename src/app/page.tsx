@@ -23,6 +23,9 @@ export default function Home() {
       {previewOpen ? (
         <div className="flex-1 flex">
           <div className="flex-1 flex flex-col">
+            <FilePreviewPane />
+          </div>
+          <div className="flex-1 flex flex-col">
             {error && (
               <div className="bg-red-600 text-white px-4 py-3 text-sm">
                 Error: {error}
@@ -31,9 +34,6 @@ export default function Home() {
             <MessageList messages={messages} isLoadingHistory={isLoadingHistory} />
             <UsageDisplay />
             <ChatInput onSend={handleSend} disabled={isStreaming} />
-          </div>
-          <div className="flex-1 flex flex-col">
-            <FilePreviewPane />
           </div>
         </div>
       ) : (

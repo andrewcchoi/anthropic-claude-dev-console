@@ -80,7 +80,7 @@ export function FilePreviewPane() {
   const fileName = selectedFile.split('/').pop() || '';
 
   return (
-    <div className="flex flex-col h-full border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+    <div className="flex flex-col h-full border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex-1 min-w-0">
