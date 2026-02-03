@@ -14,6 +14,7 @@
 
 - [Full Guide](TROUBLESHOOTING_GUIDE.md) - Complete documentation with all problems and solutions
 - [Terminal Debugging Session](TERMINAL_DEBUGGING_SESSION.md) - Detailed debugging walkthrough
+- [Monaco Error Suppression](MONACO_ERROR_SUPPRESSION.md) - Monaco Editor error handling guide
 - [JSON Export](_data/problems.json) - Machine-readable data
 
 ## Documentation Structure
