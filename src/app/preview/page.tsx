@@ -97,7 +97,7 @@ function PreviewContent() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-full text-sm text-gray-500">
             Loading...
@@ -107,7 +107,11 @@ function PreviewContent() {
             <p className="text-red-600 dark:text-red-400 text-lg mb-2">{error}</p>
           </div>
         ) : (
-          <CodeViewer content={content} language={getLanguageFromFilename(fileName)} />
+          <CodeViewer
+            content={content}
+            language={getLanguageFromFilename(fileName)}
+            height="100%"
+          />
         )}
       </div>
     </div>

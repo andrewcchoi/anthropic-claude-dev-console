@@ -139,7 +139,7 @@ export function FilePreviewPane() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-full text-sm text-gray-500">
             Loading...
@@ -159,7 +159,11 @@ export function FilePreviewPane() {
             )}
           </div>
         ) : (
-          <CodeViewer content={content} language={getLanguageFromFilename(fileName)} />
+          <CodeViewer
+            content={content}
+            language={getLanguageFromFilename(fileName)}
+            height="100%"
+          />
         )}
       </div>
     </div>
