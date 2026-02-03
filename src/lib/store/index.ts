@@ -138,55 +138,60 @@ export const useChatStore = create<ChatStore>()(
 
       switchSession: async (id, projectId) => {
         const currentId = get().sessionId;
-        const session = get().sessions.find((s) => s.id === id);
-        if (session) {
-          log.debug('Switching session', { from: currentId, to: id, projectId });
-          // Set loading state but DON'T clear messages yet
-          set({ isLoadingHistory: true });
+        const localSession = get().sessions.find((s) => s.id === id);
 
-          try {
-            // Fetch messages and tool executions from CLI session file
-            const url = projectId
-              ? `/api/sessions/${id}/messages?project=${encodeURIComponent(projectId)}`
-              : `/api/sessions/${id}/messages`;
-            const response = await fetch(url);
-            if (response.ok) {
-              const data = await response.json();
+        log.debug('Switching session', { from: currentId, to: id, projectId, hasLocal: !!localSession });
+        set({ isLoadingHistory: true });
 
-              // Handle both old format (array) and new format (object)
-              const messages: ChatMessage[] = Array.isArray(data) ? data : data.messages;
-              const toolExecutions: ToolExecution[] = Array.isArray(data) ? [] : (data.toolExecutions || []);
+        try {
+          // Fetch messages and tool executions from CLI session file
+          const url = projectId
+            ? `/api/sessions/${id}/messages?project=${encodeURIComponent(projectId)}`
+            : `/api/sessions/${id}/messages`;
+          const response = await fetch(url);
 
-              log.debug('Loaded session data', {
-                messages: messages.length,
-                toolExecutions: toolExecutions.length
-              });
+          if (response.ok) {
+            const data = await response.json();
 
-              // Atomic update - switch everything at once
-              set({
-                sessionId: session.id,
-                currentSession: session,
-                messages,
-                toolExecutions,
-                sessionUsage: null,
-                isLoadingHistory: false,
-              });
-            } else {
-              // Failed to load messages, but continue with empty state
-              set({
-                sessionId: session.id,
-                currentSession: session,
-                messages: [],
-                toolExecutions: [],
-                sessionUsage: null,
-                isLoadingHistory: false,
-              });
-            }
-          } catch (error) {
-            log.error('Failed to load session messages', { error });
-            // Continue with empty state on error
+            // Handle both old format (array) and new format (object)
+            const messages: ChatMessage[] = Array.isArray(data) ? data : data.messages;
+            const toolExecutions: ToolExecution[] = Array.isArray(data) ? [] : (data.toolExecutions || []);
+
+            log.debug('Loaded session data', {
+              messages: messages.length,
+              toolExecutions: toolExecutions.length
+            });
+
+            // Create minimal session object if not found locally
+            const session = localSession || {
+              id,
+              name: messages[0]?.content?.[0]?.text?.slice(0, 50) || 'Untitled',
+              created_at: Date.now(),
+              updated_at: Date.now(),
+              cwd: '/workspace',
+            };
+
+            // Atomic update - switch everything at once
             set({
-              sessionId: session.id,
+              sessionId: id,
+              currentSession: session,
+              messages,
+              toolExecutions,
+              sessionUsage: null,
+              isLoadingHistory: false,
+            });
+          } else {
+            // Failed to load messages, but continue with empty state
+            const session = localSession || {
+              id,
+              name: 'Untitled',
+              created_at: Date.now(),
+              updated_at: Date.now(),
+              cwd: '/workspace',
+            };
+
+            set({
+              sessionId: id,
               currentSession: session,
               messages: [],
               toolExecutions: [],
@@ -194,6 +199,25 @@ export const useChatStore = create<ChatStore>()(
               isLoadingHistory: false,
             });
           }
+        } catch (error) {
+          log.error('Failed to load session messages', { error });
+          // Continue with empty state on error
+          const session = localSession || {
+            id,
+            name: 'Untitled',
+            created_at: Date.now(),
+            updated_at: Date.now(),
+            cwd: '/workspace',
+          };
+
+          set({
+            sessionId: id,
+            currentSession: session,
+            messages: [],
+            toolExecutions: [],
+            sessionUsage: null,
+            isLoadingHistory: false,
+          });
         }
       },
 
