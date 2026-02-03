@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Bash Tool Output</title>
+  <style>
+    body {
+      font-family: monospace;
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+      background: #1e1e1e;
+      color: #d4d4d4;
+    }
+    h1 { color: #4ec9b0; }
+    h2 { color: #569cd6; margin-top: 30px; }
+    .section {
+      background: #252526;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 10px 0;
+      border-left: 3px solid #007acc;
+    }
+    button {
+      background: #0e639c;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 14px;
+      margin: 5px;
+    }
+    button:hover { background: #1177bb; }
+    button:active { background: #0d5a8f; }
+    #logs {
+      background: #1e1e1e;
+      border: 1px solid #3c3c3c;
+      padding: 10px;
+      height: 400px;
+      overflow-y: auto;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .log-entry {
+      margin: 3px 0;
+      padding: 2px 5px;
+    }
+    .log-debug { color: #858585; }
+    .log-info { color: #4ec9b0; }
+    .log-warn { color: #dcdcaa; }
+    .log-error { color: #f48771; }
+    .log-success { color: #4ec9b0; font-weight: bold; }
+    .highlight { background: #264f78; }
+    pre {
+      background: #1e1e1e;
+      border: 1px solid #3c3c3c;
+      padding: 10px;
+      overflow-x: auto;
+      font-size: 12px;
+    }
+    .status {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+    .status-waiting { background: #6c757d; color: white; }
+    .status-receiving { background: #0dcaf0; color: black; }
+    .status-success { background: #198754; color: white; }
+    .status-error { background: #dc3545; color: white; }
+  </style>
+</head>
+<body>
+  <h1>🔧 Bash Tool Output Test</h1>
+
+  <div class="section">
+    <h2>Test Prompts</h2>
+    <p>Click a button to send a test prompt to the API:</p>
+    <button onclick="testPrompt('Use the Bash tool to run: ls -la')">Test: ls -la</button>
+    <button onclick="testPrompt('Use the Bash tool to run: echo Hello World')">Test: echo Hello</button>
+    <button onclick="testPrompt('Run the command: pwd')">Test: pwd</button>
+    <button onclick="testPrompt('hello')">Test: hello (no tool)</button>
+    <button onclick="clearLogs()">Clear Logs</button>
+  </div>
+
+  <div class="section">
+    <h2>Event Stream Monitor <span id="status" class="status status-waiting">Waiting</span></h2>
+    <div id="logs"></div>
+  </div>
+
+  <div class="section">
+    <h2>Checklist</h2>
+    <div id="checklist">
+      <div id="check-assistant">⬜ Received 'assistant' message with tool_use</div>
+      <div id="check-user">⬜ Received 'user' message with tool_result</div>
+      <div id="check-output">⬜ Tool result has output content</div>
+      <div id="check-success">⬜ Received 'result' with success</div>
+    </div>
+  </div>
+
+  <script>
+    const logsEl = document.getElementById('logs');
+    const statusEl = document.getElementById('status');
+
+    let checks = {
+      assistant: false,
+      user: false,
+      output: false,
+      success: false
+    };
+
+    function updateStatus(status, text) {
+      statusEl.className = `status status-${status}`;
+      statusEl.textContent = text;
+    }
+
+    function updateChecklist() {
+      document.getElementById('check-assistant').textContent =
+        (checks.assistant ? '✅' : '⬜') + ' Received \'assistant\' message with tool_use';
+      document.getElementById('check-user').textContent =
+        (checks.user ? '✅' : '⬜') + ' Received \'user\' message with tool_result';
+      document.getElementById('check-output').textContent =
+        (checks.output ? '✅' : '⬜') + ' Tool result has output content';
+      document.getElementById('check-success').textContent =
+        (checks.success ? '✅' : '⬜') + ' Received \'result\' with success';
+    }
+
+    function log(message, type = 'info', highlight = false) {
+      const entry = document.createElement('div');
+      entry.className = `log-entry log-${type}` + (highlight ? ' highlight' : '');
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logsEl.appendChild(entry);
+      logsEl.scrollTop = logsEl.scrollHeight;
+    }
+
+    function clearLogs() {
+      logsEl.innerHTML = '';
+      checks = { assistant: false, user: false, output: false, success: false };
+      updateChecklist();
+      updateStatus('waiting', 'Waiting');
+    }
+
+    async function testPrompt(prompt) {
+      clearLogs();
+      log(`Testing prompt: "${prompt}"`, 'info');
+      log('Sending request to /api/claude...', 'debug');
+      updateStatus('receiving', 'Streaming');
+
+      try {
+        const response = await fetch('/api/claude', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt,
+            sessionId: crypto.randomUUID()
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+              try {
+                const message = JSON.parse(line.slice(6));
+
+                // Log event type
+                log(`Event: ${message.type}${message.subtype ? ':' + message.subtype : ''}`, 'debug');
+
+                // Check for assistant message with tool_use
+                if (message.type === 'assistant' && message.message?.content) {
+                  const hasToolUse = message.message.content.some(c => c.type === 'tool_use');
+                  if (hasToolUse) {
+                    const toolUseBlocks = message.message.content.filter(c => c.type === 'tool_use');
+                    log(`✓ Assistant message with ${toolUseBlocks.length} tool_use block(s)`, 'success', true);
+                    toolUseBlocks.forEach(block => {
+                      log(`  Tool: ${block.name} (ID: ${block.id})`, 'info');
+                    });
+                    checks.assistant = true;
+                    updateChecklist();
+                  }
+                }
+
+                // Check for user message with tool_result
+                if (message.type === 'user' && message.message?.content) {
+                  const toolResults = message.message.content.filter(c => c.type === 'tool_result');
+                  if (toolResults.length > 0) {
+                    log(`✓ User message with ${toolResults.length} tool_result block(s)`, 'success', true);
+                    checks.user = true;
+                    updateChecklist();
+
+                    toolResults.forEach(result => {
+                      log(`  Tool ID: ${result.tool_use_id}`, 'info');
+                      log(`  Error: ${result.is_error || false}`, 'info');
+
+                      const content = result.content;
+                      if (content) {
+                        checks.output = true;
+                        updateChecklist();
+
+                        const preview = typeof content === 'string'
+                          ? content.slice(0, 200)
+                          : JSON.stringify(content).slice(0, 200);
+                        log(`  Output: ${preview}${content.length > 200 ? '...' : ''}`, 'success', true);
+                      } else {
+                        log(`  ⚠ Output is empty!`, 'warn');
+                      }
+                    });
+                  }
+                }
+
+                // Check for result message
+                if (message.type === 'result') {
+                  if (message.subtype === 'success') {
+                    log(`✓ Result: success`, 'success', true);
+                    checks.success = true;
+                    updateChecklist();
+                  } else if (message.subtype === 'error') {
+                    log(`✗ Result: error - ${message.error}`, 'error', true);
+                  }
+                }
+
+              } catch (e) {
+                log(`Parse error: ${e.message}`, 'error');
+              }
+            } else if (line === 'data: [DONE]') {
+              log('Stream completed', 'info');
+            }
+          }
+        }
+
+        updateStatus('success', 'Complete');
+
+        // Summary
+        log('─'.repeat(50), 'debug');
+        if (checks.assistant && checks.user && checks.output && checks.success) {
+          log('✅ ALL CHECKS PASSED - Tool output flow working correctly!', 'success', true);
+        } else if (!checks.assistant) {
+          log('ℹ️ No tool was invoked (try a different prompt)', 'warn');
+        } else if (!checks.user) {
+          log('❌ PROBLEM: tool_use detected but NO tool_result received', 'error', true);
+          log('   This means the API route is not forwarding type:user events', 'error');
+        } else if (!checks.output) {
+          log('❌ PROBLEM: tool_result received but has NO OUTPUT', 'error', true);
+          log('   This means the tool execution failed or output is missing', 'error');
+        }
+
+      } catch (error) {
+        log(`Error: ${error.message}`, 'error', true);
+        updateStatus('error', 'Error');
+      }
+    }
+
+    // Initialize
+    updateChecklist();
+    log('Ready to test. Click a button above to start.', 'info');
+  </script>
+</body>
+</html>
