@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "postinstall": "node scripts/copy-monaco.js",
     "dev": "concurrently \"npm run dev:next\" \"npm run dev:terminal\"",
     "dev:next": "next dev",
     "dev:terminal": "tsx watch scripts/terminal-server.ts",

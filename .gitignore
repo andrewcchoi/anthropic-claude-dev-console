@@ -94,3 +94,6 @@ ENV/
 # TypeScript
 tsconfig.tsbuildinfo
 next-env.d.ts
+
+# Self-hosted Monaco Editor (copied from node_modules)
+public/monaco-editor/
