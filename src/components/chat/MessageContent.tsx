@@ -39,7 +39,7 @@ export function MessageContent({ content }: MessageContentProps) {
           return (
             <div
               key={index}
-              className="mt-2 rounded border border-gray-300 bg-gray-50 p-2"
+              className="mt-2 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 p-2"
             >
               <div className="text-xs font-mono opacity-70">
                 Tool Result: {block.tool_use_id}

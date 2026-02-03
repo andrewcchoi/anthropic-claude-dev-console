@@ -16,8 +16,8 @@ const InteractiveTerminal = dynamic(
 
 function TerminalSkeleton() {
   return (
-    <div className="h-full w-full bg-gray-900 rounded animate-pulse flex items-center justify-center">
-      <span className="text-gray-500 text-sm">Loading terminal...</span>
+    <div className="h-full w-full bg-gray-100 dark:bg-gray-900 rounded animate-pulse flex items-center justify-center">
+      <span className="text-gray-400 dark:text-gray-500 text-sm">Loading terminal...</span>
     </div>
   );
 }

@@ -65,13 +65,13 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
       // Default fallback UI
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-950">
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
           <div className="max-w-2xl w-full mx-4">
-            <div className="bg-red-950/20 border border-red-800 rounded-lg p-6">
+            <div className="bg-red-50/50 dark:bg-red-950/20 border border-red-300 dark:border-red-800 rounded-lg p-6">
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0">
                   <svg
-                    className="w-6 h-6 text-red-500"
+                    className="w-6 h-6 text-red-600 dark:text-red-500"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -85,22 +85,22 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-xl font-semibold text-red-400 mb-2">
+                  <h2 className="text-xl font-semibold text-red-700 dark:text-red-400 mb-2">
                     Something went wrong
                   </h2>
-                  <p className="text-gray-300 mb-4">
+                  <p className="text-gray-700 dark:text-gray-300 mb-4">
                     An unexpected error occurred while rendering this component.
                   </p>
                   <details className="mb-4">
-                    <summary className="cursor-pointer text-sm text-gray-400 hover:text-gray-300">
+                    <summary className="cursor-pointer text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300">
                       Show error details
                     </summary>
-                    <div className="mt-2 p-3 bg-gray-900 rounded border border-gray-800">
-                      <p className="text-sm text-red-400 font-mono break-all">
+                    <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-900 rounded border border-gray-300 dark:border-gray-800">
+                      <p className="text-sm text-red-700 dark:text-red-400 font-mono break-all">
                         {this.state.error.message}
                       </p>
                       {this.state.error.stack && (
-                        <pre className="mt-2 text-xs text-gray-500 overflow-x-auto">
+                        <pre className="mt-2 text-xs text-gray-600 dark:text-gray-500 overflow-x-auto">
                           {this.state.error.stack}
                         </pre>
                       )}
@@ -108,7 +108,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                   </details>
                   <button
                     onClick={this.reset}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 text-white rounded-md transition-colors"
                   >
                     Try again
                   </button>

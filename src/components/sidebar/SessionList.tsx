@@ -12,14 +12,14 @@ export function SessionList() {
   }, []);
 
   if (!isClient) {
-    return <div className="text-sm text-gray-400">Loading...</div>;
+    return <div className="text-sm text-gray-400 dark:text-gray-500">Loading...</div>;
   }
 
   const sorted = [...sessions].sort((a, b) => b.updated_at - a.updated_at);
 
   if (sorted.length === 0) {
     return (
-      <div className="text-sm text-gray-500 py-4 text-center">
+      <div className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">
         No previous sessions
       </div>
     );
@@ -33,19 +33,19 @@ export function SessionList() {
           onClick={() => switchSession(session.id)}
           className={`p-2 rounded cursor-pointer text-sm truncate ${
             session.id === sessionId
-              ? 'bg-blue-100 text-blue-900'
-              : 'hover:bg-gray-100 text-gray-700'
+              ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100'
+              : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
           }`}
         >
           <div className="truncate">{session.name}</div>
-          <div className="text-xs text-gray-500 flex justify-between mt-1">
+          <div className="text-xs text-gray-500 dark:text-gray-400 flex justify-between mt-1">
             <span>{formatRelativeTime(session.updated_at)}</span>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 deleteSession(session.id);
               }}
-              className="text-gray-400 hover:text-red-500"
+              className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400"
             >
               ×
             </button>

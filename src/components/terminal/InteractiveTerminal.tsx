@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useTerminal } from '@/hooks/useTerminal';
+import { useAppTheme } from '@/hooks/useAppTheme';
 import '@xterm/xterm/css/xterm.css';
 
 interface InteractiveTerminalProps {
@@ -19,6 +20,7 @@ export function InteractiveTerminal({
   onDisconnected,
   onError,
 }: InteractiveTerminalProps) {
+  const { resolvedTheme } = useAppTheme();
   const {
     terminalRef,
     isConnected,
@@ -28,6 +30,7 @@ export function InteractiveTerminal({
     disconnect,
   } = useTerminal({
     cwd,
+    theme: resolvedTheme === 'light' ? 'light' : 'dark',
     onConnected,
     onDisconnected,
     onError,

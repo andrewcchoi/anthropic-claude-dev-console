@@ -3,10 +3,11 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebSocketClient } from '@/lib/terminal/websocket-client';
-import { terminalTheme } from '@/components/terminal/TerminalTheme';
+import { terminalTheme, terminalLightTheme } from '@/components/terminal/TerminalTheme';
 
 interface UseTerminalOptions {
   cwd?: string;
+  theme?: 'light' | 'dark';
   onConnected?: (sessionId: string) => void;
   onDisconnected?: () => void;
   onError?: (error: string) => void;
@@ -22,7 +23,7 @@ interface UseTerminalReturn {
 }
 
 export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn {
-  const { cwd, onConnected, onDisconnected, onError } = options;
+  const { cwd, theme = 'dark', onConnected, onDisconnected, onError } = options;
 
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
@@ -85,7 +86,7 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
         disableStdin: false,
         fontSize: 14,
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-        theme: terminalTheme,
+        theme: theme === 'light' ? terminalLightTheme : terminalTheme,
       });
 
       // Load addons
