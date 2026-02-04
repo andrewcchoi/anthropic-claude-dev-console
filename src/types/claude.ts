@@ -20,6 +20,14 @@ export interface SDKMessage {
     output_tokens: number;
   };
   duration_ms?: number;
+  // Init-specific fields
+  slash_commands?: string[];
+  skills?: string[];
+  plugins?: Array<{ name: string; path: string }>;
+  mcp_servers?: Array<{ name: string; status: string }>;
+  cwd?: string;
+  claude_code_version?: string;
+  agents?: string[];
   // CLI-specific fields
   event?: {
     type: string;
@@ -47,7 +55,7 @@ export interface SDKMessage {
   };
 }
 
-export type ContentBlockType = 'text' | 'tool_use' | 'tool_result' | 'image';
+export type ContentBlockType = 'text' | 'tool_use' | 'tool_result' | 'image' | 'system_info';
 
 export interface MessageContent {
   type: ContentBlockType;
@@ -61,9 +69,20 @@ export interface MessageContent {
   source?: { type: 'file'; path: string; originalName: string };
 }
 
+export interface SystemInfoContent {
+  type: 'system_info';
+  model?: string;
+  sessionId?: string;
+  toolCount?: number;
+  mcpServers?: Array<{ name: string; status: string }>;
+  cliVersion?: string;
+  cwd?: string;
+  permissionMode?: string;
+}
+
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: MessageContent[];
   timestamp: number;
   isStreaming?: boolean;

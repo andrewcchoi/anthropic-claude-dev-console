@@ -25,14 +25,58 @@ interface ChatStore {
   sessions: Session[];
   currentSession: Session | null;
   isLoadingHistory: boolean;
+  hiddenSessionIds: Set<string>;
   setSessionId: (id: string) => void;
   setCurrentSession: (session: Session | null) => void;
   addSession: (session: Session) => void;
-  startNewSession: () => void;
-  switchSession: (sessionId: string) => Promise<void>;
+  startNewSession: () => string;
+  switchSession: (sessionId: string, projectId?: string) => Promise<void>;
   updateSessionName: (sessionId: string, name: string) => void;
   deleteSession: (sessionId: string) => void;
+  hideSession: (sessionId: string) => void;
   saveCurrentSession: () => void;
+
+  // Init data from CLI
+  availableCommands: string[];
+  availableTools: string[];
+  availableSkills: string[];
+  mcpServers: Array<{ name: string; status: string }>;
+  cliVersion: string | null;
+  workingDirectory: string;
+  activePermissionMode: string;
+  setInitInfo: (info: {
+    model?: string;
+    sessionId?: string;
+    tools?: string[];
+    commands?: string[];
+    skills?: string[];
+    mcpServers?: Array<{ name: string; status: string }>;
+    cliVersion?: string;
+    cwd?: string;
+    permissionMode?: string;
+  }) => void;
+
+  // UI panels
+  isStatusPanelOpen: boolean;
+  isHelpPanelOpen: boolean;
+  isModelPanelOpen: boolean;
+  isTodosPanelOpen: boolean;
+  isRenameDialogOpen: boolean;
+  setStatusPanelOpen: (open: boolean) => void;
+  setHelpPanelOpen: (open: boolean) => void;
+  setModelPanelOpen: (open: boolean) => void;
+  setTodosPanelOpen: (open: boolean) => void;
+  setRenameDialogOpen: (open: boolean) => void;
+  clearChat: () => void;
+
+  // Session cache for preserving messages when switching
+  sessionCache: Map<string, {
+    messages: ChatMessage[];
+    toolExecutions: ToolExecution[];
+    timestamp: number;
+  }>;
+  cacheCurrentSession: () => void;
+  getCachedSession: (id: string) => { messages: ChatMessage[]; toolExecutions: ToolExecution[] } | null;
 
   // Model selection
   currentModel: string | null;
@@ -85,6 +129,10 @@ interface ChatStore {
   setIsStreaming: (streaming: boolean) => void;
   error: string | null;
   setError: (error: string | null) => void;
+  isPrewarming: boolean;
+  setIsPrewarming: (prewarming: boolean) => void;
+  prewarmError: string | null;
+  setPrewarmError: (error: string | null) => void;
   sidebarOpen: boolean;
   toggleSidebar: () => void;
   rightPanelOpen: boolean;
@@ -117,12 +165,18 @@ export const useChatStore = create<ChatStore>()(
       sessions: [],
       currentSession: null,
       isLoadingHistory: false,
+      hiddenSessionIds: new Set<string>(),
       setSessionId: (id) => set({ sessionId: id }),
       setCurrentSession: (session) => set({ currentSession: session }),
       addSession: (session) =>
         set((state) => ({ sessions: [...state.sessions, session] })),
 
       startNewSession: () => {
+        const currentId = get().sessionId;
+        if (currentId) {
+          get().cacheCurrentSession();
+        }
+
         const newSessionId = uuidv4();
         log.debug('Starting new session', { id: newSessionId });
         set({
@@ -134,46 +188,93 @@ export const useChatStore = create<ChatStore>()(
           error: null,
           currentModel: null,
         });
+        return newSessionId;
       },
 
-      switchSession: async (id) => {
+      switchSession: async (id, projectId) => {
         const currentId = get().sessionId;
-        const session = get().sessions.find((s) => s.id === id);
-        if (session) {
-          log.debug('Switching session', { from: currentId, to: id });
-          // Set loading state but DON'T clear messages yet
-          set({ isLoadingHistory: true });
+        const localSession = get().sessions.find((s) => s.id === id);
 
-          try {
-            // Fetch messages from CLI session file
-            const response = await fetch(`/api/sessions/${id}/messages`);
-            if (response.ok) {
-              const messages: ChatMessage[] = await response.json();
-              // Atomic update - switch everything at once
-              set({
-                sessionId: session.id,
-                currentSession: session,
-                messages,
-                toolExecutions: [],
-                sessionUsage: null,
-                isLoadingHistory: false,
-              });
-            } else {
-              // Failed to load messages, but continue with empty state
-              set({
-                sessionId: session.id,
-                currentSession: session,
-                messages: [],
-                toolExecutions: [],
-                sessionUsage: null,
-                isLoadingHistory: false,
-              });
-            }
-          } catch (error) {
-            log.error('Failed to load session messages', { error });
-            // Continue with empty state on error
+        // Cache current session before switching
+        if (currentId && currentId !== id) {
+          get().cacheCurrentSession();
+        }
+
+        log.debug('Switching session', { from: currentId, to: id, projectId, hasLocal: !!localSession });
+
+        // Check cache first
+        const cached = get().getCachedSession(id);
+        if (cached) {
+          log.debug('Restored session from cache', { id, messages: cached.messages.length });
+          const session = localSession || {
+            id,
+            name: 'Cached Session',
+            created_at: Date.now(),
+            updated_at: Date.now(),
+            cwd: '/workspace',
+          };
+          set({
+            sessionId: id,
+            currentSession: session,
+            messages: cached.messages,
+            toolExecutions: cached.toolExecutions,
+            sessionUsage: null,
+            isLoadingHistory: false,
+          });
+          return;
+        }
+
+        set({ isLoadingHistory: true });
+
+        try {
+          // Fetch messages and tool executions from CLI session file
+          const url = projectId
+            ? `/api/sessions/${id}/messages?project=${encodeURIComponent(projectId)}`
+            : `/api/sessions/${id}/messages`;
+          const response = await fetch(url);
+
+          if (response.ok) {
+            const data = await response.json();
+
+            // Handle both old format (array) and new format (object)
+            const messages: ChatMessage[] = Array.isArray(data) ? data : data.messages;
+            const toolExecutions: ToolExecution[] = Array.isArray(data) ? [] : (data.toolExecutions || []);
+
+            log.debug('Loaded session data', {
+              messages: messages.length,
+              toolExecutions: toolExecutions.length
+            });
+
+            // Create minimal session object if not found locally
+            const session = localSession || {
+              id,
+              name: messages[0]?.content?.[0]?.text?.slice(0, 50) || 'Untitled',
+              created_at: Date.now(),
+              updated_at: Date.now(),
+              cwd: '/workspace',
+            };
+
+            // Atomic update - switch everything at once
             set({
-              sessionId: session.id,
+              sessionId: id,
+              currentSession: session,
+              messages,
+              toolExecutions,
+              sessionUsage: null,
+              isLoadingHistory: false,
+            });
+          } else {
+            // Failed to load messages, but continue with empty state
+            const session = localSession || {
+              id,
+              name: 'Untitled',
+              created_at: Date.now(),
+              updated_at: Date.now(),
+              cwd: '/workspace',
+            };
+
+            set({
+              sessionId: id,
               currentSession: session,
               messages: [],
               toolExecutions: [],
@@ -181,6 +282,25 @@ export const useChatStore = create<ChatStore>()(
               isLoadingHistory: false,
             });
           }
+        } catch (error) {
+          log.error('Failed to load session messages', { error });
+          // Continue with empty state on error
+          const session = localSession || {
+            id,
+            name: 'Untitled',
+            created_at: Date.now(),
+            updated_at: Date.now(),
+            cwd: '/workspace',
+          };
+
+          set({
+            sessionId: id,
+            currentSession: session,
+            messages: [],
+            toolExecutions: [],
+            sessionUsage: null,
+            isLoadingHistory: false,
+          });
         }
       },
 
@@ -222,6 +342,11 @@ export const useChatStore = create<ChatStore>()(
                 sessionUsage: null,
               }
             : {}),
+        })),
+
+      hideSession: (id) =>
+        set((state) => ({
+          hiddenSessionIds: new Set([...state.hiddenSessionIds, id]),
         })),
 
       updateSessionName: (id, name) =>
@@ -280,6 +405,10 @@ export const useChatStore = create<ChatStore>()(
       setIsStreaming: (streaming) => set({ isStreaming: streaming }),
       error: null,
       setError: (error) => set({ error }),
+      isPrewarming: false,
+      setIsPrewarming: (prewarming) => set({ isPrewarming: prewarming }),
+      prewarmError: null,
+      setPrewarmError: (error) => set({ prewarmError: error }),
       sidebarOpen: true,
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       rightPanelOpen: true,
@@ -327,6 +456,68 @@ export const useChatStore = create<ChatStore>()(
       defaultMode: 'plan',
       setDefaultMode: (mode) => set({ defaultMode: mode }),
 
+      // Init data from CLI
+      availableCommands: [],
+      availableTools: [],
+      availableSkills: [],
+      mcpServers: [],
+      cliVersion: null,
+      workingDirectory: '/workspace',
+      activePermissionMode: 'default',
+      setInitInfo: (info) => set((state) => ({
+        ...(info.model && { currentModel: info.model }),
+        ...(info.sessionId && { sessionId: info.sessionId }),
+        availableTools: info.tools || state.availableTools,
+        availableCommands: info.commands || state.availableCommands,
+        availableSkills: info.skills || state.availableSkills,
+        mcpServers: info.mcpServers || state.mcpServers,
+        cliVersion: info.cliVersion || state.cliVersion,
+        workingDirectory: info.cwd || state.workingDirectory,
+        activePermissionMode: info.permissionMode || state.activePermissionMode,
+      })),
+
+      // UI panels
+      isStatusPanelOpen: false,
+      isHelpPanelOpen: false,
+      isModelPanelOpen: false,
+      isTodosPanelOpen: false,
+      isRenameDialogOpen: false,
+      setStatusPanelOpen: (open) => set({ isStatusPanelOpen: open }),
+      setHelpPanelOpen: (open) => set({ isHelpPanelOpen: open }),
+      setModelPanelOpen: (open) => set({ isModelPanelOpen: open }),
+      setTodosPanelOpen: (open) => set({ isTodosPanelOpen: open }),
+      setRenameDialogOpen: (open) => set({ isRenameDialogOpen: open }),
+      clearChat: () => set({ messages: [], toolExecutions: [], sessionUsage: null }),
+
+      // Session cache
+      sessionCache: new Map(),
+
+      cacheCurrentSession: () => {
+        const { sessionId, messages, toolExecutions, sessionCache } = get();
+        if (!sessionId || messages.length === 0) return;
+
+        const newCache = new Map(sessionCache);
+        newCache.set(sessionId, {
+          messages,
+          toolExecutions,
+          timestamp: Date.now(),
+        });
+
+        // LRU: Keep max 5 sessions
+        if (newCache.size > 5) {
+          const oldest = [...newCache.entries()]
+            .sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
+          newCache.delete(oldest[0]);
+        }
+
+        set({ sessionCache: newCache });
+      },
+
+      getCachedSession: (id) => {
+        const cached = get().sessionCache.get(id);
+        return cached ? { messages: cached.messages, toolExecutions: cached.toolExecutions } : null;
+      },
+
       // File browser
       expandedFolders: new Set<string>(),
       selectedFile: null,
@@ -363,14 +554,32 @@ export const useChatStore = create<ChatStore>()(
       name: 'claude-code-sessions',
       partialize: (state) => ({
         sessions: state.sessions,
-        // sessionId: state.sessionId, // Don't persist - prevents conflicts
+        sessionId: state.sessionId,
         currentSession: state.currentSession,
         preferredModel: state.preferredModel,
         provider: state.provider,
         providerConfig: state.providerConfig,
         defaultMode: state.defaultMode,
         sidebarTab: state.sidebarTab,
+        hiddenSessionIds: Array.from(state.hiddenSessionIds), // Convert Set to Array for JSON
       }),
+      onRehydrateStorage: () => (state) => {
+        // Convert Array back to Set after rehydration
+        if (state && Array.isArray(state.hiddenSessionIds)) {
+          state.hiddenSessionIds = new Set(state.hiddenSessionIds);
+        } else if (state && !state.hiddenSessionIds) {
+          state.hiddenSessionIds = new Set();
+        }
+
+        // Validate sessionId against currentSession to prevent orphaned state
+        if (state && state.sessionId && !state.currentSession) {
+          state.sessionId = null;
+        }
+        // If currentSession exists but sessionId doesn't match, sync them
+        if (state && state.currentSession && state.sessionId !== state.currentSession.id) {
+          state.sessionId = state.currentSession.id;
+        }
+      },
     }
   )
 );

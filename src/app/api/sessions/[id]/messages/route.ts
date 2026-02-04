@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { ChatMessage, MessageContent } from '@/types/claude';
+import { ChatMessage, MessageContent, ToolExecution } from '@/types/claude';
 
 interface CLIMessage {
   type: string;
@@ -17,6 +17,59 @@ interface CLIMessage {
   sourceToolAssistantUUID?: string;
 }
 
+interface SessionHistoryResponse {
+  messages: ChatMessage[];
+  toolExecutions: ToolExecution[];
+}
+
+/**
+ * Normalize tool output from various CLI formats to a consistent structure
+ * This ensures terminal formatting is preserved when sessions are restored
+ */
+function normalizeToolOutput(toolUseResult: unknown, toolName?: string): unknown {
+  if (toolUseResult == null) return null;
+
+  // String errors or plain strings - pass through
+  if (typeof toolUseResult === 'string') return toolUseResult;
+
+  if (typeof toolUseResult === 'object') {
+    // Bash tool: ensure {stdout, stderr} structure is preserved
+    if (toolName === 'Bash' || toolName === 'bash') {
+      if ('stdout' in toolUseResult || 'stderr' in toolUseResult) {
+        return {
+          stdout: (toolUseResult as any).stdout || '',
+          stderr: (toolUseResult as any).stderr || '',
+          interrupted: (toolUseResult as any).interrupted,
+          isImage: (toolUseResult as any).isImage,
+        };
+      }
+    }
+
+    // Agent/Task results: extract text content from {content: [{type: "text", text: "..."}]}
+    if ('content' in toolUseResult) {
+      const content = (toolUseResult as any).content;
+      if (Array.isArray(content)) {
+        const textBlocks = content.filter((c: any) => c.type === 'text');
+        if (textBlocks.length > 0) {
+          // Return as plain string to preserve formatting
+          return textBlocks.map((c: any) => c.text).join('\n');
+        }
+      }
+    }
+
+    // Read tool: extract file content
+    if ('file' in toolUseResult && typeof (toolUseResult as any).file === 'object') {
+      const fileObj = (toolUseResult as any).file;
+      if ('content' in fileObj) {
+        return fileObj.content;
+      }
+    }
+  }
+
+  // Fallback: return as-is
+  return toolUseResult;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -24,15 +77,19 @@ export async function GET(
   try {
     const { id } = await params;
 
+    // Get project ID from query parameter, default to '-workspace'
+    const searchParams = request.nextUrl.searchParams;
+    const projectId = searchParams.get('project') || '-workspace';
+
     // Path to CLI session file
-    const sessionPath = join(homedir(), '.claude', 'projects', '-workspace', `${id}.jsonl`);
+    const sessionPath = join(homedir(), '.claude', 'projects', projectId, `${id}.jsonl`);
 
     // Check if file exists
     try {
       await fs.access(sessionPath);
     } catch {
       // File doesn't exist - new session or deleted session
-      return NextResponse.json([]);
+      return NextResponse.json({ messages: [], toolExecutions: [] });
     }
 
     // Read and parse JSONL file
@@ -48,6 +105,8 @@ export async function GET(
     };
 
     const messages: ChatMessage[] = [];
+    const toolExecutions: ToolExecution[] = [];
+    const toolExecutionMap = new Map<string, Partial<ToolExecution>>();
     let processedCount = 0;
     let includedCount = 0;
 
@@ -55,6 +114,51 @@ export async function GET(
       try {
         const record: CLIMessage = JSON.parse(line);
         processedCount++;
+
+        // Track tool_use blocks from assistant messages
+        if (record.type === 'assistant' && record.message?.content) {
+          const normalizedContent = normalizeContent(record.message.content);
+          for (const block of normalizedContent) {
+            if (block.type === 'tool_use' && block.id && block.name) {
+              toolExecutionMap.set(block.id, {
+                id: block.id,
+                name: block.name,
+                input: (block.input || {}) as Record<string, unknown>,
+                status: 'pending',
+                timestamp: record.timestamp ? new Date(record.timestamp).getTime() : Date.now(),
+              });
+            }
+          }
+        }
+
+        // Track tool results from user messages
+        if (record.type === 'user' && record.toolUseResult && record.sourceToolAssistantUUID) {
+          // Find the tool_use_id from the message content
+          const normalizedContent = normalizeContent(record.message?.content || []);
+          const toolResultBlock = normalizedContent.find(
+            (c: any) => c.type === 'tool_result' && c.tool_use_id
+          );
+
+          if (toolResultBlock && toolResultBlock.tool_use_id) {
+            const toolId = toolResultBlock.tool_use_id;
+            const existing = toolExecutionMap.get(toolId);
+
+            if (existing) {
+              // Determine status based on result
+              const isError = toolResultBlock.is_error ||
+                            (typeof record.toolUseResult === 'string' && record.toolUseResult.startsWith('Error:'));
+
+              // Normalize output to preserve formatting across session restores
+              const normalizedOutput = normalizeToolOutput(record.toolUseResult, existing.name);
+
+              toolExecutionMap.set(toolId, {
+                ...existing,
+                output: normalizedOutput,
+                status: isError ? 'error' : 'success',
+              });
+            }
+          }
+        }
 
         // Only include user and assistant messages
         // Exclude tool results (identified by toolUseResult field or tool_result content)
@@ -94,9 +198,21 @@ export async function GET(
       }
     }
 
-    console.log(`Processed ${processedCount} lines, included ${includedCount} messages`);
+    // Convert tool execution map to array
+    for (const [_, toolExec] of toolExecutionMap) {
+      if (toolExec.id && toolExec.name && toolExec.input && toolExec.status && toolExec.timestamp !== undefined) {
+        toolExecutions.push(toolExec as ToolExecution);
+      }
+    }
 
-    return NextResponse.json(messages, {
+    console.log(`Processed ${processedCount} lines, included ${includedCount} messages, ${toolExecutions.length} tool executions`);
+
+    const response: SessionHistoryResponse = {
+      messages,
+      toolExecutions,
+    };
+
+    return NextResponse.json(response, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate',
       },

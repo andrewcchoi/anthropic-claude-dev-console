@@ -3,16 +3,18 @@
 import { useEffect } from 'react';
 import { useChatStore } from '@/lib/store';
 import { useSessionDiscoveryStore } from '@/lib/store/sessions';
+import { useCliPrewarm } from '@/hooks/useCliPrewarm';
 import { SessionSearch } from './SessionSearch';
 import { RefreshButton } from './RefreshButton';
 import { ProjectList } from './ProjectList';
-import { CurrentSessionItem } from './CurrentSessionItem';
+import { Loader2 } from 'lucide-react';
 
 const STALE_THRESHOLD = 60000; // 60 seconds
 
 export function SessionPanel() {
-  const { startNewSession } = useChatStore();
-  const { discoverSessions, lastDiscoveryTime, isDiscovering, projects } = useSessionDiscoveryStore();
+  const { startNewSession, isPrewarming } = useChatStore();
+  const { discoverSessions, lastDiscoveryTime, isDiscovering } = useSessionDiscoveryStore();
+  const { prewarmCli } = useCliPrewarm();
 
   useEffect(() => {
     // Auto-discover on mount if stale or never discovered
@@ -23,7 +25,8 @@ export function SessionPanel() {
   }, [lastDiscoveryTime, isDiscovering, discoverSessions]);
 
   const handleNewChat = () => {
-    startNewSession();
+    const newSessionId = startNewSession();
+    prewarmCli(newSessionId);
   };
 
   const handleRefresh = () => {
@@ -35,34 +38,31 @@ export function SessionPanel() {
       <div className="p-4 space-y-2">
         <button
           onClick={handleNewChat}
-          className="w-full rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600"
+          disabled={isPrewarming}
+          className="w-full rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
-          + New Chat
+          {isPrewarming ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Initializing...
+            </>
+          ) : (
+            '+ New Chat'
+          )}
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        {/* Current Session section */}
-        <CurrentSessionItem />
-
-        <div className="flex items-center justify-between mb-3 mt-4">
-          <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            History
-          </div>
+        {/* Search and refresh controls */}
+        <div className="flex items-center justify-between mb-3">
+          <SessionSearch />
           <RefreshButton onRefresh={handleRefresh} isRefreshing={isDiscovering} />
         </div>
 
-        <div className="mb-3">
-          <SessionSearch />
-        </div>
-
+        {/* Projects with sessions - no collapsible wrapper */}
         {isDiscovering && !lastDiscoveryTime ? (
           <div className="text-sm text-gray-400 dark:text-gray-500 py-4 text-center">
             Discovering sessions...
-          </div>
-        ) : projects.length === 0 ? (
-          <div className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">
-            No sessions found
           </div>
         ) : (
           <ProjectList />

@@ -6,6 +6,8 @@ import { CodeViewer } from '@/components/editor';
 import { SelectionToolbar } from '@/components/editor/SelectionToolbar';
 import { useEditorSelection } from '@/hooks/useEditorSelection';
 import { serializeError } from '@/lib/utils/errorUtils';
+import { shouldHighlightAsJson, formatJsonWithAnsi } from '@/lib/utils/jsonHighlight';
+import { JsonViewer } from '@/components/ui/JsonViewer';
 
 const Terminal = dynamic(
   () => import('../terminal').then((mod) => mod.Terminal),
@@ -107,9 +109,20 @@ export function ToolExecution({
     }
 
     if (typeof output === 'object') {
+      // Handle {content: [{type: "text", text: "..."}]} format (agent results)
+      if ('content' in output && Array.isArray((output as any).content)) {
+        const contentArray = (output as any).content;
+        const text = contentArray
+          .filter((c: any) => c.type === 'text')
+          .map((c: any) => c.text)
+          .join('\n');
+        if (text) return text;
+      }
+
       // Handle {stdout: "...", stderr: "..."} format
       if ('stdout' in output) return output.stdout || '';
       if ('text' in output) return output.text || '';
+
       // Fallback: stringify unknown object formats
       return JSON.stringify(output, null, 2);
     }
@@ -127,7 +140,13 @@ export function ToolExecution({
 
   // Check if this is a Bash tool
   const isBashTool = BASH_TOOL_NAMES.includes(name as typeof BASH_TOOL_NAMES[number]);
-  const bashOutput = isBashTool ? getBashOutput(output) : null;
+  const rawBashOutput = isBashTool ? getBashOutput(output) : null;
+
+  // Apply JSON highlighting if output is valid JSON
+  const bashOutput = rawBashOutput && shouldHighlightAsJson(rawBashOutput)
+    ? formatJsonWithAnsi(rawBashOutput)
+    : rawBashOutput;
+
   const cwd = isBashTool ? getCwd(input) : '/workspace';
 
   // Handle toggle between readonly and interactive
@@ -179,9 +198,7 @@ export function ToolExecution({
             <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
               Input:
             </div>
-            <pre className="text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-2 rounded overflow-x-auto border border-gray-200 dark:border-gray-700">
-              {JSON.stringify(input, null, 2)}
-            </pre>
+            <JsonViewer data={input} />
           </div>
           {output && (
             <div>
@@ -235,13 +252,15 @@ export function ToolExecution({
                   onSelectionChange={handleSelectionChange}
                 />
               ) : (
-                <pre className="text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-2 rounded overflow-x-auto border border-gray-200 dark:border-gray-700">
-                  {typeof output === 'string'
-                    ? output
-                    : output instanceof Error
-                    ? serializeError(output)
-                    : JSON.stringify(output, null, 2)}
-                </pre>
+                <JsonViewer
+                  data={
+                    typeof output === 'string'
+                      ? output
+                      : output instanceof Error
+                      ? serializeError(output)
+                      : output
+                  }
+                />
               )}
             </div>
           )}
