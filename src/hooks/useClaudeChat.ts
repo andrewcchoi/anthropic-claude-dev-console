@@ -102,15 +102,17 @@ export function useClaudeChat() {
       setError(null);
 
       try {
-        // Get fresh sessionId, preferredModel, provider, and providerConfig from store to avoid stale closure
+        // Get fresh sessionId, preferredModel, provider, providerConfig, and defaultMode from store to avoid stale closure
         const currentSessionId = useChatStore.getState().sessionId;
         const preferredModel = useChatStore.getState().preferredModel;
         const provider = useChatStore.getState().provider;
         const providerConfig = useChatStore.getState().providerConfig;
+        const defaultMode = useChatStore.getState().defaultMode;
         log.debug('Sending message', {
           sessionId: currentSessionId,
           model: preferredModel,
           provider,
+          defaultMode,
           contentLength: prompt.length
         });
 
@@ -125,6 +127,7 @@ export function useClaudeChat() {
             model: preferredModel || 'opusplan',
             provider,
             providerConfig,
+            defaultMode,
           }),
         });
 
@@ -163,10 +166,17 @@ export function useClaudeChat() {
                 if (message.type === 'system') {
                   // Handle system.init message specifically
                   if (message.subtype === 'init') {
-                    // Capture current model from CLI
-                    if (message.model) {
-                      useChatStore.getState().setCurrentModel(message.model);
-                    }
+                    useChatStore.getState().setInitInfo({
+                      model: message.model,
+                      sessionId: message.session_id,
+                      tools: message.tools,
+                      commands: message.slash_commands,
+                      skills: message.skills,
+                      mcpServers: message.mcp_servers,
+                      cliVersion: message.claude_code_version,
+                      cwd: message.cwd,
+                      permissionMode: message.permissionMode,
+                    });
                   }
                   // Store session ID
                   if (message.session_id) {

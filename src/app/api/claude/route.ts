@@ -17,13 +17,14 @@ const TELEMETRY_LOG = '/workspace/logs/telemetry.jsonl';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { prompt, sessionId, cwd, model, provider, providerConfig } = body;
+    const { prompt, sessionId, cwd, model, provider, providerConfig, defaultMode } = body;
 
     log.debug('Received chat request', {
       sessionId,
       cwd,
       model,
       provider,
+      defaultMode,
       promptLength: prompt.length
     });
 
@@ -33,6 +34,10 @@ export async function POST(req: NextRequest) {
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
+
+    // Validate defaultMode
+    const VALID_MODES = ['default', 'acceptEdits', 'plan', 'dontAsk', 'bypassPermissions'] as const;
+    const validatedMode = defaultMode && VALID_MODES.includes(defaultMode) ? defaultMode : 'default';
 
     const encoder = new TextEncoder();
 
@@ -47,6 +52,11 @@ export async function POST(req: NextRequest) {
             'stream-json',
             '--include-partial-messages',
           ];
+
+          // Add permission mode if not default
+          if (validatedMode && validatedMode !== 'default') {
+            args.push('--permission-mode', validatedMode);
+          }
 
           // Check if session file exists to determine whether to use --resume or --session-id
           if (sessionId) {
@@ -112,6 +122,7 @@ export async function POST(req: NextRequest) {
             args,
             cwd: cwd || '/workspace',
             provider,
+            permissionMode: validatedMode,
             hasCustomEnv: provider !== 'anthropic'
           });
 

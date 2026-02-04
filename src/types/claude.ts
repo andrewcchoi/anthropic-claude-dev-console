@@ -20,6 +20,14 @@ export interface SDKMessage {
     output_tokens: number;
   };
   duration_ms?: number;
+  // Init-specific fields
+  slash_commands?: string[];
+  skills?: string[];
+  plugins?: Array<{ name: string; path: string }>;
+  mcp_servers?: Array<{ name: string; status: string }>;
+  cwd?: string;
+  claude_code_version?: string;
+  agents?: string[];
   // CLI-specific fields
   event?: {
     type: string;

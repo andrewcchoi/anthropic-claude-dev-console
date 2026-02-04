@@ -6,6 +6,7 @@ import { useFileUpload } from '@/hooks/useFileUpload';
 import { AttachmentPreview } from './AttachmentPreview';
 import { FileAttachment } from '@/types/upload';
 import { useChatStore } from '@/lib/store';
+import { routeCommand } from '@/lib/commands/router';
 
 interface ChatInputProps {
   onSend: (message: string, attachments?: FileAttachment[]) => void;
@@ -46,11 +47,51 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
   }, [searchQuery, setSearchQuery, onSend]);
 
   const handleSend = () => {
-    if (input.trim() && !disabled) {
-      onSend(input.trim(), attachments.length > 0 ? attachments : undefined);
+    const trimmed = input.trim();
+    if (!trimmed || disabled) return;
+
+    // Route the command
+    const route = routeCommand(trimmed);
+
+    if (route.type === 'local') {
+      // Handle built-in commands locally
+      const {
+        clearChat,
+        setHelpPanelOpen,
+        setStatusPanelOpen,
+      } = useChatStore.getState();
+
+      switch (route.handler) {
+        case 'openHelpPanel':
+          setHelpPanelOpen(true);
+          break;
+        case 'clearChat':
+          clearChat();
+          break;
+        case 'openStatusPanel':
+          setStatusPanelOpen(true);
+          break;
+        case 'scrollToUsage':
+          // Find and scroll to usage display
+          const usageElement = document.querySelector('[data-usage-display]');
+          usageElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          break;
+        case 'openContextPanel':
+        case 'openConfigPanel':
+          // Future: implement these panels
+          // For now, pass through to CLI
+          onSend(trimmed, attachments.length > 0 ? attachments : undefined);
+          break;
+      }
       setInput('');
       clearAttachments();
+      return;
     }
+
+    // Pass through to CLI (skill commands, plugins, regular messages)
+    onSend(trimmed, attachments.length > 0 ? attachments : undefined);
+    setInput('');
+    clearAttachments();
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {

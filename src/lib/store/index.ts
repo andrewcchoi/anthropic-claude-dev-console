@@ -36,6 +36,33 @@ interface ChatStore {
   hideSession: (sessionId: string) => void;
   saveCurrentSession: () => void;
 
+  // Init data from CLI
+  availableCommands: string[];
+  availableTools: string[];
+  availableSkills: string[];
+  mcpServers: Array<{ name: string; status: string }>;
+  cliVersion: string | null;
+  workingDirectory: string;
+  activePermissionMode: string;
+  setInitInfo: (info: {
+    model?: string;
+    sessionId?: string;
+    tools?: string[];
+    commands?: string[];
+    skills?: string[];
+    mcpServers?: Array<{ name: string; status: string }>;
+    cliVersion?: string;
+    cwd?: string;
+    permissionMode?: string;
+  }) => void;
+
+  // UI panels
+  isStatusPanelOpen: boolean;
+  isHelpPanelOpen: boolean;
+  setStatusPanelOpen: (open: boolean) => void;
+  setHelpPanelOpen: (open: boolean) => void;
+  clearChat: () => void;
+
   // Session cache for preserving messages when switching
   sessionCache: Map<string, {
     messages: ChatMessage[];
@@ -413,6 +440,33 @@ export const useChatStore = create<ChatStore>()(
       // Default mode selection
       defaultMode: 'plan',
       setDefaultMode: (mode) => set({ defaultMode: mode }),
+
+      // Init data from CLI
+      availableCommands: [],
+      availableTools: [],
+      availableSkills: [],
+      mcpServers: [],
+      cliVersion: null,
+      workingDirectory: '/workspace',
+      activePermissionMode: 'default',
+      setInitInfo: (info) => set((state) => ({
+        ...(info.model && { currentModel: info.model }),
+        ...(info.sessionId && { sessionId: info.sessionId }),
+        availableTools: info.tools || state.availableTools,
+        availableCommands: info.commands || state.availableCommands,
+        availableSkills: info.skills || state.availableSkills,
+        mcpServers: info.mcpServers || state.mcpServers,
+        cliVersion: info.cliVersion || state.cliVersion,
+        workingDirectory: info.cwd || state.workingDirectory,
+        activePermissionMode: info.permissionMode || state.activePermissionMode,
+      })),
+
+      // UI panels
+      isStatusPanelOpen: false,
+      isHelpPanelOpen: false,
+      setStatusPanelOpen: (open) => set({ isStatusPanelOpen: open }),
+      setHelpPanelOpen: (open) => set({ isHelpPanelOpen: open }),
+      clearChat: () => set({ messages: [], toolExecutions: [], sessionUsage: null }),
 
       // Session cache
       sessionCache: new Map(),

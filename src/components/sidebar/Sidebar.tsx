@@ -6,7 +6,18 @@ import { SessionPanel } from './SessionPanel';
 import { FileTree } from '@/components/files';
 
 export function Sidebar() {
-  const { sidebarOpen, toggleSidebar, currentModel, sidebarTab, setSidebarTab } = useChatStore();
+  const {
+    sidebarOpen,
+    toggleSidebar,
+    currentModel,
+    sidebarTab,
+    setSidebarTab,
+    workingDirectory,
+    activePermissionMode,
+    availableTools,
+    mcpServers,
+    cliVersion,
+  } = useChatStore();
   const [sidebarWidth, setSidebarWidth] = useState(256); // 16rem = 256px
   const isResizing = useRef(false);
 
@@ -89,17 +100,49 @@ export function Sidebar() {
         </div>
       )}
 
-      <div className="border-t border-gray-200 dark:border-gray-700 p-4 text-xs text-gray-500 dark:text-gray-400">
+      <div className="border-t border-gray-200 dark:border-gray-700 p-4 text-xs text-gray-500 dark:text-gray-400 space-y-2">
         {currentModel && (
-          <div className="mb-3">
-            <div>Model:</div>
-            <div className="font-mono mt-1 text-gray-700 dark:text-gray-300">
+          <div className="flex justify-between">
+            <span>Model:</span>
+            <span className="font-mono text-gray-700 dark:text-gray-300 truncate ml-2">
               {currentModel}
-            </div>
+            </span>
           </div>
         )}
-        <div>Working Directory:</div>
-        <div className="font-mono mt-1 truncate text-gray-700 dark:text-gray-300">/workspace</div>
+        <div className="flex justify-between">
+          <span>Directory:</span>
+          <span className="font-mono text-gray-700 dark:text-gray-300 truncate ml-2">
+            {workingDirectory}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span>Mode:</span>
+          <span className="font-mono text-gray-700 dark:text-gray-300">
+            {activePermissionMode}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span>Tools:</span>
+          <span className="font-mono text-gray-700 dark:text-gray-300">
+            {availableTools.length} available
+          </span>
+        </div>
+        {mcpServers.length > 0 && (
+          <div className="flex justify-between">
+            <span>MCP:</span>
+            <span className="font-mono text-gray-700 dark:text-gray-300">
+              {mcpServers.filter(s => s.status === 'connected').length}/{mcpServers.length} connected
+            </span>
+          </div>
+        )}
+        {cliVersion && (
+          <div className="flex justify-between">
+            <span>CLI:</span>
+            <span className="font-mono text-gray-700 dark:text-gray-300">
+              v{cliVersion}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Resize handle */}
