@@ -10,16 +10,16 @@ interface UISessionItemProps {
 }
 
 export function UISessionItem({ session }: UISessionItemProps) {
-  const { sessionId, switchSession, deleteSession } = useChatStore();
+  const { sessionId, switchSession, hideSession } = useChatStore();
   const isActive = sessionId === session.id;
 
   const handleClick = () => {
     switchSession(session.id);
   };
 
-  const handleDelete = (e: React.MouseEvent) => {
+  const handleHide = (e: React.MouseEvent) => {
     e.stopPropagation();
-    deleteSession(session.id);
+    hideSession(session.id);
   };
 
   return (
@@ -51,9 +51,10 @@ export function UISessionItem({ session }: UISessionItemProps) {
       <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex justify-between">
         <span>{formatSmartTime(session.updated_at)}</span>
         <button
-          onClick={handleDelete}
-          className="text-gray-400 hover:text-red-500"
-          aria-label="Delete session"
+          onClick={handleHide}
+          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          aria-label="Hide session"
+          title="Hide session"
         >
           ×
         </button>

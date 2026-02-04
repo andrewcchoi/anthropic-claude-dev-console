@@ -2,10 +2,13 @@
 
 import { useState } from 'react';
 import { useSessionDiscoveryStore } from '@/lib/store/sessions';
+import { useChatStore } from '@/lib/store';
 import { SessionItem } from './SessionItem';
+import { UISessionItem } from './UISessionItem';
 
 export function ProjectList() {
   const { projects, sessions } = useSessionDiscoveryStore();
+  const { sessions: uiSessions, sessionId, hiddenSessionIds } = useChatStore();
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
   const toggleProject = (projectId: string) => {
@@ -31,7 +34,34 @@ export function ProjectList() {
   return (
     <div className="space-y-2">
       {projects.map((project) => {
-        const projectSessions = sessions.filter((s) => s.projectId === project.id);
+        const isWorkspace = project.path === '/workspace';
+
+        // Get CLI sessions for this project
+        const cliSessions = sessions.filter((s) => s.projectId === project.id);
+
+        // For workspace: mix in browser sessions (excluding current and hidden)
+        const browserSessions = isWorkspace
+          ? uiSessions.filter(s => !hiddenSessionIds.has(s.id))
+          : [];
+
+        // Combine and sort by recency
+        type MixedSession =
+          | { source: 'browser'; data: typeof uiSessions[0] }
+          | { source: 'cli'; data: typeof cliSessions[0] };
+
+        const allProjectSessions: MixedSession[] = [
+          ...browserSessions.map(s => ({ source: 'browser' as const, data: s })),
+          ...cliSessions.map(s => ({ source: 'cli' as const, data: s })),
+        ].sort((a, b) => {
+          const aTime = a.source === 'browser'
+            ? (a.data.updated_at || a.data.created_at || 0)
+            : (a.data.modifiedAt || a.data.createdAt || 0);
+          const bTime = b.source === 'browser'
+            ? (b.data.updated_at || b.data.created_at || 0)
+            : (b.data.modifiedAt || b.data.createdAt || 0);
+          return bTime - aTime;
+        });
+
         const isExpanded = expandedProjects.has(project.id);
 
         return (
@@ -57,22 +87,26 @@ export function ProjectList() {
                     {project.path === '/workspace' ? 'Current Workspace' : project.path}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {projectSessions.length} session{projectSessions.length !== 1 ? 's' : ''}
+                    {allProjectSessions.length} session{allProjectSessions.length !== 1 ? 's' : ''}
                   </div>
                 </div>
               </div>
             </button>
 
             {/* Project sessions */}
-            {isExpanded && projectSessions.length > 0 && (
+            {isExpanded && allProjectSessions.length > 0 && (
               <div className="ml-6 space-y-1">
-                {projectSessions.map((session) => (
-                  <SessionItem key={session.id} session={session} />
-                ))}
+                {allProjectSessions.map((session) =>
+                  session.source === 'browser' ? (
+                    <UISessionItem key={session.data.id} session={session.data} />
+                  ) : (
+                    <SessionItem key={session.data.id} session={session.data} />
+                  )
+                )}
               </div>
             )}
 
-            {isExpanded && projectSessions.length === 0 && (
+            {isExpanded && allProjectSessions.length === 0 && (
               <div className="ml-6 text-sm text-gray-500 dark:text-gray-400 py-2">
                 No sessions in this project
               </div>

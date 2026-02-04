@@ -25,6 +25,7 @@ interface ChatStore {
   sessions: Session[];
   currentSession: Session | null;
   isLoadingHistory: boolean;
+  hiddenSessionIds: Set<string>;
   setSessionId: (id: string) => void;
   setCurrentSession: (session: Session | null) => void;
   addSession: (session: Session) => void;
@@ -32,6 +33,7 @@ interface ChatStore {
   switchSession: (sessionId: string, projectId?: string) => Promise<void>;
   updateSessionName: (sessionId: string, name: string) => void;
   deleteSession: (sessionId: string) => void;
+  hideSession: (sessionId: string) => void;
   saveCurrentSession: () => void;
 
   // Session cache for preserving messages when switching
@@ -126,6 +128,7 @@ export const useChatStore = create<ChatStore>()(
       sessions: [],
       currentSession: null,
       isLoadingHistory: false,
+      hiddenSessionIds: new Set<string>(),
       setSessionId: (id) => set({ sessionId: id }),
       setCurrentSession: (session) => set({ currentSession: session }),
       addSession: (session) =>
@@ -303,6 +306,11 @@ export const useChatStore = create<ChatStore>()(
             : {}),
         })),
 
+      hideSession: (id) =>
+        set((state) => ({
+          hiddenSessionIds: new Set([...state.hiddenSessionIds, id]),
+        })),
+
       updateSessionName: (id, name) =>
         set((state) => ({
           sessions: state.sessions.map((s) =>
@@ -478,7 +486,16 @@ export const useChatStore = create<ChatStore>()(
         providerConfig: state.providerConfig,
         defaultMode: state.defaultMode,
         sidebarTab: state.sidebarTab,
+        hiddenSessionIds: Array.from(state.hiddenSessionIds), // Convert Set to Array for JSON
       }),
+      onRehydrateStorage: () => (state) => {
+        // Convert Array back to Set after rehydration
+        if (state && Array.isArray(state.hiddenSessionIds)) {
+          state.hiddenSessionIds = new Set(state.hiddenSessionIds);
+        } else if (state && !state.hiddenSessionIds) {
+          state.hiddenSessionIds = new Set();
+        }
+      },
     }
   )
 );
