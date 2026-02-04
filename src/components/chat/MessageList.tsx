@@ -4,6 +4,8 @@ import { useEffect, useRef } from 'react';
 import { ChatMessage } from '@/types/claude';
 import { MessageContent } from './MessageContent';
 import { SystemMessage } from './SystemMessage';
+import { useChatStore } from '@/lib/store';
+import { Loader2 } from 'lucide-react';
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -12,6 +14,7 @@ interface MessageListProps {
 
 export function MessageList({ messages, isLoadingHistory }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { isPrewarming, prewarmError } = useChatStore();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -24,6 +27,29 @@ export function MessageList({ messages, isLoadingHistory }: MessageListProps) {
           <div className="text-center">
             <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite] mb-2" />
             <p>Loading chat history...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Prewarm placeholder */}
+      {isPrewarming && messages.length === 0 && !isLoadingHistory && (
+        <div className="flex justify-center">
+          <div className="max-w-2xl w-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+              <span className="text-gray-600 dark:text-gray-300">Initializing session...</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Prewarm error */}
+      {prewarmError && messages.length === 0 && (
+        <div className="flex justify-center">
+          <div className="max-w-2xl w-full bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+            <div className="text-red-600 dark:text-red-400">
+              Failed to initialize: {prewarmError}
+            </div>
           </div>
         </div>
       )}

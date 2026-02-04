@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { useChatStore } from '@/lib/store';
 import { SessionPanel } from './SessionPanel';
 import { FileTree } from '@/components/files';
+import { Menu, FolderTree, MessageSquare } from 'lucide-react';
 
 export function Sidebar() {
   const {
@@ -43,13 +44,34 @@ export function Sidebar() {
   };
 
   if (!sidebarOpen) {
+    // Collapsed state: Show vertical strip on left edge
     return (
-      <button
-        onClick={toggleSidebar}
-        className="fixed left-0 top-0 z-50 m-4 rounded-lg bg-blue-600 dark:bg-blue-500 p-2 text-white hover:bg-blue-700 dark:hover:bg-blue-600"
-      >
-        ☰
-      </button>
+      <div className="fixed left-0 top-0 h-screen w-10 bg-gray-100 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col items-center py-4 gap-2 z-40">
+        <button
+          onClick={toggleSidebar}
+          aria-label="Open sidebar"
+          className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+          title="Expand sidebar"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <button
+          onClick={() => { toggleSidebar(); setSidebarTab('sessions'); }}
+          aria-label="Open sessions"
+          className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+          title="Sessions"
+        >
+          <MessageSquare className="h-5 w-5" />
+        </button>
+        <button
+          onClick={() => { toggleSidebar(); setSidebarTab('files'); }}
+          aria-label="Open files"
+          className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+          title="Files"
+        >
+          <FolderTree className="h-5 w-5" />
+        </button>
+      </div>
     );
   }
 
