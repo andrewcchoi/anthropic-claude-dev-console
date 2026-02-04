@@ -1,24 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useSessionDiscoveryStore } from '@/lib/store/sessions';
 import { SessionItem } from './SessionItem';
 
 export function ProjectList() {
   const { projects, sessions } = useSessionDiscoveryStore();
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
-  const hasInitialized = useRef(false);
-
-  // Auto-expand the workspace project on initial load
-  useEffect(() => {
-    if (projects.length > 0 && !hasInitialized.current) {
-      hasInitialized.current = true;
-      const workspaceProject = projects.find((p) => p.id === '-workspace');
-      if (workspaceProject) {
-        setExpandedProjects(new Set([workspaceProject.id]));
-      }
-    }
-  }, [projects]);
 
   const toggleProject = (projectId: string) => {
     setExpandedProjects((prev) => {

@@ -79,7 +79,6 @@ interface ChatStore {
   sidebarTab: 'sessions' | 'files';
   pendingInputText: string | null;
   searchQuery: string | null;
-  sessionSortBy: 'lastModified' | 'created';
   toggleFolder: (path: string) => void;
   selectFile: (path: string | null) => void;
   setPreviewOpen: (open: boolean) => void;
@@ -87,7 +86,6 @@ interface ChatStore {
   setSidebarTab: (tab: 'sessions' | 'files') => void;
   setPendingInputText: (text: string | null) => void;
   setSearchQuery: (query: string | null) => void;
-  setSessionSortBy: (sort: 'lastModified' | 'created') => void;
   clearExpandedFolders: () => void;
   expandFolders: (paths: string[]) => void;
 
@@ -445,7 +443,6 @@ export const useChatStore = create<ChatStore>()(
       sidebarTab: 'sessions',
       pendingInputText: null,
       searchQuery: null,
-      sessionSortBy: 'lastModified',
       toggleFolder: (path) =>
         set((state) => {
           const newExpanded = new Set(state.expandedFolders);
@@ -467,7 +464,6 @@ export const useChatStore = create<ChatStore>()(
       setSidebarTab: (tab) => set({ sidebarTab: tab }),
       setPendingInputText: (text) => set({ pendingInputText: text }),
       setSearchQuery: (query) => set({ searchQuery: query }),
-      setSessionSortBy: (sort) => set({ sessionSortBy: sort }),
       clearExpandedFolders: () => set({ expandedFolders: new Set<string>() }),
       expandFolders: (paths) => set({ expandedFolders: new Set(paths) }),
     }),
@@ -482,7 +478,6 @@ export const useChatStore = create<ChatStore>()(
         providerConfig: state.providerConfig,
         defaultMode: state.defaultMode,
         sidebarTab: state.sidebarTab,
-        sessionSortBy: state.sessionSortBy,
       }),
     }
   )

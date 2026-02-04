@@ -62,34 +62,3 @@ export function formatSmartTime(timestamp: number): string {
   // Fall back to relative time
   return formatRelativeTime(timestamp);
 }
-
-type SortableSession = {
-  updated_at?: number;
-  modifiedAt?: number;
-  created_at?: number;
-  createdAt?: number;
-};
-
-/**
- * Sort sessions by either last modified or created time
- * Handles both Session (updated_at/created_at) and CLISession (modifiedAt/createdAt) types
- * @param sessions - Array of sessions to sort
- * @param sortBy - Sort by 'lastModified' or 'created'
- * @returns Sorted array (newest first)
- */
-export function sortSessions<T extends SortableSession>(
-  sessions: T[],
-  sortBy: 'lastModified' | 'created'
-): T[] {
-  return [...sessions].sort((a, b) => {
-    if (sortBy === 'lastModified') {
-      const aTime = a.modifiedAt ?? a.updated_at ?? 0;
-      const bTime = b.modifiedAt ?? b.updated_at ?? 0;
-      return bTime - aTime;
-    } else {
-      const aTime = a.createdAt ?? a.created_at ?? 0;
-      const bTime = b.createdAt ?? b.created_at ?? 0;
-      return bTime - aTime;
-    }
-  });
-}

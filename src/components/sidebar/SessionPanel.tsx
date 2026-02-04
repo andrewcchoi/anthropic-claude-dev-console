@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useChatStore } from '@/lib/store';
 import { useSessionDiscoveryStore } from '@/lib/store/sessions';
-import { sortSessions } from '@/lib/utils/time';
 import { SessionSearch } from './SessionSearch';
 import { RefreshButton } from './RefreshButton';
 import { ProjectList } from './ProjectList';
@@ -13,16 +12,29 @@ import { UISessionItem } from './UISessionItem';
 const STALE_THRESHOLD = 60000; // 60 seconds
 
 export function SessionPanel() {
-  const { startNewSession, sessions: uiSessions, sessionId, sessionSortBy, setSessionSortBy } = useChatStore();
+  const { startNewSession, sessions: uiSessions, sessionId } = useChatStore();
   const { discoverSessions, lastDiscoveryTime, isDiscovering, projects } = useSessionDiscoveryStore();
 
-  // Memoize sorted sessions to prevent re-sorting on every render
-  const sortedUISessions = useMemo(() => {
-    return sortSessions(
-      uiSessions.filter(s => s.id !== sessionId),
-      sessionSortBy
-    ).slice(0, 5);
-  }, [uiSessions, sessionId, sessionSortBy]);
+  // Collapsible sections state
+  const [collapsedSections, setCollapsedSections] = useState<Set<'recentChats' | 'history'>>(new Set(['recentChats', 'history']));
+
+  const toggleSection = (section: 'recentChats' | 'history') => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(section)) {
+        next.delete(section);
+      } else {
+        next.add(section);
+      }
+      return next;
+    });
+  };
+
+  // Keep sessions in creation order (newest prepended), just filter + slice
+  const recentSessions = useMemo(() =>
+    uiSessions.filter(s => s.id !== sessionId).slice(0, 5),
+    [uiSessions, sessionId]
+  );
 
   useEffect(() => {
     // Auto-discover on mount if stale or never discovered
@@ -55,51 +67,82 @@ export function SessionPanel() {
         {/* Current Session section */}
         <CurrentSessionItem />
 
-        {/* UI Sessions section - only if there are multiple */}
+        {/* Recent Chats section - only if there are multiple */}
         {uiSessions.length > 1 && (
           <div className="mt-4">
-            <div className="flex items-center justify-between mb-2">
+            <button
+              onClick={() => toggleSection('recentChats')}
+              className="flex items-center gap-2 w-full mb-2 group"
+              aria-expanded={!collapsedSections.has('recentChats')}
+              aria-label="Toggle Recent Chats section"
+            >
+              <svg
+                className={`w-4 h-4 text-gray-400 transition-transform ${
+                  collapsedSections.has('recentChats') ? '' : 'rotate-90'
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
               <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Recent Chats
               </div>
-              <select
-                value={sessionSortBy}
-                onChange={(e) => setSessionSortBy(e.target.value as 'lastModified' | 'created')}
-                className="text-xs bg-transparent border-none text-gray-400 cursor-pointer focus:outline-none"
-              >
-                <option value="lastModified">Modified</option>
-                <option value="created">Created</option>
-              </select>
-            </div>
-            <div className="space-y-0">
-              {sortedUISessions.map(session => (
-                <UISessionItem key={session.id} session={session} />
-              ))}
-            </div>
+            </button>
+            {!collapsedSections.has('recentChats') && (
+              <div className="space-y-0">
+                {recentSessions.map(session => (
+                  <UISessionItem key={session.id} session={session} />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
+        {/* History section */}
         <div className="flex items-center justify-between mb-3 mt-4">
-          <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            History
-          </div>
+          <button
+            onClick={() => toggleSection('history')}
+            className="flex items-center gap-2 group"
+            aria-expanded={!collapsedSections.has('history')}
+            aria-label="Toggle History section"
+          >
+            <svg
+              className={`w-4 h-4 text-gray-400 transition-transform ${
+                collapsedSections.has('history') ? '' : 'rotate-90'
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              History
+            </div>
+          </button>
           <RefreshButton onRefresh={handleRefresh} isRefreshing={isDiscovering} />
         </div>
 
-        <div className="mb-3">
-          <SessionSearch />
-        </div>
+        {!collapsedSections.has('history') && (
+          <>
+            <div className="mb-3">
+              <SessionSearch />
+            </div>
 
-        {isDiscovering && !lastDiscoveryTime ? (
-          <div className="text-sm text-gray-400 dark:text-gray-500 py-4 text-center">
-            Discovering sessions...
-          </div>
-        ) : projects.length === 0 ? (
-          <div className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">
-            No sessions found
-          </div>
-        ) : (
-          <ProjectList />
+            {isDiscovering && !lastDiscoveryTime ? (
+              <div className="text-sm text-gray-400 dark:text-gray-500 py-4 text-center">
+                Discovering sessions...
+              </div>
+            ) : projects.length === 0 ? (
+              <div className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">
+                No sessions found
+              </div>
+            ) : (
+              <ProjectList />
+            )}
+          </>
         )}
       </div>
     </>
