@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useChatStore } from '@/lib/store';
 import { useSessionDiscoveryStore } from '@/lib/store/sessions';
+import { sortSessions } from '@/lib/utils/time';
 import { SessionSearch } from './SessionSearch';
 import { RefreshButton } from './RefreshButton';
 import { ProjectList } from './ProjectList';
@@ -12,8 +13,16 @@ import { UISessionItem } from './UISessionItem';
 const STALE_THRESHOLD = 60000; // 60 seconds
 
 export function SessionPanel() {
-  const { startNewSession, sessions: uiSessions, sessionId } = useChatStore();
+  const { startNewSession, sessions: uiSessions, sessionId, sessionSortBy, setSessionSortBy } = useChatStore();
   const { discoverSessions, lastDiscoveryTime, isDiscovering, projects } = useSessionDiscoveryStore();
+
+  // Memoize sorted sessions to prevent re-sorting on every render
+  const sortedUISessions = useMemo(() => {
+    return sortSessions(
+      uiSessions.filter(s => s.id !== sessionId),
+      sessionSortBy
+    ).slice(0, 5);
+  }, [uiSessions, sessionId, sessionSortBy]);
 
   useEffect(() => {
     // Auto-discover on mount if stale or never discovered
@@ -49,16 +58,23 @@ export function SessionPanel() {
         {/* UI Sessions section - only if there are multiple */}
         {uiSessions.length > 1 && (
           <div className="mt-4">
-            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
-              Recent Chats
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Recent Chats
+              </div>
+              <select
+                value={sessionSortBy}
+                onChange={(e) => setSessionSortBy(e.target.value as 'lastModified' | 'created')}
+                className="text-xs bg-transparent border-none text-gray-400 cursor-pointer focus:outline-none"
+              >
+                <option value="lastModified">Modified</option>
+                <option value="created">Created</option>
+              </select>
             </div>
-            <div className="space-y-1">
-              {uiSessions
-                .filter(s => s.id !== sessionId) // Exclude current (shown in CurrentSessionItem)
-                .slice(0, 5) // Limit to 5
-                .map(session => (
-                  <UISessionItem key={session.id} session={session} />
-                ))}
+            <div className="space-y-0">
+              {sortedUISessions.map(session => (
+                <UISessionItem key={session.id} session={session} />
+              ))}
             </div>
           </div>
         )}
