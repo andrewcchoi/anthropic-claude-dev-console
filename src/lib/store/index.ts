@@ -59,8 +59,14 @@ interface ChatStore {
   // UI panels
   isStatusPanelOpen: boolean;
   isHelpPanelOpen: boolean;
+  isModelPanelOpen: boolean;
+  isTodosPanelOpen: boolean;
+  isRenameDialogOpen: boolean;
   setStatusPanelOpen: (open: boolean) => void;
   setHelpPanelOpen: (open: boolean) => void;
+  setModelPanelOpen: (open: boolean) => void;
+  setTodosPanelOpen: (open: boolean) => void;
+  setRenameDialogOpen: (open: boolean) => void;
   clearChat: () => void;
 
   // Session cache for preserving messages when switching
@@ -464,8 +470,14 @@ export const useChatStore = create<ChatStore>()(
       // UI panels
       isStatusPanelOpen: false,
       isHelpPanelOpen: false,
+      isModelPanelOpen: false,
+      isTodosPanelOpen: false,
+      isRenameDialogOpen: false,
       setStatusPanelOpen: (open) => set({ isStatusPanelOpen: open }),
       setHelpPanelOpen: (open) => set({ isHelpPanelOpen: open }),
+      setModelPanelOpen: (open) => set({ isModelPanelOpen: open }),
+      setTodosPanelOpen: (open) => set({ isTodosPanelOpen: open }),
+      setRenameDialogOpen: (open) => set({ isRenameDialogOpen: open }),
       clearChat: () => set({ messages: [], toolExecutions: [], sessionUsage: null }),
 
       // Session cache
@@ -533,7 +545,7 @@ export const useChatStore = create<ChatStore>()(
       name: 'claude-code-sessions',
       partialize: (state) => ({
         sessions: state.sessions,
-        // sessionId: state.sessionId, // Don't persist - prevents conflicts
+        sessionId: state.sessionId,
         currentSession: state.currentSession,
         preferredModel: state.preferredModel,
         provider: state.provider,
@@ -548,6 +560,15 @@ export const useChatStore = create<ChatStore>()(
           state.hiddenSessionIds = new Set(state.hiddenSessionIds);
         } else if (state && !state.hiddenSessionIds) {
           state.hiddenSessionIds = new Set();
+        }
+
+        // Validate sessionId against currentSession to prevent orphaned state
+        if (state && state.sessionId && !state.currentSession) {
+          state.sessionId = null;
+        }
+        // If currentSession exists but sessionId doesn't match, sync them
+        if (state && state.currentSession && state.sessionId !== state.currentSession.id) {
+          state.sessionId = state.currentSession.id;
         }
       },
     }

@@ -8,6 +8,12 @@ const LOCAL_COMMANDS: Record<string, string> = {
   '/cost': 'scrollToUsage',
   '/context': 'openContextPanel',
   '/config': 'openConfigPanel',
+  '/copy': 'copyLastResponse',
+  '/model': 'openModelPanel',
+  '/theme': 'cycleTheme',
+  '/export': 'exportConversation',
+  '/todos': 'openTodosPanel',
+  '/rename': 'openRenameDialog',
 };
 
 export type CommandRouteType = 'local' | 'passthrough';

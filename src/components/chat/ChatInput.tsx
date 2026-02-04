@@ -7,6 +7,8 @@ import { AttachmentPreview } from './AttachmentPreview';
 import { FileAttachment } from '@/types/upload';
 import { useChatStore } from '@/lib/store';
 import { routeCommand } from '@/lib/commands/router';
+import { showToast } from '@/lib/utils/toast';
+import { cycleTheme, getThemeDisplayName } from '@/lib/utils/theme';
 
 interface ChatInputProps {
   onSend: (message: string, attachments?: FileAttachment[]) => void;
@@ -59,6 +61,11 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
         clearChat,
         setHelpPanelOpen,
         setStatusPanelOpen,
+        setModelPanelOpen,
+        setTodosPanelOpen,
+        setRenameDialogOpen,
+        messages,
+        currentSession,
       } = useChatStore.getState();
 
       switch (route.handler) {
@@ -75,6 +82,69 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
           // Find and scroll to usage display
           const usageElement = document.querySelector('[data-usage-display]');
           usageElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          break;
+        case 'copyLastResponse': {
+          // Find last assistant message
+          const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant');
+          if (lastAssistant) {
+            const text = lastAssistant.content
+              .filter(c => c.type === 'text')
+              .map(c => c.text)
+              .join('\n');
+            navigator.clipboard.writeText(text).then(() => {
+              showToast('Copied to clipboard', 'success');
+            }).catch(() => {
+              showToast('Failed to copy', 'error');
+            });
+          } else {
+            showToast('No assistant response to copy', 'info');
+          }
+          break;
+        }
+        case 'cycleTheme': {
+          const newTheme = cycleTheme();
+          showToast(`Theme: ${getThemeDisplayName(newTheme)}`, 'info');
+          break;
+        }
+        case 'openModelPanel':
+          setModelPanelOpen(true);
+          break;
+        case 'exportConversation': {
+          // Export messages as JSON
+          const exportData = {
+            sessionId: currentSession?.id,
+            sessionName: currentSession?.name,
+            exportedAt: new Date().toISOString(),
+            messages: messages.map(m => ({
+              role: m.role,
+              content: m.content,
+              timestamp: m.timestamp
+            }))
+          };
+          const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+            type: 'application/json'
+          });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          const filename = currentSession?.name
+            ? `${currentSession.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${Date.now()}.json`
+            : `conversation-${Date.now()}.json`;
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(url);
+          showToast('Exported conversation', 'success');
+          break;
+        }
+        case 'openTodosPanel':
+          setTodosPanelOpen(true);
+          break;
+        case 'openRenameDialog':
+          if (!currentSession) {
+            showToast('No active session to rename', 'info');
+          } else {
+            setRenameDialogOpen(true);
+          }
           break;
         case 'openContextPanel':
         case 'openConfigPanel':

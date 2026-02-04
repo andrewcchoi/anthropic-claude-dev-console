@@ -17,6 +17,7 @@ export function Sidebar() {
     availableTools,
     mcpServers,
     cliVersion,
+    sessionId,
   } = useChatStore();
   const [sidebarWidth, setSidebarWidth] = useState(256); // 16rem = 256px
   const isResizing = useRef(false);
@@ -140,6 +141,18 @@ export function Sidebar() {
             <span>CLI:</span>
             <span className="font-mono text-gray-700 dark:text-gray-300">
               v{cliVersion}
+            </span>
+          </div>
+        )}
+        {sessionId && (
+          <div className="flex justify-between">
+            <span>Session:</span>
+            <span
+              className="font-mono text-gray-700 dark:text-gray-300 truncate ml-2 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
+              title={`Click to copy: ${sessionId}`}
+              onClick={() => navigator.clipboard.writeText(sessionId)}
+            >
+              {sessionId.slice(0, 8)}...
             </span>
           </div>
         )}

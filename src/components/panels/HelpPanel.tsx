@@ -9,10 +9,23 @@ export function HelpPanel() {
   if (!isHelpPanelOpen) return null;
 
   // Group commands by type
-  const builtInCommands = ['/help', '/clear', '/status', '/cost', '/context', '/config'];
+  const builtInCommands = [
+    { cmd: '/help', desc: 'Show available commands' },
+    { cmd: '/clear', desc: 'Clear conversation' },
+    { cmd: '/status', desc: 'Show session status' },
+    { cmd: '/cost', desc: 'Show token usage' },
+    { cmd: '/copy', desc: 'Copy last response' },
+    { cmd: '/model', desc: 'Change model' },
+    { cmd: '/theme', desc: 'Toggle theme' },
+    { cmd: '/export', desc: 'Export conversation' },
+    { cmd: '/todos', desc: 'Show TODO list' },
+    { cmd: '/rename', desc: 'Rename session' },
+    { cmd: '/context', desc: 'View context' },
+    { cmd: '/config', desc: 'Open settings' },
+  ];
   const skillCommands = availableSkills;
   const otherCommands = availableCommands.filter(
-    cmd => !builtInCommands.includes(cmd) && !skillCommands.includes(cmd)
+    cmd => !builtInCommands.some(bc => bc.cmd === cmd) && !skillCommands.includes(cmd)
   );
 
   const handleCommandClick = (command: string) => {
@@ -44,13 +57,20 @@ export function HelpPanel() {
               Built-in Commands
             </h3>
             <div className="space-y-1">
-              {builtInCommands.map((cmd) => (
+              {builtInCommands.map(({ cmd, desc }) => (
                 <button
                   key={cmd}
                   onClick={() => handleCommandClick(cmd)}
-                  className="block w-full text-left px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-mono text-blue-600 dark:text-blue-400"
+                  className="block w-full text-left px-3 py-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
-                  {cmd}
+                  <div className="flex items-start gap-2">
+                    <span className="text-sm font-mono text-blue-600 dark:text-blue-400 min-w-[80px]">
+                      {cmd}
+                    </span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      {desc}
+                    </span>
+                  </div>
                 </button>
               ))}
             </div>

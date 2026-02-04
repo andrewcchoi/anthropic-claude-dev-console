@@ -9,6 +9,10 @@ import { UsageDisplay } from '@/components/usage/UsageDisplay';
 import { FilePreviewPane } from '@/components/files/FilePreviewPane';
 import { HelpPanel } from '@/components/panels/HelpPanel';
 import { StatusPanel } from '@/components/panels/StatusPanel';
+import { ModelPanel } from '@/components/panels/ModelPanel';
+import { TodosPanel } from '@/components/panels/TodosPanel';
+import { RenameDialog } from '@/components/panels/RenameDialog';
+import { ToastContainer } from '@/components/ui/ToastContainer';
 import { useChatStore } from '@/lib/store';
 
 export default function Home() {
@@ -24,6 +28,10 @@ export default function Home() {
       <Sidebar />
       <HelpPanel />
       <StatusPanel />
+      <ModelPanel />
+      <TodosPanel />
+      <RenameDialog />
+      <ToastContainer />
       {previewOpen ? (
         <div className="flex-1 flex">
           <div className="flex-1 flex flex-col">
