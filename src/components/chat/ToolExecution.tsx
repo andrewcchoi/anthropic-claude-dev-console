@@ -252,13 +252,15 @@ export function ToolExecution({
                   onSelectionChange={handleSelectionChange}
                 />
               ) : (
-                <pre className="text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-2 rounded overflow-x-auto border border-gray-200 dark:border-gray-700">
-                  {typeof output === 'string'
-                    ? output
-                    : output instanceof Error
-                    ? serializeError(output)
-                    : JSON.stringify(output, null, 2)}
-                </pre>
+                <JsonViewer
+                  data={
+                    typeof output === 'string'
+                      ? output
+                      : output instanceof Error
+                      ? serializeError(output)
+                      : output
+                  }
+                />
               )}
             </div>
           )}
