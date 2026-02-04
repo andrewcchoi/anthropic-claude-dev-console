@@ -22,6 +22,54 @@ interface SessionHistoryResponse {
   toolExecutions: ToolExecution[];
 }
 
+/**
+ * Normalize tool output from various CLI formats to a consistent structure
+ * This ensures terminal formatting is preserved when sessions are restored
+ */
+function normalizeToolOutput(toolUseResult: unknown, toolName?: string): unknown {
+  if (toolUseResult == null) return null;
+
+  // String errors or plain strings - pass through
+  if (typeof toolUseResult === 'string') return toolUseResult;
+
+  if (typeof toolUseResult === 'object') {
+    // Bash tool: ensure {stdout, stderr} structure is preserved
+    if (toolName === 'Bash' || toolName === 'bash') {
+      if ('stdout' in toolUseResult || 'stderr' in toolUseResult) {
+        return {
+          stdout: (toolUseResult as any).stdout || '',
+          stderr: (toolUseResult as any).stderr || '',
+          interrupted: (toolUseResult as any).interrupted,
+          isImage: (toolUseResult as any).isImage,
+        };
+      }
+    }
+
+    // Agent/Task results: extract text content from {content: [{type: "text", text: "..."}]}
+    if ('content' in toolUseResult) {
+      const content = (toolUseResult as any).content;
+      if (Array.isArray(content)) {
+        const textBlocks = content.filter((c: any) => c.type === 'text');
+        if (textBlocks.length > 0) {
+          // Return as plain string to preserve formatting
+          return textBlocks.map((c: any) => c.text).join('\n');
+        }
+      }
+    }
+
+    // Read tool: extract file content
+    if ('file' in toolUseResult && typeof (toolUseResult as any).file === 'object') {
+      const fileObj = (toolUseResult as any).file;
+      if ('content' in fileObj) {
+        return fileObj.content;
+      }
+    }
+  }
+
+  // Fallback: return as-is
+  return toolUseResult;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -100,9 +148,12 @@ export async function GET(
               const isError = toolResultBlock.is_error ||
                             (typeof record.toolUseResult === 'string' && record.toolUseResult.startsWith('Error:'));
 
+              // Normalize output to preserve formatting across session restores
+              const normalizedOutput = normalizeToolOutput(record.toolUseResult, existing.name);
+
               toolExecutionMap.set(toolId, {
                 ...existing,
-                output: record.toolUseResult,
+                output: normalizedOutput,
                 status: isError ? 'error' : 'success',
               });
             }
