@@ -37,6 +37,7 @@ This guide documents 8 solved problems and 2 ongoing investigations captured dur
 
 1. [ENOENT error in telemetry logging](#problem-1-enoent-error-in-telemetry-logging)
 2. [TypeScript build failure with undefined telemetry](#problem-2-typescript-build-failure-with-undefined-)
+3. *(Removed - merged with Problem 4)*
 4. [Session ID already in use error on new chat](#problem-4-session-id-already-in-use-error-on-new-c)
 5. [User messages disappear when switching sessions](#problem-5-user-messages-disappear-when-switching-s)
 6. [Session conflict when resuming existing session](#problem-6-session-conflict-when-resuming-existing-)
@@ -688,11 +689,11 @@ Quick lookup table for searching by error message:
 |---------------|------------|--------|----------|
 | enoent: no such file or directory, open '<PATH>' | `prob_001` | solved | file-system |
 | typeerror: cannot read property 'telemetry' of undefined | `prob_002` | investigating | logic |
-|  | `prob_ac67e87c` | investigating | unknown |
+| *(N/A - see prob_ac67e87c)* | `prob_ac67e87c` | investigating | unknown |
 | session id already in use | `prob_ac67e87c` | solved | state-management |
 | Cannot read properties of string (reading 'some') | `prob_msg_content` | solved | api |
 | Session conflict detected, regenerating session | `prob_resume_flag` | solved | cli-integration |
-|  | `prob_atomic_switch` | solved | state-management |
+| *(N/A - see prob_atomic_switch)* | `prob_atomic_switch` | solved | state-management |
 | Terminal output shows escaped ANSI sequences like \033[31m instead of actual colors | `prob_ansi_colors` | solved | ui |
 | WebSocket is closed before the connection is established | `prob_websocket_strictmode` | solved | react |
 | /logs page shows "No logs" even after calling enableDebug() in browser console | `prob_logs_page` | solved | logging |
@@ -709,7 +710,7 @@ Files that were modified during troubleshooting:
 - `/workspace/src/hooks/useClaudeChat.ts`
 - `/workspace/src/components/chat/ToolExecution.tsx`
 - `/workspace/src/components/terminal/InteractiveTerminal.tsx`
-- `store/useChatStore.ts`
+- `/workspace/src/lib/store/useChatStore.ts`
 
 ---
 

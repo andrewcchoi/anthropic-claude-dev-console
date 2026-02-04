@@ -43,7 +43,7 @@ Claude Code CLI (local subprocess)
 ```
 src/
 ├── app/
-│   ├── api/claude/route.ts    # Claude SDK integration
+│   ├── api/claude/route.ts    # Claude CLI integration
 │   ├── page.tsx               # Main chat interface
 │   ├── layout.tsx
 │   └── globals.css
