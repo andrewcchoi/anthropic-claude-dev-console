@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useChatStore } from '@/lib/store';
 import { useSessionDiscoveryStore } from '@/lib/store/sessions';
+import { useCliPrewarm } from '@/hooks/useCliPrewarm';
 import { SessionSearch } from './SessionSearch';
 import { RefreshButton } from './RefreshButton';
 import { ProjectList } from './ProjectList';
@@ -12,6 +13,7 @@ const STALE_THRESHOLD = 60000; // 60 seconds
 export function SessionPanel() {
   const { startNewSession } = useChatStore();
   const { discoverSessions, lastDiscoveryTime, isDiscovering } = useSessionDiscoveryStore();
+  const { prewarmCli } = useCliPrewarm();
 
   useEffect(() => {
     // Auto-discover on mount if stale or never discovered
@@ -22,7 +24,8 @@ export function SessionPanel() {
   }, [lastDiscoveryTime, isDiscovering, discoverSessions]);
 
   const handleNewChat = () => {
-    startNewSession();
+    const newSessionId = startNewSession();
+    prewarmCli(newSessionId);
   };
 
   const handleRefresh = () => {

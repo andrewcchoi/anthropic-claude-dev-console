@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { ChatMessage } from '@/types/claude';
 import { MessageContent } from './MessageContent';
+import { SystemMessage } from './SystemMessage';
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -36,30 +37,37 @@ export function MessageList({ messages, isLoadingHistory }: MessageListProps) {
           </div>
         </div>
       )}
-      {!isLoadingHistory && messages.map((message) => (
-        <div
-          key={message.id}
-          className={`flex ${
-            message.role === 'user' ? 'justify-end' : 'justify-start'
-          }`}
-        >
+      {!isLoadingHistory && messages.map((message) => {
+        // Handle system messages differently
+        if (message.role === 'system') {
+          return <SystemMessage key={message.id} message={message} />;
+        }
+
+        return (
           <div
-            className={`max-w-[80%] rounded-lg p-4 ${
-              message.role === 'user'
-                ? 'bg-blue-600 dark:bg-blue-500 text-white'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+            key={message.id}
+            className={`flex ${
+              message.role === 'user' ? 'justify-end' : 'justify-start'
             }`}
           >
-            <div className="text-xs font-semibold mb-2 uppercase opacity-70">
-              {message.role}
+            <div
+              className={`max-w-[80%] rounded-lg p-4 ${
+                message.role === 'user'
+                  ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+              }`}
+            >
+              <div className="text-xs font-semibold mb-2 uppercase opacity-70">
+                {message.role}
+              </div>
+              <MessageContent content={message.content} />
+              {message.isStreaming && (
+                <span className="inline-block ml-1 animate-pulse">▊</span>
+              )}
             </div>
-            <MessageContent content={message.content} />
-            {message.isStreaming && (
-              <span className="inline-block ml-1 animate-pulse">▊</span>
-            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
       <div ref={bottomRef} />
     </div>
   );

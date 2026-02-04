@@ -29,7 +29,7 @@ interface ChatStore {
   setSessionId: (id: string) => void;
   setCurrentSession: (session: Session | null) => void;
   addSession: (session: Session) => void;
-  startNewSession: () => void;
+  startNewSession: () => string;
   switchSession: (sessionId: string, projectId?: string) => Promise<void>;
   updateSessionName: (sessionId: string, name: string) => void;
   deleteSession: (sessionId: string) => void;
@@ -129,6 +129,10 @@ interface ChatStore {
   setIsStreaming: (streaming: boolean) => void;
   error: string | null;
   setError: (error: string | null) => void;
+  isPrewarming: boolean;
+  setIsPrewarming: (prewarming: boolean) => void;
+  prewarmError: string | null;
+  setPrewarmError: (error: string | null) => void;
   sidebarOpen: boolean;
   toggleSidebar: () => void;
   rightPanelOpen: boolean;
@@ -184,6 +188,7 @@ export const useChatStore = create<ChatStore>()(
           error: null,
           currentModel: null,
         });
+        return newSessionId;
       },
 
       switchSession: async (id, projectId) => {
@@ -400,6 +405,10 @@ export const useChatStore = create<ChatStore>()(
       setIsStreaming: (streaming) => set({ isStreaming: streaming }),
       error: null,
       setError: (error) => set({ error }),
+      isPrewarming: false,
+      setIsPrewarming: (prewarming) => set({ isPrewarming: prewarming }),
+      prewarmError: null,
+      setPrewarmError: (error) => set({ prewarmError: error }),
       sidebarOpen: true,
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       rightPanelOpen: true,

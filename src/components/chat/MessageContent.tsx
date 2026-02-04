@@ -15,6 +15,11 @@ export function MessageContent({ content }: MessageContentProps) {
   return (
     <div className="space-y-2">
       {content.map((block, index) => {
+        // Skip system_info blocks - handled by SystemMessage component
+        if (block.type === 'system_info') {
+          return null;
+        }
+
         if (block.type === 'text') {
           return (
             <div key={index} className="whitespace-pre-wrap">
