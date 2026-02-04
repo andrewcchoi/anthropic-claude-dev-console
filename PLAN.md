@@ -3,7 +3,7 @@
 ## Implementation Status
 
 **Status:** Partially Implemented (CLI Subprocess Approach)
-**Last Updated:** 2026-01-27
+**Last Updated:** 2026-02-03
 
 ### Recent Fixes
 
@@ -24,11 +24,36 @@ Instead of implementing provider SDKs directly in the Next.js app, the applicati
 - ✅ Next.js 14+ app with App Router
 - ✅ SSE streaming chat interface
 - ✅ CLI subprocess integration (`claude -p --output-format stream-json`)
-- ✅ Session management UI (SessionList.tsx)
+- ✅ Session management UI
+  - ✅ SessionPanel with project-based organization
+  - ✅ ProjectList for session discovery across CLI projects
+  - ✅ UISessionItem with time-based grouping
+  - ✅ Session search and filtering (SessionSearch)
+  - ✅ Refresh button for manual session discovery
 - ✅ Message display with tool execution rendering
   - ✅ Tool result capture from CLI `user` messages
   - ✅ ANSI color rendering in Bash output (Terminal component)
+  - ✅ JSON syntax highlighting (JsonViewer component)
+- ✅ Slash command support
+  - ✅ Local command routing (/help, /clear, /status, /model, /todos, /rename)
+  - ✅ CLI command passthrough (all other commands)
+  - ✅ Help panel with command documentation
+- ✅ UI Panels
+  - ✅ StatusPanel (system info, session details)
+  - ✅ HelpPanel (slash commands, keyboard shortcuts)
+  - ✅ ModelPanel (provider/model selection)
+  - ✅ TodosPanel (task management)
+  - ✅ RenameDialog (session renaming)
+- ✅ CLI Pre-warm
+  - ✅ useCliPrewarm hook for startup initialization
+  - ✅ /api/claude/init endpoint
+  - ✅ SystemMessage component for system info display
+- ✅ Provider/Model Selection UI
+  - ✅ ProviderSelector component
+  - ✅ ModelSelector component
+  - ✅ DefaultModeSelector component
 - ✅ Usage tracking (UsageDisplay.tsx with telemetry)
+- ✅ Toast notifications (ToastContainer)
 - ✅ Zustand state management with localStorage persistence
 - ✅ Troubleshoot-recorder plugin v2.0 (hooks + commands)
 
@@ -43,9 +68,7 @@ Instead of implementing provider SDKs directly in the Next.js app, the applicati
 
 **Future Work:**
 - ⚠️ Terminal emulator (xterm.js) - Basic terminal rendering implemented, full xterm.js integration pending
-- ❌ Code viewer (Monaco Editor)
-- ❌ Dark/light theme toggle
-- ❌ Provider selector UI
+- ❌ Keyboard shortcuts
 - ❌ shadcn/ui components
 
 ---
@@ -145,25 +168,57 @@ Instead of implementing provider SDKs directly in the Next.js app, the applicati
 │   │   ├── page.tsx                  # ✅ Main chat interface
 │   │   ├── layout.tsx                # ✅ Root layout
 │   │   └── api/
-│   │       ├── claude/route.ts       # ✅ SSE streaming (CLI subprocess)
-│   │       ├── sessions/[id]/messages/route.ts  # ✅ Message history
+│   │       ├── claude/
+│   │       │   ├── route.ts          # ✅ SSE streaming (CLI subprocess)
+│   │       │   └── init/route.ts     # ✅ CLI pre-warm endpoint
+│   │       ├── sessions/
+│   │       │   ├── [id]/messages/route.ts  # ✅ Message history
+│   │       │   └── discover/route.ts # ✅ Session discovery
 │   │       └── test-route/route.ts   # ✅ Test endpoint
 │   ├── components/
 │   │   ├── chat/
 │   │   │   ├── ChatInput.tsx         # ✅ Input with submit
 │   │   │   ├── MessageList.tsx       # ✅ Message display
 │   │   │   ├── MessageContent.tsx    # ✅ Markdown rendering
+│   │   │   ├── SystemMessage.tsx     # ✅ System info display
 │   │   │   └── ToolExecution.tsx     # ✅ Tool result display
+│   │   ├── panels/                   # ✅ UI Panels
+│   │   │   ├── StatusPanel.tsx       # ✅ System/session status
+│   │   │   ├── HelpPanel.tsx         # ✅ Command help
+│   │   │   ├── ModelPanel.tsx        # ✅ Provider/model selection
+│   │   │   ├── TodosPanel.tsx        # ✅ Task management
+│   │   │   └── RenameDialog.tsx      # ✅ Session rename
 │   │   ├── sidebar/
 │   │   │   ├── Sidebar.tsx           # ✅ Session list container
-│   │   │   └── SessionList.tsx       # ✅ Session management
+│   │   │   ├── SessionList.tsx       # ✅ Session management
+│   │   │   ├── SessionPanel.tsx      # ✅ Session panel wrapper
+│   │   │   ├── ProjectList.tsx       # ✅ Project-based session list
+│   │   │   ├── UISessionItem.tsx     # ✅ Session item UI
+│   │   │   ├── SessionSearch.tsx     # ✅ Session search/filter
+│   │   │   └── RefreshButton.tsx     # ✅ Manual session refresh
+│   │   ├── ui/
+│   │   │   ├── ProviderSelector.tsx  # ✅ Provider selection
+│   │   │   ├── ModelSelector.tsx     # ✅ Model selection
+│   │   │   ├── DefaultModeSelector.tsx # ✅ Mode selection
+│   │   │   ├── JsonViewer.tsx        # ✅ JSON syntax highlighting
+│   │   │   └── ToastContainer.tsx    # ✅ Toast notifications
 │   │   └── usage/
 │   │       └── UsageDisplay.tsx      # ✅ Token/cost tracking
 │   ├── lib/
-│   │   ├── store/index.ts            # ✅ Zustand state management
+│   │   ├── commands/
+│   │   │   └── router.ts             # ✅ Slash command routing
+│   │   ├── store/
+│   │   │   ├── index.ts              # ✅ Zustand state management
+│   │   │   └── sessions.ts           # ✅ Session state store
+│   │   ├── utils/
+│   │   │   ├── jsonHighlight.ts      # ✅ JSON syntax highlighting
+│   │   │   ├── toast.ts              # ✅ Toast utilities
+│   │   │   ├── theme.ts              # ✅ Theme utilities
+│   │   │   └── time.ts               # ✅ Time utilities
 │   │   └── telemetry.ts              # ✅ Telemetry parsing
 │   ├── hooks/
-│   │   └── useClaudeChat.ts          # ✅ Chat hook with SSE
+│   │   ├── useClaudeChat.ts          # ✅ Chat hook with SSE
+│   │   └── useCliPrewarm.ts          # ✅ CLI pre-warm hook
 │   └── types/
 │       └── claude.ts                 # ✅ TypeScript types
 ├── .claude-plugins/
@@ -284,17 +339,25 @@ Instead of implementing provider SDKs directly in the Next.js app, the applicati
 
 **Gate:** ✅ Working plugin with automatic problem tracking
 
-### Phase 6: Future Enhancements ⏳ IN PROGRESS
+### Phase 6: Future Enhancements ✅ MOSTLY COMPLETED
 
-**Tasks (Parallel):**
-- [x] Terminal emulator (xterm.js integration) - Implemented: ReadOnlyTerminal for chat output, InteractiveTerminal for standalone shell
-- [ ] Code viewer (Monaco Editor)
-- [ ] Dark/light theme toggle
-- [ ] Provider selector UI
+**Completed:**
+- [x] Terminal emulator (xterm.js) - ReadOnlyTerminal + InteractiveTerminal
+- [x] Code viewer (Monaco Editor) - Self-hosted with syntax highlighting
+- [x] Dark/light theme toggle - ThemeProvider with system/light/dark
+- [x] Provider selector UI - ProviderSelector, ModelSelector, DefaultModeSelector
+- [x] Slash command support - Local + passthrough with HelpPanel
+- [x] Session discovery - ProjectList with sessions-index.json
+- [x] CLI pre-warm - useCliPrewarm hook with system info display
+- [x] JSON syntax highlighting - JsonViewer component
+- [x] Toast notifications - ToastContainer
+- [x] UI Panels - StatusPanel, HelpPanel, ModelPanel, TodosPanel, RenameDialog
+
+**Remaining:**
 - [ ] Keyboard shortcuts
 - [ ] shadcn/ui component migration
 
-**Gate:** Production-ready UX with advanced features
+**Gate:** ✅ Production-ready UX with most advanced features
 
 ---
 
@@ -366,6 +429,141 @@ A Claude Code plugin that automatically tracks errors and solutions across sessi
 - `.claude-plugins/troubleshoot-recorder/agents/` - Specialized agents
 
 See `.claude-plugins/troubleshoot-recorder/README.md` for details.
+
+---
+
+## Slash Commands
+
+The web UI implements a command routing system that handles slash commands similarly to the Claude CLI.
+
+**Architecture:**
+- **Command Router** (`src/lib/commands/router.ts`) - Parses and routes commands
+- **Local Commands** - Handled directly in the web UI
+- **Passthrough Commands** - Forwarded to Claude CLI subprocess
+
+**Local Commands:**
+
+| Command | Description | Implementation |
+|---------|-------------|----------------|
+| `/help` | Show command help | Opens HelpPanel with command documentation |
+| `/clear` | Clear current chat | Clears message list in UI state |
+| `/status` | Show system status | Opens StatusPanel with session/system info |
+| `/model` | Change model/provider | Opens ModelPanel for provider/model selection |
+| `/todos` | Manage tasks | Opens TodosPanel for task management |
+| `/rename [name]` | Rename session | Opens RenameDialog for session renaming |
+
+**Passthrough Commands:**
+- All other commands (e.g., `/commit`, `/review-pr`, custom plugin commands) are forwarded to the CLI subprocess
+- CLI handles command execution and returns results via SSE stream
+
+**Implementation:**
+
+```typescript
+// src/lib/commands/router.ts
+export function routeCommand(input: string): CommandRoute {
+  const match = input.match(/^\/(\w+)(?:\s+(.*))?$/);
+  if (!match) return { type: 'message', content: input };
+
+  const [, command, args] = match;
+
+  // Check if local command
+  if (LOCAL_COMMANDS.includes(command)) {
+    return { type: 'local', command, args };
+  }
+
+  // Forward to CLI
+  return { type: 'passthrough', content: input };
+}
+```
+
+**UI Components:**
+- `HelpPanel.tsx` - Command documentation and keyboard shortcuts
+- `StatusPanel.tsx` - System info, session details, workspace path
+- `ModelPanel.tsx` - Provider/model/mode selection
+- `TodosPanel.tsx` - Task management interface
+- `RenameDialog.tsx` - Session rename modal
+
+---
+
+## Session Discovery
+
+The web UI implements a session discovery system that scans the `~/.claude/` directory for CLI sessions across multiple projects.
+
+**Architecture:**
+- **Discovery API** (`src/app/api/sessions/discover/route.ts`) - Scans filesystem for sessions
+- **Session Index** - Caches discovered sessions in `~/.claude/sessions-index.json`
+- **ProjectList Component** (`src/components/sidebar/ProjectList.tsx`) - Groups sessions by project
+
+**Discovery Process:**
+
+1. **Scan Projects** - Read all project directories in `~/.claude/projects/`
+2. **Parse Sessions** - Read session metadata from `.jsonl` files
+3. **Group by Project** - Organize sessions by project name
+4. **Cache Results** - Store in `sessions-index.json` for faster loading
+5. **Time-based Grouping** - Group sessions by "Today", "Yesterday", "This Week", etc.
+
+**Data Structure:**
+
+```typescript
+interface SessionIndex {
+  projects: Array<{
+    name: string;        // Project directory name
+    path: string;        // Full path to project
+    sessions: Array<{
+      id: string;        // Session ID (UUID)
+      title: string;     // Session title
+      createdAt: number; // Timestamp
+      lastMessage: number; // Last activity timestamp
+    }>;
+  }>;
+  lastUpdated: number;   // Cache timestamp
+}
+```
+
+**Components:**
+- `SessionPanel.tsx` - Top-level session panel wrapper
+- `ProjectList.tsx` - Displays projects with collapsible session lists
+- `UISessionItem.tsx` - Individual session item with time grouping
+- `SessionSearch.tsx` - Search/filter sessions by title
+- `RefreshButton.tsx` - Manual session discovery trigger
+
+**Implementation:**
+
+```typescript
+// src/app/api/sessions/discover/route.ts
+export async function GET() {
+  const projectsDir = path.join(os.homedir(), '.claude', 'projects');
+  const projects = await fs.readdir(projectsDir);
+
+  const sessionIndex = {
+    projects: await Promise.all(
+      projects.map(async (project) => {
+        const sessionsPath = path.join(projectsDir, project, 'sessions');
+        const sessions = await discoverSessions(sessionsPath);
+        return { name: project, path: sessionsPath, sessions };
+      })
+    ),
+    lastUpdated: Date.now()
+  };
+
+  // Cache to sessions-index.json
+  await fs.writeFile(
+    path.join(os.homedir(), '.claude', 'sessions-index.json'),
+    JSON.stringify(sessionIndex, null, 2)
+  );
+
+  return Response.json(sessionIndex);
+}
+```
+
+**Time Grouping:**
+
+Sessions are grouped into time-based categories:
+- **Today** - Created/modified today
+- **Yesterday** - Created/modified yesterday
+- **This Week** - Within last 7 days
+- **This Month** - Within last 30 days
+- **Older** - More than 30 days ago
 
 ---
 
