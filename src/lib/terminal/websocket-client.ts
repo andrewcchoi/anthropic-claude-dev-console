@@ -207,8 +207,21 @@ export class WebSocketClient {
    */
   sendInput(data: string): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      log.error('WebSocket not connected');
+      log.error('Cannot send input - WebSocket not connected', {
+        readyState: this.ws?.readyState,
+        dataLength: data.length
+      });
       return;
+    }
+
+    // Log command execution (especially for Claude CLI commands)
+    if (data.includes('claude')) {
+      log.info('Sending Claude CLI command to terminal', {
+        command: data.trim(),
+        sessionId: this.sessionId?.slice(0, 8) || 'none'
+      });
+    } else {
+      log.debug('Sending input to terminal', { dataLength: data.length });
     }
 
     const message: TerminalClientMessage = {

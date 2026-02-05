@@ -13,8 +13,26 @@ const STALE_THRESHOLD = 60000; // 60 seconds
 
 export function SessionPanel() {
   const { startNewSession, isPrewarming } = useChatStore();
-  const { discoverSessions, lastDiscoveryTime, isDiscovering } = useSessionDiscoveryStore();
+  const {
+    discoverSessions,
+    lastDiscoveryTime,
+    lastDiscoveryCount,
+    discoveryError,
+    isDiscovering,
+  } = useSessionDiscoveryStore();
   const { prewarmCli } = useCliPrewarm();
+
+  // Helper to format relative time
+  const formatRelativeTime = (timestamp: number): string => {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
 
   useEffect(() => {
     // Auto-discover on mount if stale or never discovered
@@ -54,10 +72,17 @@ export function SessionPanel() {
 
       <div className="flex-1 overflow-y-auto p-4">
         {/* Search and refresh controls */}
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 mb-3">
           <SessionSearch />
-          <RefreshButton onRefresh={handleRefresh} isRefreshing={isDiscovering} />
+          <RefreshButton onRefresh={handleRefresh} isRefreshing={isDiscovering} error={discoveryError} />
         </div>
+
+        {/* Last refresh indicator */}
+        {lastDiscoveryTime && lastDiscoveryCount !== null && (
+          <div className="text-xs text-gray-400 dark:text-gray-500 mb-2">
+            {lastDiscoveryCount} session{lastDiscoveryCount !== 1 ? 's' : ''} • Last refreshed {formatRelativeTime(lastDiscoveryTime)}
+          </div>
+        )}
 
         {/* Projects with sessions - no collapsible wrapper */}
         {isDiscovering && !lastDiscoveryTime ? (

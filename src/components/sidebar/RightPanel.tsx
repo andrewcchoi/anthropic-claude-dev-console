@@ -1,14 +1,18 @@
 'use client';
 
 import { useChatStore } from '@/lib/store';
-import { Settings, X, Terminal, ExternalLink } from 'lucide-react';
+import { Settings, X, Terminal, ExternalLink, Bug } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { ModelSelector } from '@/components/ui/ModelSelector';
 import { ProviderSelector } from '@/components/ui/ProviderSelector';
 import { DefaultModeSelector } from '@/components/ui/DefaultModeSelector';
+import { createLogger } from '@/lib/logger';
+import { showToast } from '@/lib/utils/toast';
+
+const log = createLogger('RightPanel');
 
 export function RightPanel() {
-  const { rightPanelOpen, toggleRightPanel } = useChatStore();
+  const { rightPanelOpen, toggleRightPanel, sessionId } = useChatStore();
 
   if (!rightPanelOpen) {
     // Collapsed state: Show vertical strip on right edge
@@ -56,13 +60,46 @@ export function RightPanel() {
 
           {/* Open Terminal Button */}
           <button
-            onClick={() => window.open('/terminal', '_blank')}
+            onClick={() => {
+              const url = sessionId
+                ? `/terminal?sessionId=${encodeURIComponent(sessionId)}`
+                : '/terminal';
+
+              log.info('Opening terminal in new tab', {
+                hasSession: !!sessionId,
+                sessionId: sessionId ? sessionId.slice(0, 8) : null,
+                url
+              });
+
+              window.open(url, '_blank');
+            }}
             aria-label="Open terminal in new tab"
             className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors"
           >
             <div className="flex items-center gap-2">
               <Terminal className="h-4 w-4" />
               <span className="text-sm font-medium">Open Terminal</span>
+            </div>
+            <ExternalLink className="h-4 w-4" />
+          </button>
+
+          {/* Debug Logs Button */}
+          <button
+            onClick={() => {
+              // Enable debug mode
+              localStorage.setItem('DEBUG_MODE', 'true');
+              log.info('Debug mode enabled, opening logs');
+              showToast('Debug mode enabled', 'success');
+
+              // Open logs in new tab
+              window.open('/logs', '_blank');
+            }}
+            aria-label="Enable debug mode and open logs"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Bug className="h-4 w-4" />
+              <span className="text-sm font-medium">Debug Logs</span>
             </div>
             <ExternalLink className="h-4 w-4" />
           </button>

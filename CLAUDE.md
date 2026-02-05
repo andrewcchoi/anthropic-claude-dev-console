@@ -294,6 +294,12 @@ enableDebug()   // or disableDebug(), toggleDebug()
 **Solution:** Don't persist transient IDs; use atomic session switching in Zustand store.
 **Docs:** `docs/troubleshooting/TROUBLESHOOTING_GUIDE.md` (Problem 4, 6, 7)
 
+### Dark Mode Visibility
+**Problem:** Interactive elements (hover states, borders) have insufficient contrast in dark mode.
+**Solution:** Use 2+ step jumps in Tailwind gray scale for hover states (gray-600 on gray-800, not gray-700). Add thicker borders (border-2) and subtle glow effects for containers. Include focus rings for accessibility.
+**Pattern:** For dark backgrounds (gray-800/900), use gray-600 for hovers, gray-500 for borders.
+**Docs:** `docs/troubleshooting/DARK_MODE_STYLING.md`
+
 ## Testing & Verification
 
 ```bash
@@ -376,6 +382,34 @@ Two distinct terminal components serve different purposes:
 
 ### Learnings
 <!-- Updated during multi-agent execution -->
+
+#### Dark Mode Visibility Improvements (2026-02-05)
+- Implemented CSS-only improvements for dark mode UI visibility
+- **Terminal borders**: Changed from `border dark:border-gray-600` to `border-2 dark:border-gray-500` with subtle glow effect `dark:shadow-[0_0_0_1px_rgba(107,114,128,0.3)]` for better visibility against dark terminal background (#1f2937)
+- **Interactive hover states**: Updated all dark mode hover states from `dark:hover:bg-gray-700` to `dark:hover:bg-gray-600` for more visible contrast (minimum 2-step jump in Tailwind gray scale recommended)
+- **Selector enhancements**: Added border highlights on hover, focus rings for accessibility, and active state indicators with left border accents
+- **Pattern established**: For dark mode UI elements on gray-800/900 backgrounds, use gray-600 for hover states and gray-500/gray-400 for borders to ensure sufficient contrast
+- **Permission Mode Selector Fix (Round 2)**: Improved active/selected item visibility in dropdown
+  * Container: `dark:bg-gray-800` → `dark:bg-gray-900`, `dark:border-gray-700` → `dark:border-gray-600` (darker container for better item contrast)
+  * Active state light: `bg-blue-50` → `bg-blue-100` (stronger highlight)
+  * Active state dark: `dark:bg-blue-900/30` → `dark:bg-blue-600/40` (brighter blue, more opacity)
+  * Hover state dark: `dark:hover:bg-gray-600` → `dark:hover:bg-gray-700` (adjusted for darker container)
+  * **Key insight**: Active states need strong contrast - pale blues (`bg-blue-50`, `dark:bg-blue-900/30`) are too subtle; use `bg-blue-100` and `dark:bg-blue-600/40` for clear visibility
+- **Terminal Background Transparency Fix**: Resolved terminal appearing invisible in dark mode
+  * Issue: Terminal background (gray-800) matched ToolExecution container (gray-800), causing them to blend
+  * Solution: Darkened container to gray-900, kept terminal at gray-800 to match input box
+  * Added explicit `backgroundColor` to both outer and inner terminal divs
+  * Result: Terminal now has clear visual separation while maintaining consistency with input box styling
+  * Color hierarchy: Container (gray-900) → Terminal (gray-800) → Content (gray-200 text)
+- Files modified:
+  * `src/components/terminal/ReadOnlyTerminal.tsx` - Terminal border visibility, explicit background colors
+  * `src/components/terminal/TerminalTheme.ts` - Terminal background colors to match input box
+  * `src/components/chat/ToolExecution.tsx` - Container background darkened to gray-900
+  * `src/components/ui/DefaultModeSelector.tsx` - Permission selector hover states
+  * `src/components/chat/ChatInput.tsx` - Mode button, dropdown hover states, and active item highlights
+  * `docs/troubleshooting/DARK_MODE_STYLING.md` - Updated Issue 3 with improved patterns, added Issue 2b for terminal transparency
+- **Accessibility**: All interactive elements now have focus rings (`focus:ring-2 focus:ring-blue-500/50`) and proper border transitions
+- **Lesson**: When implementing dark mode, test with actual background colors - gray-700 on gray-800 provides insufficient contrast for interactive feedback. Active/selected states need even stronger contrast than hover states - don't be afraid to use bright colors with higher opacity.
 
 #### Ultrathink Workflow System (2026-02-03)
 - Implemented comprehensive multi-phase agent workflow framework
