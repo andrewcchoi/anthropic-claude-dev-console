@@ -308,7 +308,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
 
             {/* Mode dropdown menu */}
             {showModeMenu && (
-              <div className="absolute bottom-full left-0 mb-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20 overflow-hidden">
+              <div className="absolute bottom-full left-0 mb-1 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg z-20 overflow-hidden">
                 {PERMISSION_MODES.map((mode) => (
                   <button
                     key={mode.value}
@@ -317,8 +317,10 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
                       setShowModeMenu(false);
                       showToast(`Mode: ${mode.label}`, 'info');
                     }}
-                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors ${
-                      mode.value === defaultMode ? 'bg-blue-50 dark:bg-blue-900/30 border-l-2 border-blue-500' : ''
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                      mode.value === defaultMode
+                        ? 'bg-blue-100 dark:bg-blue-600/40 border-l-2 border-blue-500'
+                        : ''
                     }`}
                   >
                     <div className={`w-2 h-2 rounded-full ${mode.color}`} />

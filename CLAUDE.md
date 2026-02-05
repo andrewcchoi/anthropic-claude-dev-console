@@ -389,12 +389,19 @@ Two distinct terminal components serve different purposes:
 - **Interactive hover states**: Updated all dark mode hover states from `dark:hover:bg-gray-700` to `dark:hover:bg-gray-600` for more visible contrast (minimum 2-step jump in Tailwind gray scale recommended)
 - **Selector enhancements**: Added border highlights on hover, focus rings for accessibility, and active state indicators with left border accents
 - **Pattern established**: For dark mode UI elements on gray-800/900 backgrounds, use gray-600 for hover states and gray-500/gray-400 for borders to ensure sufficient contrast
+- **Permission Mode Selector Fix (Round 2)**: Improved active/selected item visibility in dropdown
+  * Container: `dark:bg-gray-800` → `dark:bg-gray-900`, `dark:border-gray-700` → `dark:border-gray-600` (darker container for better item contrast)
+  * Active state light: `bg-blue-50` → `bg-blue-100` (stronger highlight)
+  * Active state dark: `dark:bg-blue-900/30` → `dark:bg-blue-600/40` (brighter blue, more opacity)
+  * Hover state dark: `dark:hover:bg-gray-600` → `dark:hover:bg-gray-700` (adjusted for darker container)
+  * **Key insight**: Active states need strong contrast - pale blues (`bg-blue-50`, `dark:bg-blue-900/30`) are too subtle; use `bg-blue-100` and `dark:bg-blue-600/40` for clear visibility
 - Files modified:
   * `src/components/terminal/ReadOnlyTerminal.tsx` - Terminal border visibility
   * `src/components/ui/DefaultModeSelector.tsx` - Permission selector hover states
-  * `src/components/chat/ChatInput.tsx` - Mode button and dropdown hover states
+  * `src/components/chat/ChatInput.tsx` - Mode button, dropdown hover states, and active item highlights
+  * `docs/troubleshooting/DARK_MODE_STYLING.md` - Updated Issue 3 with improved patterns
 - **Accessibility**: All interactive elements now have focus rings (`focus:ring-2 focus:ring-blue-500/50`) and proper border transitions
-- **Lesson**: When implementing dark mode, test with actual background colors - gray-700 on gray-800 provides insufficient contrast for interactive feedback
+- **Lesson**: When implementing dark mode, test with actual background colors - gray-700 on gray-800 provides insufficient contrast for interactive feedback. Active/selected states need even stronger contrast than hover states - don't be afraid to use bright colors with higher opacity.
 
 #### Ultrathink Workflow System (2026-02-03)
 - Implemented comprehensive multi-phase agent workflow framework

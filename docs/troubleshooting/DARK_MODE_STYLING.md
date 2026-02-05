@@ -65,27 +65,35 @@ className={`
 
 ### Issue 3: Dropdown/Menu Item Hover States
 
-**Symptom:** Can't tell which menu item is being hovered over in dark mode.
+**Symptom:** Can't tell which menu item is being hovered over in dark mode, or active/selected items are too subtle.
 
-**Root Cause:** Subtle background transitions without border or additional feedback.
+**Root Cause:**
+- Subtle background transitions without border or additional feedback
+- Insufficient contrast between active item background and container background
+- Light mode active states too pale (e.g., `bg-blue-50`)
+- Dark mode active states too dark (e.g., `dark:bg-blue-900/30`)
 
 **Solution:**
 - Use strong hover background color (2+ steps in scale)
+- Darken dropdown container background (`dark:bg-gray-900` instead of `dark:bg-gray-800`)
+- Increase active state contrast with brighter colors and higher opacity
 - Add border highlights that change on hover
 - Use active state indicators (colored left border, stronger background)
-- Apply `transition-all` instead of `transition-colors` for smoother multi-property transitions
 
 **Example:**
 
 ```tsx
+// Dropdown container - darker background for better item contrast
+<div className="absolute bottom-full left-0 mb-1 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg z-20 overflow-hidden">
+
 // Permission mode dropdown item
 className={`
   w-full flex items-center gap-2 px-3 py-2 text-sm
   hover:bg-gray-100
-  dark:hover:bg-gray-600
+  dark:hover:bg-gray-700
   transition-colors
   ${mode.value === defaultMode
-    ? 'bg-blue-50 dark:bg-blue-900/30 border-l-2 border-blue-500'
+    ? 'bg-blue-100 dark:bg-blue-600/40 border-l-2 border-blue-500'
     : ''
   }
 `}
@@ -93,7 +101,11 @@ className={`
 
 **Active State Indicators:**
 - Left border accent: `border-l-2 border-blue-500`
-- Stronger background: `dark:bg-blue-900/30` instead of `/20`
+- Light mode: `bg-blue-100` (stronger than `bg-blue-50`)
+- Dark mode: `dark:bg-blue-600/40` (brighter and more opaque than `dark:bg-blue-900/30`)
+- Container: `dark:bg-gray-900` (darker than `dark:bg-gray-800` for better contrast)
+
+**Fixed in:** `src/components/chat/ChatInput.tsx` (2026-02-05)
 
 ### Issue 4: Focus Ring Accessibility
 
@@ -184,17 +196,21 @@ style={{ backgroundColor: theme.background }}
 ### Dropdown Menu Item
 
 ```tsx
+// Container - use darker background for better item contrast
+<div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 ...">
+
+// Menu item
 className={`
   /* Base layout */
   w-full flex items-center gap-2 px-3 py-2
 
-  /* Hover states */
-  hover:bg-gray-100 dark:hover:bg-gray-600
+  /* Hover states - 2+ step jump for visibility */
+  hover:bg-gray-100 dark:hover:bg-gray-700
   transition-colors
 
-  /* Active state */
+  /* Active state - stronger colors and higher opacity */
   ${isActive
-    ? 'bg-blue-50 dark:bg-blue-900/30 border-l-2 border-blue-500'
+    ? 'bg-blue-100 dark:bg-blue-600/40 border-l-2 border-blue-500'
     : ''
   }
 `}
