@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
             '--output-format',
             'stream-json',
             '--include-partial-messages',
+            '--allow-dangerously-skip-permissions',  // YOLO mode per CLAUDE.md
           ];
 
           // Add permission mode if not default

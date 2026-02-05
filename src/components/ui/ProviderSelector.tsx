@@ -48,7 +48,7 @@ export function ProviderSelector() {
   }, [loaded, providerConfig, setProvider, setProviderConfig]);
 
   return (
-    <div className="px-3 py-2">
+    <form onSubmit={(e) => e.preventDefault()} autoComplete="off" className="px-3 py-2">
       <label className="flex items-center gap-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
         <Cloud className="h-3.5 w-3.5" />
         Provider
@@ -157,6 +157,6 @@ export function ProviderSelector() {
           />
         </>
       )}
-    </div>
+    </form>
   );
 }

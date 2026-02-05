@@ -1,7 +1,7 @@
 import { ITheme } from '@xterm/xterm';
 
 export const terminalTheme: ITheme = {
-  background: '#1f2937', // gray-800
+  background: '#1f2937', // gray-800 (matches input box)
   foreground: '#e5e7eb', // gray-200
   cursor: '#60a5fa', // blue-400
   cursorAccent: '#1f2937',
@@ -29,10 +29,10 @@ export const terminalTheme: ITheme = {
 };
 
 export const terminalLightTheme: ITheme = {
-  background: '#f9fafb', // gray-50
+  background: '#ffffff', // white (matches input box)
   foreground: '#1f2937', // gray-800
   cursor: '#2563eb', // blue-600
-  cursorAccent: '#f9fafb',
+  cursorAccent: '#ffffff',
   selectionBackground: '#3b82f680', // blue-500 with opacity
 
   // Standard ANSI colors (matching Tailwind, adjusted for light bg)

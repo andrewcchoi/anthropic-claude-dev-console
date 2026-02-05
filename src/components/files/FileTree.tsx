@@ -40,6 +40,9 @@ export function FileTree() {
     expandFolders,
   } = useChatStore();
 
+  // Local search state for file tree filtering (UI only)
+  const [fileSearchQuery, setFileSearchQuery] = useState('');
+
   const loadDirectory = useCallback(async (path: string, force: boolean = false) => {
     // Get current directoryContents from state
     setDirectoryContents((currentContents) => {
@@ -381,8 +384,35 @@ export function FileTree() {
     loadDirectory(dirPath, true);  // Force reload
   };
 
+  // Recursive filter to check if item or any descendant matches search
+  const filterTreeItems = useCallback(
+    (items: FileItem[], query: string): FileItem[] => {
+      if (!query) return items;
+      const lowerQuery = query.toLowerCase();
+
+      return items.filter((item) => {
+        // Match on name
+        if (item.name.toLowerCase().includes(lowerQuery)) {
+          return true;
+        }
+        // For directories, check if any descendant matches
+        if (item.type === 'directory') {
+          const children = directoryContents.get(item.path);
+          if (children) {
+            return filterTreeItems(children, query).length > 0;
+          }
+        }
+        return false;
+      });
+    },
+    [directoryContents]
+  );
+
   const renderTree = (items: FileItem[], level: number = 0): React.ReactNode => {
-    return items.map((item) => {
+    // Apply search filter if query exists
+    const filteredItems = fileSearchQuery ? filterTreeItems(items, fileSearchQuery) : items;
+
+    return filteredItems.map((item) => {
       const isExpanded = expandedFolders.has(item.path);
       const isSelected = selectedFile === item.path;
       const activityType = fileActivity.get(item.path);
@@ -439,6 +469,8 @@ export function FileTree() {
         onToggleExpandCollapse={handleToggleExpandCollapse}
         isAllExpanded={isAllExpanded()}
         isLoading={isExpandingAll}
+        searchQuery={fileSearchQuery}
+        onSearchChange={setFileSearchQuery}
       />
       <div className="flex-1 overflow-y-auto">
         {isLoadingRoot ? (

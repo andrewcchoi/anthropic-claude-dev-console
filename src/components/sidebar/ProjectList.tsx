@@ -7,9 +7,15 @@ import { SessionItem } from './SessionItem';
 import { UISessionItem } from './UISessionItem';
 
 export function ProjectList() {
-  const { projects, sessions } = useSessionDiscoveryStore();
+  const { projects, sessions, sessionSearchQuery } = useSessionDiscoveryStore();
   const { sessions: uiSessions, sessionId, hiddenSessionIds } = useChatStore();
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+
+  // Helper to check if text matches search query
+  const matchesSearch = (text: string | undefined, query: string): boolean => {
+    if (!text) return false;
+    return text.toLowerCase().includes(query.toLowerCase());
+  };
 
   const toggleProject = (projectId: string) => {
     setExpandedProjects((prev) => {
@@ -37,12 +43,23 @@ export function ProjectList() {
         const isWorkspace = project.path === '/workspace';
 
         // Get CLI sessions for this project
-        const cliSessions = sessions.filter((s) => s.projectId === project.id);
+        let cliSessions = sessions.filter((s) => s.projectId === project.id);
 
         // For workspace: mix in browser sessions (excluding current and hidden)
-        const browserSessions = isWorkspace
+        let browserSessions = isWorkspace
           ? uiSessions.filter(s => !hiddenSessionIds.has(s.id))
           : [];
+
+        // Apply search filter if query exists
+        if (sessionSearchQuery) {
+          cliSessions = cliSessions.filter((s) =>
+            matchesSearch(s.name, sessionSearchQuery) ||
+            matchesSearch(s.gitBranch, sessionSearchQuery)
+          );
+          browserSessions = browserSessions.filter((s) =>
+            matchesSearch(s.name, sessionSearchQuery)
+          );
+        }
 
         // Combine and sort by recency
         type MixedSession =
@@ -63,6 +80,11 @@ export function ProjectList() {
         });
 
         const isExpanded = expandedProjects.has(project.id);
+
+        // Skip projects with no matching sessions when searching
+        if (sessionSearchQuery && allProjectSessions.length === 0) {
+          return null;
+        }
 
         return (
           <div key={project.id} className="space-y-1">
@@ -98,9 +120,9 @@ export function ProjectList() {
               <div className="ml-6 space-y-1">
                 {allProjectSessions.map((session) =>
                   session.source === 'browser' ? (
-                    <UISessionItem key={session.data.id} session={session.data} />
+                    <UISessionItem key={`browser-${session.data.id}`} session={session.data} />
                   ) : (
-                    <SessionItem key={session.data.id} session={session.data} />
+                    <SessionItem key={`cli-${session.data.id}`} session={session.data} />
                   )
                 )}
               </div>

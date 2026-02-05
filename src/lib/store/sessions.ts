@@ -9,6 +9,10 @@ interface SessionDiscoveryState {
   sessions: CLISession[];
   isDiscovering: boolean;
   lastDiscoveryTime: number | null;
+  sessionSearchQuery: string;
+  lastDiscoveryCount: number | null;
+  discoveryError: string | null;
+  setSessionSearchQuery: (query: string) => void;
   discoverSessions: (quick?: boolean) => Promise<void>;
   loadSessionDetails: (sessionId: string) => Promise<void>;
 }
@@ -18,6 +22,11 @@ export const useSessionDiscoveryStore = create<SessionDiscoveryState>((set, get)
   sessions: [],
   isDiscovering: false,
   lastDiscoveryTime: null,
+  sessionSearchQuery: '',
+  lastDiscoveryCount: null,
+  discoveryError: null,
+
+  setSessionSearchQuery: (query) => set({ sessionSearchQuery: query }),
 
   discoverSessions: async (quick = false) => {
     const { isDiscovering } = get();
@@ -48,11 +57,15 @@ export const useSessionDiscoveryStore = create<SessionDiscoveryState>((set, get)
         sessions: data.sessions,
         isDiscovering: false,
         lastDiscoveryTime: Date.now(),
+        lastDiscoveryCount: data.sessions.length,
+        discoveryError: null,
       });
     } catch (error) {
       log.error('Session discovery failed', { error });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       set({
         isDiscovering: false,
+        discoveryError: errorMessage,
       });
     }
   },
