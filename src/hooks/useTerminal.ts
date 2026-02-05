@@ -8,6 +8,7 @@ import { terminalTheme, terminalLightTheme } from '@/components/terminal/Termina
 interface UseTerminalOptions {
   cwd?: string;
   theme?: 'light' | 'dark';
+  initialCommand?: string;
   onConnected?: (sessionId: string) => void;
   onDisconnected?: () => void;
   onError?: (error: string) => void;
@@ -23,7 +24,7 @@ interface UseTerminalReturn {
 }
 
 export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn {
-  const { cwd, theme = 'dark', onConnected, onDisconnected, onError } = options;
+  const { cwd, theme = 'dark', initialCommand, onConnected, onDisconnected, onError } = options;
 
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
@@ -129,6 +130,14 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
               setConnectedState(true);
               setSessionId(sid);
               onConnected?.(sid);
+
+              // Send initial command if provided
+              if (initialCommand && wsClientRef.current) {
+                // Small delay to ensure terminal is ready
+                setTimeout(() => {
+                  wsClientRef.current?.sendInput(initialCommand);
+                }, 100);
+              }
             },
             onData: (data: string) => {
               xtermRef.current?.write(data);

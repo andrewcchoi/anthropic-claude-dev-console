@@ -8,6 +8,7 @@ import '@xterm/xterm/css/xterm.css';
 interface InteractiveTerminalProps {
   cwd?: string;
   className?: string;
+  initialCommand?: string;
   onConnected?: (sessionId: string) => void;
   onDisconnected?: () => void;
   onError?: (error: string) => void;
@@ -16,6 +17,7 @@ interface InteractiveTerminalProps {
 export function InteractiveTerminal({
   cwd,
   className = '',
+  initialCommand,
   onConnected,
   onDisconnected,
   onError,
@@ -31,6 +33,7 @@ export function InteractiveTerminal({
   } = useTerminal({
     cwd,
     theme: resolvedTheme === 'light' ? 'light' : 'dark',
+    initialCommand,
     onConnected,
     onDisconnected,
     onError,
@@ -57,7 +60,7 @@ export function InteractiveTerminal({
   }, []); // connect/disconnect are stable refs from useTerminal
 
   return (
-    <div className={`relative h-full w-full ${className}`}>
+    <div className={`relative h-full w-full overflow-hidden ${className}`}>
       {/* Connection status indicator */}
       <div className="absolute top-2 right-2 z-10 flex items-center gap-2 text-xs">
         <div

@@ -11,8 +11,8 @@ export default function TerminalPage() {
           Testing WebSocket connection to terminal server on port 3001
         </p>
       </div>
-      <div className="flex-1 p-4">
-        <Terminal mode="interactive" />
+      <div className="flex-1 p-4 overflow-hidden min-h-0">
+        <Terminal mode="interactive" className="h-full" />
       </div>
     </div>
   );

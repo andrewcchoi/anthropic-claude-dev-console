@@ -8,6 +8,7 @@ import { useEditorSelection } from '@/hooks/useEditorSelection';
 import { serializeError } from '@/lib/utils/errorUtils';
 import { shouldHighlightAsJson, formatJsonWithAnsi } from '@/lib/utils/jsonHighlight';
 import { JsonViewer } from '@/components/ui/JsonViewer';
+import { useChatStore } from '@/lib/store';
 
 const Terminal = dynamic(
   () => import('../terminal').then((mod) => mod.Terminal),
@@ -46,6 +47,9 @@ export function ToolExecution({
 }: ToolExecutionProps) {
   const [expanded, setExpanded] = useState(false);
   const [viewMode, setViewMode] = useState<'readonly' | 'interactive'>('readonly');
+
+  // Get current session ID for claude resume command
+  const sessionId = useChatStore((state) => state.sessionId);
 
   // Get file path for selection context
   const filePath = (input as ToolInput)?.file_path as string | undefined;
@@ -149,6 +153,11 @@ export function ToolExecution({
 
   const cwd = isBashTool ? getCwd(input) : '/workspace';
 
+  // Build claude resume command for interactive mode
+  const claudeCommand = sessionId
+    ? `claude --allow-dangerously-skip-permissions --resume ${sessionId}\n`
+    : undefined;
+
   // Handle toggle between readonly and interactive
   const handleToggleInteractive = () => {
     setViewMode((prev) => (prev === 'readonly' ? 'interactive' : 'readonly'));
@@ -206,7 +215,7 @@ export function ToolExecution({
                 <div className="text-xs font-semibold text-gray-600 dark:text-gray-400">
                   Output:
                 </div>
-                {isBashTool && bashOutput && status === 'success' && (
+                {isBashTool && bashOutput && (status === 'success' || status === 'error') && (
                   <div className="flex gap-1">
                     <button
                       onClick={handleToggleInteractive}
@@ -238,6 +247,7 @@ export function ToolExecution({
                   cwd={cwd}
                   minHeight={80}
                   maxHeight={300}
+                  initialCommand={viewMode === 'interactive' ? claudeCommand : undefined}
                 />
               ) : (name === 'Read' || name === 'Edit') && typeof output === 'string' ? (
                 <CodeViewer

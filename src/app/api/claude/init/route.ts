@@ -153,12 +153,6 @@ export async function POST(req: NextRequest) {
                   }
 
                   controller.enqueue(encoder.encode(`data: ${trimmed}\n\n`));
-
-                  // Kill CLI after receiving init message
-                  if (receivedInit) {
-                    log.debug('Init complete, terminating CLI');
-                    claude.kill();
-                  }
                 }
               } catch (e) {
                 // Skip invalid JSON
@@ -204,8 +198,8 @@ export async function POST(req: NextRequest) {
             controller.close();
           });
 
-          // Send minimal prompt to trigger system.init
-          claude.stdin.write('.\n');
+          // Send /status command to trigger system.init without API cost
+          claude.stdin.write('/status\n');
           claude.stdin.end();
         } catch (error: any) {
           const errorMessage = {

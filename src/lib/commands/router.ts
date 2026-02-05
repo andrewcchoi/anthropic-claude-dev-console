@@ -1,5 +1,11 @@
 // Command routing logic for slash commands
 
+export interface CommandInfo {
+  command: string;
+  handler: string;
+  description: string;
+}
+
 // Built-in commands handled locally in the web UI
 const LOCAL_COMMANDS: Record<string, string> = {
   '/help': 'openHelpPanel',
@@ -15,6 +21,22 @@ const LOCAL_COMMANDS: Record<string, string> = {
   '/todos': 'openTodosPanel',
   '/rename': 'openRenameDialog',
 };
+
+// Command descriptions for autocomplete
+export const LOCAL_COMMAND_INFO: CommandInfo[] = [
+  { command: '/help', handler: 'openHelpPanel', description: 'Show help panel with available commands' },
+  { command: '/clear', handler: 'clearChat', description: 'Clear the current chat history' },
+  { command: '/status', handler: 'openStatusPanel', description: 'Show connection and session status' },
+  { command: '/cost', handler: 'scrollToUsage', description: 'Scroll to usage and cost information' },
+  { command: '/context', handler: 'openContextPanel', description: 'Open context panel (future)' },
+  { command: '/config', handler: 'openConfigPanel', description: 'Open configuration panel (future)' },
+  { command: '/copy', handler: 'copyLastResponse', description: 'Copy last assistant response to clipboard' },
+  { command: '/model', handler: 'openModelPanel', description: 'Open model selection panel' },
+  { command: '/theme', handler: 'cycleTheme', description: 'Cycle through available themes' },
+  { command: '/export', handler: 'exportConversation', description: 'Export conversation as JSON file' },
+  { command: '/todos', handler: 'openTodosPanel', description: 'Show tasks and todos panel' },
+  { command: '/rename', handler: 'openRenameDialog', description: 'Rename the current session' },
+];
 
 export type CommandRouteType = 'local' | 'passthrough';
 

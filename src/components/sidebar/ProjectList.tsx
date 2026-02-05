@@ -98,9 +98,9 @@ export function ProjectList() {
               <div className="ml-6 space-y-1">
                 {allProjectSessions.map((session) =>
                   session.source === 'browser' ? (
-                    <UISessionItem key={session.data.id} session={session.data} />
+                    <UISessionItem key={`browser-${session.data.id}`} session={session.data} />
                   ) : (
-                    <SessionItem key={session.data.id} session={session.data} />
+                    <SessionItem key={`cli-${session.data.id}`} session={session.data} />
                   )
                 )}
               </div>
