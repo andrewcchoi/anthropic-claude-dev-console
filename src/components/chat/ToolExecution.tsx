@@ -187,7 +187,7 @@ export function ToolExecution({
 
   return (
     <div
-      className={`mt-2 rounded border-l-4 ${getBorderColor()} border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 overflow-hidden`}
+      className={`mt-2 rounded border-l-4 ${getBorderColor()} border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 overflow-hidden`}
     >
       <button
         onClick={() => setExpanded(!expanded)}

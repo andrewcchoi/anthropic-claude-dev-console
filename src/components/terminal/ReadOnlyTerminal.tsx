@@ -155,7 +155,14 @@ export function ReadOnlyTerminal({
         backgroundColor: theme.background
       }}
     >
-      <div ref={terminalRef} className="h-full" style={{ minHeight: `${minHeight}px` }} />
+      <div
+        ref={terminalRef}
+        className="h-full"
+        style={{
+          minHeight: `${minHeight}px`,
+          backgroundColor: theme.background
+        }}
+      />
     </div>
   );
 }

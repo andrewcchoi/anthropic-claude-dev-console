@@ -63,6 +63,43 @@ className={`
 - `dark:border-gray-500`: Lighter gray for contrast
 - Shadow: `0_0_0_1px_rgba(107,114,128,0.3)` provides subtle outer glow
 
+### Issue 2b: Terminal Background Appearing Transparent
+
+**Symptom:** Terminal emulator appears transparent or invisible against its container background in dark mode.
+
+**Root Cause:** Terminal background color matches the container background color, causing them to blend together with no visual separation.
+
+**Solution:**
+- Set terminal background to match input box color for consistency (gray-800)
+- Darken the ToolExecution container background (gray-900 instead of gray-800)
+- Ensure both outer and inner terminal divs have explicit background colors
+
+**Example:**
+
+```tsx
+// ToolExecution.tsx - Container background
+className="... bg-gray-50 dark:bg-gray-900 ..."
+
+// TerminalTheme.ts - Terminal background (matches input box)
+export const terminalTheme: ITheme = {
+  background: '#1f2937', // gray-800
+  // ...
+};
+
+// ReadOnlyTerminal.tsx - Explicit backgrounds on both divs
+<div style={{ backgroundColor: theme.background }}>
+  <div ref={terminalRef} style={{ backgroundColor: theme.background }} />
+</div>
+```
+
+**Color Hierarchy:**
+- ToolExecution container: gray-900 (darkest)
+- Terminal background: gray-800 (matches input box)
+- Terminal content: gray-200 text
+- Result: Clear visual separation with consistent design
+
+**Fixed in:** `src/components/terminal/TerminalTheme.ts`, `src/components/terminal/ReadOnlyTerminal.tsx`, `src/components/chat/ToolExecution.tsx` (2026-02-05)
+
 ### Issue 3: Dropdown/Menu Item Hover States
 
 **Symptom:** Can't tell which menu item is being hovered over in dark mode, or active/selected items are too subtle.

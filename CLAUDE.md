@@ -395,11 +395,19 @@ Two distinct terminal components serve different purposes:
   * Active state dark: `dark:bg-blue-900/30` → `dark:bg-blue-600/40` (brighter blue, more opacity)
   * Hover state dark: `dark:hover:bg-gray-600` → `dark:hover:bg-gray-700` (adjusted for darker container)
   * **Key insight**: Active states need strong contrast - pale blues (`bg-blue-50`, `dark:bg-blue-900/30`) are too subtle; use `bg-blue-100` and `dark:bg-blue-600/40` for clear visibility
+- **Terminal Background Transparency Fix**: Resolved terminal appearing invisible in dark mode
+  * Issue: Terminal background (gray-800) matched ToolExecution container (gray-800), causing them to blend
+  * Solution: Darkened container to gray-900, kept terminal at gray-800 to match input box
+  * Added explicit `backgroundColor` to both outer and inner terminal divs
+  * Result: Terminal now has clear visual separation while maintaining consistency with input box styling
+  * Color hierarchy: Container (gray-900) → Terminal (gray-800) → Content (gray-200 text)
 - Files modified:
-  * `src/components/terminal/ReadOnlyTerminal.tsx` - Terminal border visibility
+  * `src/components/terminal/ReadOnlyTerminal.tsx` - Terminal border visibility, explicit background colors
+  * `src/components/terminal/TerminalTheme.ts` - Terminal background colors to match input box
+  * `src/components/chat/ToolExecution.tsx` - Container background darkened to gray-900
   * `src/components/ui/DefaultModeSelector.tsx` - Permission selector hover states
   * `src/components/chat/ChatInput.tsx` - Mode button, dropdown hover states, and active item highlights
-  * `docs/troubleshooting/DARK_MODE_STYLING.md` - Updated Issue 3 with improved patterns
+  * `docs/troubleshooting/DARK_MODE_STYLING.md` - Updated Issue 3 with improved patterns, added Issue 2b for terminal transparency
 - **Accessibility**: All interactive elements now have focus rings (`focus:ring-2 focus:ring-blue-500/50`) and proper border transitions
 - **Lesson**: When implementing dark mode, test with actual background colors - gray-700 on gray-800 provides insufficient contrast for interactive feedback. Active/selected states need even stronger contrast than hover states - don't be afraid to use bright colors with higher opacity.
 
