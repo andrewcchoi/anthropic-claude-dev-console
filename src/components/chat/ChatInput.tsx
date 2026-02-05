@@ -1,27 +1,40 @@
 'use client';
 
 import { useState, useRef, useEffect, KeyboardEvent, DragEvent } from 'react';
-import { Paperclip } from 'lucide-react';
+import { Paperclip, Shield } from 'lucide-react';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { AttachmentPreview } from './AttachmentPreview';
+import { CommandPalette } from './CommandPalette';
 import { FileAttachment } from '@/types/upload';
 import { useChatStore } from '@/lib/store';
 import { routeCommand } from '@/lib/commands/router';
 import { showToast } from '@/lib/utils/toast';
 import { cycleTheme, getThemeDisplayName } from '@/lib/utils/theme';
+import { DefaultMode } from '@/types/claude';
 
 interface ChatInputProps {
   onSend: (message: string, attachments?: FileAttachment[]) => void;
   disabled?: boolean;
 }
 
+const PERMISSION_MODES: { value: DefaultMode; label: string; color: string }[] = [
+  { value: 'default', label: 'Default', color: 'bg-green-500' },
+  { value: 'plan', label: 'Plan', color: 'bg-blue-500' },
+  { value: 'acceptEdits', label: 'Accept Edits', color: 'bg-yellow-500' },
+  { value: 'dontAsk', label: "Don't Ask", color: 'bg-orange-500' },
+  { value: 'bypassPermissions', label: 'Bypass', color: 'bg-red-500' },
+];
+
 export function ChatInput({ onSend, disabled }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+  const [showModeMenu, setShowModeMenu] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const modeMenuRef = useRef<HTMLDivElement>(null);
   const { attachments, addFiles, removeAttachment, clearAttachments } = useFileUpload();
-  const { pendingInputText, setPendingInputText, searchQuery, setSearchQuery } = useChatStore();
+  const { pendingInputText, setPendingInputText, searchQuery, setSearchQuery, defaultMode, setDefaultMode, isStreaming } = useChatStore();
 
   // Handle pending input text from file reference insertion
   useEffect(() => {
@@ -47,6 +60,47 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
       onSend(searchMessage);
     }
   }, [searchQuery, setSearchQuery, onSend]);
+
+  // Close mode menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modeMenuRef.current && !modeMenuRef.current.contains(event.target as Node)) {
+        setShowModeMenu(false);
+      }
+    };
+    if (showModeMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showModeMenu]);
+
+  const currentModeInfo = PERMISSION_MODES.find(m => m.value === defaultMode) || PERMISSION_MODES[0];
+
+  const cycleMode = () => {
+    const currentIndex = PERMISSION_MODES.findIndex(m => m.value === defaultMode);
+    const nextIndex = (currentIndex + 1) % PERMISSION_MODES.length;
+    setDefaultMode(PERMISSION_MODES[nextIndex].value);
+    showToast(`Mode: ${PERMISSION_MODES[nextIndex].label}`, 'info');
+  };
+
+  // Show/hide command palette based on input
+  useEffect(() => {
+    const trimmed = input.trim();
+    if (trimmed.startsWith('/') && trimmed.length > 0) {
+      setShowCommandPalette(true);
+    } else {
+      setShowCommandPalette(false);
+    }
+  }, [input]);
+
+  const handleCommandSelect = (command: string) => {
+    setInput(command + ' ');
+    setShowCommandPalette(false);
+    // Focus textarea after selection
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 0);
+  };
 
   const handleSend = () => {
     const trimmed = input.trim();
@@ -165,6 +219,15 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // If command palette is open, let it handle arrow keys and enter
+    if (showCommandPalette && ['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) {
+      // Don't prevent default for Escape - let CommandPalette handle it
+      if (e.key === 'Escape') {
+        setShowCommandPalette(false);
+      }
+      return;
+    }
+
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       handleSend();
@@ -228,10 +291,57 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
           </div>
         )}
 
+        {/* Permission mode indicator */}
+        <div className="mb-2 flex items-center gap-2">
+          <div className="relative" ref={modeMenuRef}>
+            <button
+              onClick={() => setShowModeMenu(!showModeMenu)}
+              onDoubleClick={cycleMode}
+              disabled={isStreaming}
+              className="flex items-center gap-2 px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-800 border border-transparent dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 hover:border-gray-300 dark:hover:border-gray-500 transition-all disabled:opacity-50 text-xs"
+              title="Click to select mode, double-click to cycle"
+            >
+              <Shield className="h-3 w-3 text-gray-600 dark:text-gray-400" />
+              <div className={`w-2 h-2 rounded-full ${currentModeInfo.color}`} />
+              <span className="text-gray-700 dark:text-gray-300 font-medium">{currentModeInfo.label}</span>
+            </button>
+
+            {/* Mode dropdown menu */}
+            {showModeMenu && (
+              <div className="absolute bottom-full left-0 mb-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20 overflow-hidden">
+                {PERMISSION_MODES.map((mode) => (
+                  <button
+                    key={mode.value}
+                    onClick={() => {
+                      setDefaultMode(mode.value);
+                      setShowModeMenu(false);
+                      showToast(`Mode: ${mode.label}`, 'info');
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors ${
+                      mode.value === defaultMode ? 'bg-blue-50 dark:bg-blue-900/30 border-l-2 border-blue-500' : ''
+                    }`}
+                  >
+                    <div className={`w-2 h-2 rounded-full ${mode.color}`} />
+                    <span className="text-gray-900 dark:text-gray-100">{mode.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Attachment preview */}
         <AttachmentPreview attachments={attachments} onRemove={removeAttachment} />
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 relative">
+          {/* Command palette */}
+          {showCommandPalette && (
+            <CommandPalette
+              inputValue={input}
+              onSelectCommand={handleCommandSelect}
+              onClose={() => setShowCommandPalette(false)}
+            />
+          )}
           {/* Hidden file input */}
           <input
             ref={fileInputRef}

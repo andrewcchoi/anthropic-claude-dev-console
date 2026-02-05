@@ -148,7 +148,7 @@ export function ReadOnlyTerminal({
 
   return (
     <div
-      className={`rounded border border-gray-300 dark:border-gray-600 overflow-hidden ${className}`}
+      className={`rounded border-2 border-gray-300 dark:border-gray-500 dark:shadow-[0_0_0_1px_rgba(107,114,128,0.3)] overflow-hidden ${className}`}
       style={{
         minHeight: `${minHeight}px`,
         maxHeight: `${maxHeight}px`,

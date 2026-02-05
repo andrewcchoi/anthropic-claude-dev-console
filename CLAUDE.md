@@ -294,6 +294,12 @@ enableDebug()   // or disableDebug(), toggleDebug()
 **Solution:** Don't persist transient IDs; use atomic session switching in Zustand store.
 **Docs:** `docs/troubleshooting/TROUBLESHOOTING_GUIDE.md` (Problem 4, 6, 7)
 
+### Dark Mode Visibility
+**Problem:** Interactive elements (hover states, borders) have insufficient contrast in dark mode.
+**Solution:** Use 2+ step jumps in Tailwind gray scale for hover states (gray-600 on gray-800, not gray-700). Add thicker borders (border-2) and subtle glow effects for containers. Include focus rings for accessibility.
+**Pattern:** For dark backgrounds (gray-800/900), use gray-600 for hovers, gray-500 for borders.
+**Docs:** `docs/troubleshooting/DARK_MODE_STYLING.md`
+
 ## Testing & Verification
 
 ```bash
@@ -376,6 +382,19 @@ Two distinct terminal components serve different purposes:
 
 ### Learnings
 <!-- Updated during multi-agent execution -->
+
+#### Dark Mode Visibility Improvements (2026-02-05)
+- Implemented CSS-only improvements for dark mode UI visibility
+- **Terminal borders**: Changed from `border dark:border-gray-600` to `border-2 dark:border-gray-500` with subtle glow effect `dark:shadow-[0_0_0_1px_rgba(107,114,128,0.3)]` for better visibility against dark terminal background (#1f2937)
+- **Interactive hover states**: Updated all dark mode hover states from `dark:hover:bg-gray-700` to `dark:hover:bg-gray-600` for more visible contrast (minimum 2-step jump in Tailwind gray scale recommended)
+- **Selector enhancements**: Added border highlights on hover, focus rings for accessibility, and active state indicators with left border accents
+- **Pattern established**: For dark mode UI elements on gray-800/900 backgrounds, use gray-600 for hover states and gray-500/gray-400 for borders to ensure sufficient contrast
+- Files modified:
+  * `src/components/terminal/ReadOnlyTerminal.tsx` - Terminal border visibility
+  * `src/components/ui/DefaultModeSelector.tsx` - Permission selector hover states
+  * `src/components/chat/ChatInput.tsx` - Mode button and dropdown hover states
+- **Accessibility**: All interactive elements now have focus rings (`focus:ring-2 focus:ring-blue-500/50`) and proper border transitions
+- **Lesson**: When implementing dark mode, test with actual background colors - gray-700 on gray-800 provides insufficient contrast for interactive feedback
 
 #### Ultrathink Workflow System (2026-02-03)
 - Implemented comprehensive multi-phase agent workflow framework

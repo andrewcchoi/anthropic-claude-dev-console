@@ -26,7 +26,7 @@ export function DefaultModeSelector() {
           value={defaultMode}
           onChange={(e) => setDefaultMode(e.target.value as DefaultMode)}
           disabled={isStreaming}
-          className="w-full px-3 py-2 pr-8 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300 disabled:opacity-50 appearance-none cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          className="w-full px-3 py-2 pr-8 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 disabled:opacity-50 appearance-none cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 hover:border-gray-300 dark:hover:border-gray-500 focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-1 dark:focus:ring-offset-gray-900 transition-all"
         >
           {DEFAULT_MODES.map((mode) => (
             <option key={mode.value} value={mode.value}>
