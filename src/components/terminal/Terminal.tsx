@@ -30,6 +30,7 @@ interface TerminalProps {
   minHeight?: number;
   maxHeight?: number;
   sessionId?: string;
+  initialCommand?: string;
   onConnected?: (sessionId: string) => void;
   onDisconnected?: () => void;
   onError?: (error: string) => void;
@@ -47,6 +48,7 @@ export function Terminal({
   minHeight = 100,
   maxHeight = 400,
   sessionId,
+  initialCommand,
   onConnected,
   onDisconnected,
   onError,
@@ -67,6 +69,7 @@ export function Terminal({
       <InteractiveTerminal
         cwd={cwd}
         className={className}
+        initialCommand={initialCommand}
         onConnected={onConnected}
         onDisconnected={onDisconnected}
         onError={onError}

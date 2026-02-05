@@ -80,7 +80,7 @@ export function useClaudeChat() {
 
       // Add user message
       const userMessage: ChatMessage = {
-        id: `user-${Date.now()}`,
+        id: `user-${crypto.randomUUID()}`,
         role: 'user',
         content: userMessageContent,
         timestamp: Date.now(),
@@ -88,7 +88,7 @@ export function useClaudeChat() {
       addMessage(userMessage);
 
       // Create assistant message placeholder
-      const assistantMessageId = `assistant-${Date.now()}`;
+      const assistantMessageId = `assistant-${crypto.randomUUID()}`;
       const assistantMessage: ChatMessage = {
         id: assistantMessageId,
         role: 'assistant',
@@ -294,7 +294,7 @@ export function useClaudeChat() {
                     // New content block starting
                     if (event.content_block?.type === 'tool_use') {
                       const toolBlock = event.content_block;
-                      const toolId = toolBlock.id || `tool-${Date.now()}`;
+                      const toolId = toolBlock.id || `tool-${crypto.randomUUID()}`;
 
                       // Track which tool is at this index
                       if (event.index !== undefined) {
