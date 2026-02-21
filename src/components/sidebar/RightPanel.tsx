@@ -52,7 +52,7 @@ export function RightPanel() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="p-4 space-y-2">
+        <div className="p-4 space-y-2" suppressHydrationWarning>
           <ThemeToggle />
           <ProviderSelector />
           <ModelSelector />
