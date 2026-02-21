@@ -17,6 +17,7 @@ export function SessionPanel() {
     discoverSessions,
     lastDiscoveryTime,
     lastDiscoveryCount,
+    systemSessionCount,
     discoveryError,
     isDiscovering,
   } = useSessionDiscoveryStore();
@@ -80,7 +81,11 @@ export function SessionPanel() {
         {/* Last refresh indicator */}
         {lastDiscoveryTime && lastDiscoveryCount !== null && (
           <div className="text-xs text-gray-400 dark:text-gray-500 mb-2">
-            {lastDiscoveryCount} session{lastDiscoveryCount !== 1 ? 's' : ''} • Last refreshed {formatRelativeTime(lastDiscoveryTime)}
+            {lastDiscoveryCount} session{lastDiscoveryCount !== 1 ? 's' : ''}
+            {systemSessionCount > 0 && (
+              <span className="text-gray-500 dark:text-gray-600"> (+{systemSessionCount} system)</span>
+            )}
+            {' • '}Last refreshed {formatRelativeTime(lastDiscoveryTime)}
           </div>
         )}
 

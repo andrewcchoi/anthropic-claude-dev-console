@@ -11,6 +11,10 @@ export function ProjectList() {
   const { sessions: uiSessions, sessionId, hiddenSessionIds } = useChatStore();
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
+  // Split sessions into user and system sessions
+  const userSessions = sessions.filter(s => !s.isSystem);
+  const systemSessions = sessions.filter(s => s.isSystem);
+
   // Helper to check if text matches search query
   const matchesSearch = (text: string | undefined, query: string): boolean => {
     if (!text) return false;
@@ -69,8 +73,8 @@ export function ProjectList() {
       {displayProjects.map((project) => {
         const isWorkspace = project.path === '/workspace';
 
-        // Get CLI sessions for this project
-        let cliSessions = sessions.filter((s) => s.projectId === project.id);
+        // Get CLI sessions for this project (excluding system sessions)
+        let cliSessions = userSessions.filter((s) => s.projectId === project.id);
 
         // For workspace: mix in browser sessions (excluding current and hidden)
         let browserSessions = isWorkspace
@@ -163,6 +167,53 @@ export function ProjectList() {
           </div>
         );
       })}
+
+      {/* System Sessions - separate collapsible section */}
+      {systemSessions.length > 0 && (
+        <div className="space-y-1 mt-4">
+          {/* System Sessions header */}
+          <button
+            onClick={() => toggleProject('__system__')}
+            className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-left"
+          >
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <svg
+                className={`w-4 h-4 flex-shrink-0 transition-transform ${
+                  expandedProjects.has('__system__') ? 'rotate-90' : ''
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                  System Sessions
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {systemSessions.length} session{systemSessions.length !== 1 ? 's' : ''}
+                </div>
+              </div>
+            </div>
+          </button>
+
+          {/* System sessions list */}
+          {expandedProjects.has('__system__') && (
+            <div className="ml-6 space-y-1">
+              {systemSessions
+                .filter((s) =>
+                  !sessionSearchQuery ||
+                  matchesSearch(s.name, sessionSearchQuery) ||
+                  matchesSearch(s.gitBranch, sessionSearchQuery)
+                )
+                .map((session) => (
+                  <SessionItem key={`system-${session.id}`} session={session} />
+                ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

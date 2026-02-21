@@ -41,6 +41,7 @@ async function scanSessionFiles(projectPath: string, projectId: string): Promise
 
       // Read first line for session name
       let name = 'Untitled Session';
+      let firstPrompt = '';
       try {
         const handle = await fs.open(filePath, 'r');
         const buffer = Buffer.alloc(1024);
@@ -52,10 +53,14 @@ async function scanSessionFiles(projectPath: string, projectId: string): Promise
           const parsed = JSON.parse(firstLine);
           // Extract name from first user message
           if (parsed.type === 'user' && parsed.message?.content) {
-            name = parsed.message.content.slice(0, 100);
+            firstPrompt = parsed.message.content;
+            name = firstPrompt.slice(0, 100);
           }
         }
       } catch { /* Use default name */ }
+
+      // Detect system sessions
+      const isSystem = firstPrompt.startsWith('Context: This summary will be shown');
 
       sessions.push({
         id: sessionId,
@@ -66,6 +71,7 @@ async function scanSessionFiles(projectPath: string, projectId: string): Promise
         name,
         modifiedAt: stats.mtimeMs,
         createdAt: stats.birthtimeMs || stats.mtimeMs,
+        isSystem,
       });
     }
   } catch (error) {
@@ -94,6 +100,7 @@ async function discoverSessions(quick: boolean = true): Promise<DiscoverResponse
         projects: [],
         sessions: [],
         totalSessions: 0,
+        systemSessionCount: 0,
         scanDurationMs: Date.now() - startTime,
       };
     }
@@ -118,6 +125,9 @@ async function discoverSessions(quick: boolean = true): Promise<DiscoverResponse
         // Map index entries to CLISession
         let lastActivity = 0;
         for (const entry of index.entries) {
+          // Detect system sessions
+          const isSystem = entry.firstPrompt?.startsWith('Context: This summary will be shown') || false;
+
           const session: CLISession = {
             id: entry.sessionId,
             projectId,
@@ -129,6 +139,7 @@ async function discoverSessions(quick: boolean = true): Promise<DiscoverResponse
             modifiedAt: new Date(entry.modified).getTime(),
             createdAt: new Date(entry.created).getTime(),
             gitBranch: entry.gitBranch || undefined,
+            isSystem,
           };
           sessions.push(session);
           if (session.modifiedAt > lastActivity) {
@@ -177,10 +188,14 @@ async function discoverSessions(quick: boolean = true): Promise<DiscoverResponse
     // Sort sessions by modified time
     sessions.sort((a, b) => b.modifiedAt - a.modifiedAt);
 
+    // Count system sessions
+    const systemSessionCount = sessions.filter(s => s.isSystem).length;
+
     return {
       projects,
       sessions,
       totalSessions: sessions.length,
+      systemSessionCount,
       scanDurationMs: Date.now() - startTime,
     };
   } catch (error) {
@@ -189,6 +204,7 @@ async function discoverSessions(quick: boolean = true): Promise<DiscoverResponse
       projects: [],
       sessions: [],
       totalSessions: 0,
+      systemSessionCount: 0,
       scanDurationMs: Date.now() - startTime,
     };
   }
