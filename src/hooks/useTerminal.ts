@@ -31,6 +31,7 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
   const fitAddonRef = useRef<FitAddon | null>(null);
   const wsClientRef = useRef<WebSocketClient | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
 
   const [isConnected, setIsConnected] = useState(false);
@@ -47,6 +48,11 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
   // Cleanup function
   const cleanup = () => {
     isMountedRef.current = false;
+
+    if (resizeTimeoutRef.current) {
+      clearTimeout(resizeTimeoutRef.current);
+      resizeTimeoutRef.current = null;
+    }
 
     if (resizeObserverRef.current) {
       resizeObserverRef.current.disconnect();
@@ -163,13 +169,18 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
             wsClient.sendInput(data);
           });
 
-          // Set up resize observer
+          // Set up resize observer with debounce
           const resizeObserver = new ResizeObserver(() => {
-            if (fitAddonRef.current && wsClientRef.current && isConnectedRef.current) {
-              fitAddonRef.current.fit();
-              const { cols, rows } = xtermRef.current ?? { cols: 80, rows: 24 };
-              wsClientRef.current.resize(cols, rows);
+            if (resizeTimeoutRef.current) {
+              clearTimeout(resizeTimeoutRef.current);
             }
+            resizeTimeoutRef.current = setTimeout(() => {
+              if (fitAddonRef.current && wsClientRef.current && isConnectedRef.current) {
+                fitAddonRef.current.fit();
+                const { cols, rows } = xtermRef.current ?? { cols: 80, rows: 24 };
+                wsClientRef.current.resize(cols, rows);
+              }
+            }, 50);  // 50ms debounce - fast enough to feel responsive
           });
 
           resizeObserver.observe(container);

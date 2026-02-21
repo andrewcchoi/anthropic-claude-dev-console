@@ -11,6 +11,7 @@ interface SessionDiscoveryState {
   lastDiscoveryTime: number | null;
   sessionSearchQuery: string;
   lastDiscoveryCount: number | null;
+  systemSessionCount: number;
   discoveryError: string | null;
   setSessionSearchQuery: (query: string) => void;
   discoverSessions: (quick?: boolean) => Promise<void>;
@@ -24,6 +25,7 @@ export const useSessionDiscoveryStore = create<SessionDiscoveryState>((set, get)
   lastDiscoveryTime: null,
   sessionSearchQuery: '',
   lastDiscoveryCount: null,
+  systemSessionCount: 0,
   discoveryError: null,
 
   setSessionSearchQuery: (query) => set({ sessionSearchQuery: query }),
@@ -49,15 +51,20 @@ export const useSessionDiscoveryStore = create<SessionDiscoveryState>((set, get)
       log.debug('Discovery complete', {
         projects: data.projects.length,
         sessions: data.sessions.length,
+        systemSessions: data.systemSessionCount,
         duration: data.scanDurationMs,
       });
+
+      // Calculate user session count (excluding system sessions)
+      const userSessionCount = data.sessions.length - data.systemSessionCount;
 
       set({
         projects: data.projects,
         sessions: data.sessions,
         isDiscovering: false,
         lastDiscoveryTime: Date.now(),
-        lastDiscoveryCount: data.sessions.length,
+        lastDiscoveryCount: userSessionCount,
+        systemSessionCount: data.systemSessionCount,
         discoveryError: null,
       });
     } catch (error) {

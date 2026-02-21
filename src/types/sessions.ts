@@ -21,6 +21,7 @@ export interface CLISession {
   gitBranch?: string;
   cwd?: string;
   isLoading?: boolean;
+  isSystem?: boolean;  // True for automated/helper sessions
 }
 
 export interface SessionIndexEntry {
@@ -46,5 +47,6 @@ export interface DiscoverResponse {
   projects: Project[];
   sessions: CLISession[];
   totalSessions: number;
+  systemSessionCount: number;
   scanDurationMs: number;
 }

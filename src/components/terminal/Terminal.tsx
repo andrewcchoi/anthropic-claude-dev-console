@@ -66,14 +66,16 @@ export function Terminal({
 
   if (mode === 'interactive') {
     return (
-      <InteractiveTerminal
-        cwd={cwd}
-        className={className}
-        initialCommand={initialCommand}
-        onConnected={onConnected}
-        onDisconnected={onDisconnected}
-        onError={onError}
-      />
+      <div className={`h-full w-full ${className}`}>
+        <InteractiveTerminal
+          cwd={cwd}
+          className="h-full w-full"
+          initialCommand={initialCommand}
+          onConnected={onConnected}
+          onDisconnected={onDisconnected}
+          onError={onError}
+        />
+      </div>
     );
   }
 
