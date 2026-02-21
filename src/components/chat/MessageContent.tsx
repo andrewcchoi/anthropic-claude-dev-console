@@ -7,9 +7,10 @@ import { useChatStore } from '@/lib/store';
 
 interface MessageContentProps {
   content: MessageContentType[];
+  hasToolUse?: boolean;
 }
 
-export function MessageContent({ content }: MessageContentProps) {
+export function MessageContent({ content, hasToolUse = false }: MessageContentProps) {
   const toolExecutions = useChatStore((state) => state.toolExecutions);
 
   return (
@@ -21,8 +22,10 @@ export function MessageContent({ content }: MessageContentProps) {
         }
 
         if (block.type === 'text') {
+          // When message has tools, constrain text width for readability
+          // but let tool outputs use full available width
           return (
-            <div key={index} className="whitespace-pre-wrap">
+            <div key={index} className={`whitespace-pre-wrap ${hasToolUse ? 'max-w-[85%]' : ''}`}>
               {block.text}
             </div>
           );
@@ -40,14 +43,17 @@ export function MessageContent({ content }: MessageContentProps) {
           const status = toolExecution?.status || 'pending';
           const output = toolExecution?.output;
 
+          // Wrap in full-width container that breaks out of parent padding
+          // This allows DiffViewer and Terminal to fill available space
           return (
-            <ToolExecution
-              key={block.id || index}
-              name={block.name || 'unknown'}
-              input={(toolExecution?.input ?? block.input ?? {}) as Record<string, unknown>}
-              status={status}
-              output={output as any}
-            />
+            <div key={block.id || index} className="-mx-4 px-4">
+              <ToolExecution
+                name={block.name || 'unknown'}
+                input={(toolExecution?.input ?? block.input ?? {}) as Record<string, unknown>}
+                status={status}
+                output={output as any}
+              />
+            </div>
           );
         } else if (block.type === 'tool_result') {
           return (

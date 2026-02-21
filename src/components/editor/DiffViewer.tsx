@@ -48,6 +48,7 @@ export function DiffViewer({
 }: DiffViewerProps) {
   const monaco = useMonaco();
   const editorRef = useRef<any>(null);
+  const isMountedRef = useRef(true);
   const [copied, setCopied] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const { resolvedTheme } = useAppTheme();
@@ -58,6 +59,24 @@ export function DiffViewer({
   // Resolve theme
   const effectiveTheme = theme === 'auto' ? (resolvedTheme || 'dark') : theme;
   const monacoThemeName = effectiveTheme === 'light' ? 'claude-light' : 'claude-dark';
+
+  // Cleanup effect - dispose editor on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+
+      if (editorRef.current) {
+        try {
+          editorRef.current.dispose();
+        } catch (e) {
+          // Ignore disposal errors during unmount - expected in React Strict Mode
+        }
+        editorRef.current = null;
+      }
+    };
+  }, []);
 
   // Update Monaco theme when it changes
   useEffect(() => {
@@ -77,6 +96,8 @@ export function DiffViewer({
   };
 
   const handleEditorDidMount = (editor: any) => {
+    if (!isMountedRef.current) return;
+
     editorRef.current = editor;
     setIsReady(true);
 

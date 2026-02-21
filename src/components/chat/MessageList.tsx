@@ -69,6 +69,15 @@ export function MessageList({ messages, isLoadingHistory }: MessageListProps) {
           return <SystemMessage key={message.id} message={message} />;
         }
 
+        // Check if message contains tool_use blocks (for dynamic width)
+        const hasToolUse = message.content.some(block => block.type === 'tool_use');
+
+        // Apply max-width constraint based on content type:
+        // - User messages: always 80% for readability
+        // - Assistant messages without tools: 80% for readability
+        // - Assistant messages with tools: wider to accommodate DiffViewer/Terminal
+        const widthClass = message.role === 'user' || !hasToolUse ? 'max-w-[80%]' : 'max-w-[95%]';
+
         return (
           <div
             key={message.id}
@@ -77,7 +86,7 @@ export function MessageList({ messages, isLoadingHistory }: MessageListProps) {
             }`}
           >
             <div
-              className={`max-w-[80%] rounded-lg p-4 ${
+              className={`${widthClass} rounded-lg p-4 ${
                 message.role === 'user'
                   ? 'bg-blue-600 dark:bg-blue-500 text-white'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
@@ -86,7 +95,7 @@ export function MessageList({ messages, isLoadingHistory }: MessageListProps) {
               <div className="text-xs font-semibold mb-2 uppercase opacity-70">
                 {message.role}
               </div>
-              <MessageContent content={message.content} />
+              <MessageContent content={message.content} hasToolUse={hasToolUse} />
               {message.isStreaming && (
                 <span className="inline-block ml-1 animate-pulse">▊</span>
               )}
