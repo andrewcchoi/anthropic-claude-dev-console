@@ -461,7 +461,6 @@ Two distinct terminal components serve different purposes:
   * `.claude/skills/ultrathink-adversarial.md` - Adversarial mode (~400 tokens)
   * `.claude/skills/ultrathink-temporal.md` - Temporal mode (~450 tokens)
   * `.claude/docs/ultrathink-README.md` - Getting started guide
-  * `.claude/docs/ultrathink-reference.md` - Quick reference cards
   * `.claude/docs/ultrathink-examples.md` - Real-world usage examples
   * `.claude/docs/ultrathink-verification.md` - Test cases and validation
 - Key features:
