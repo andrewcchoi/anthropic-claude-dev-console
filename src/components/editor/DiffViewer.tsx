@@ -106,7 +106,7 @@ export function DiffViewer({
   const isDark = effectiveTheme === 'dark';
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div style={{ height: typeof height === 'number' ? `${height}px` : height }} className="w-full flex flex-col">
       {showHeader && (
         <div className={`flex items-center justify-between px-3 py-2 border-b ${
           isDark
@@ -136,9 +136,9 @@ export function DiffViewer({
           </div>
         </div>
       )}
-      <div className={`flex-1 ${isDark ? 'bg-gray-900' : 'bg-white'}`}>
+      <div className={`flex-1 min-h-0 ${isDark ? 'bg-gray-900' : 'bg-white'}`}>
         <DiffEditor
-          height={showHeader ? '100%' : height}
+          height="100%"
           language={detectedLanguage}
           original={original}
           modified={modified}
