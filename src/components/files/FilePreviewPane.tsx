@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { X, ExternalLink, Copy } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { X, ExternalLink } from 'lucide-react';
 import { useChatStore } from '@/lib/store';
 import { MonacoViewer } from '@/components/editor/MonacoViewer';
 import { SelectionToolbar } from '@/components/editor/SelectionToolbar';
