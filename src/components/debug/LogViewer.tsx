@@ -8,6 +8,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useDebug } from '../providers/DebugProvider';
 import { type LogEntry } from '@/types/logger';
+import { DebugToggle } from '@/components/ui/DebugToggle';
 
 const LOG_COLORS = {
   debug: 'text-gray-400 dark:text-gray-500',
@@ -97,11 +98,9 @@ export function LogViewer() {
   if (!debugEnabled) {
     return (
       <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-950 text-gray-500 dark:text-gray-500">
-        <div className="text-center">
+        <div className="text-center space-y-4">
           <p className="mb-2">Log viewer requires debug mode</p>
-          <p className="text-sm">
-            Type <code className="text-green-600 dark:text-green-400">enableDebug()</code> in the console
-          </p>
+          <DebugToggle variant="full" />
         </div>
       </div>
     );
@@ -178,8 +177,17 @@ export function LogViewer() {
       {/* Logs */}
       <div className="flex-1 overflow-auto p-2 space-y-1 font-mono text-xs">
         {filteredLogs.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-600">
-            {logs.length === 0 ? 'No logs yet...' : 'No logs match filter'}
+          <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-500 space-y-3">
+            <div className="text-center">
+              <p className="text-base font-medium mb-2">
+                {logs.length === 0 ? 'No logs yet' : 'No logs match filter'}
+              </p>
+              {logs.length === 0 && (
+                <p className="text-sm text-gray-400 dark:text-gray-600">
+                  Trigger some activity (chat messages, API calls) to see logs appear
+                </p>
+              )}
+            </div>
           </div>
         ) : (
           filteredLogs.map((log, index) => (

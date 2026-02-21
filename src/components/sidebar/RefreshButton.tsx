@@ -30,7 +30,7 @@ export function RefreshButton({ onRefresh, isRefreshing, error }: RefreshButtonP
     <button
       onClick={onRefresh}
       disabled={isRefreshing}
-      className={`p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 ${
+      className={`p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 active:scale-[0.98] active:bg-gray-300 dark:active:bg-gray-600 disabled:opacity-50 disabled:active:scale-100 transition-all duration-150 ${
         hasError
           ? 'text-red-500 dark:text-red-400'
           : justCompleted
