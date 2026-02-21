@@ -26,6 +26,7 @@ interface ChatStore {
   currentSession: Session | null;
   isLoadingHistory: boolean;
   hiddenSessionIds: Set<string>;
+  collapsedProjects: Set<string>;
   pendingSessionId: string | null;
   setSessionId: (id: string) => void;
   setCurrentSession: (session: Session | null) => void;
@@ -35,6 +36,7 @@ interface ChatStore {
   updateSessionName: (sessionId: string, name: string) => void;
   deleteSession: (sessionId: string) => void;
   hideSession: (sessionId: string) => void;
+  toggleProjectCollapse: (projectId: string) => void;
   saveCurrentSession: () => void;
 
   // Init data from CLI
@@ -167,6 +169,7 @@ export const useChatStore = create<ChatStore>()(
       currentSession: null,
       isLoadingHistory: false,
       hiddenSessionIds: new Set<string>(),
+      collapsedProjects: new Set<string>(),
       pendingSessionId: null,
       setSessionId: (id) => set({ sessionId: id }),
       setCurrentSession: (session) => set({ currentSession: session }),
@@ -392,6 +395,17 @@ export const useChatStore = create<ChatStore>()(
           hiddenSessionIds: new Set([...state.hiddenSessionIds, id]),
         })),
 
+      toggleProjectCollapse: (projectId) =>
+        set((state) => {
+          const next = new Set(state.collapsedProjects);
+          if (next.has(projectId)) {
+            next.delete(projectId);
+          } else {
+            next.add(projectId);
+          }
+          return { collapsedProjects: next };
+        }),
+
       updateSessionName: (id, name) =>
         set((state) => ({
           sessions: state.sessions.map((s) =>
@@ -605,6 +619,7 @@ export const useChatStore = create<ChatStore>()(
         defaultMode: state.defaultMode,
         sidebarTab: state.sidebarTab,
         hiddenSessionIds: Array.from(state.hiddenSessionIds), // Convert Set to Array for JSON
+        collapsedProjects: Array.from(state.collapsedProjects), // Convert Set to Array for JSON
         // pendingSessionId: NOT persisted - resets on refresh
       }),
       onRehydrateStorage: () => (state) => {
@@ -613,6 +628,12 @@ export const useChatStore = create<ChatStore>()(
           state.hiddenSessionIds = new Set(state.hiddenSessionIds);
         } else if (state && !state.hiddenSessionIds) {
           state.hiddenSessionIds = new Set();
+        }
+
+        if (state && Array.isArray(state.collapsedProjects)) {
+          state.collapsedProjects = new Set(state.collapsedProjects);
+        } else if (state && !state.collapsedProjects) {
+          state.collapsedProjects = new Set();
         }
 
         // Validate sessionId against currentSession to prevent orphaned state

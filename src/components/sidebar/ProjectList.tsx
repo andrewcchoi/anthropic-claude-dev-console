@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useSessionDiscoveryStore } from '@/lib/store/sessions';
 import { useChatStore } from '@/lib/store';
 import { SessionItem } from './SessionItem';
@@ -8,8 +7,7 @@ import { UISessionItem } from './UISessionItem';
 
 export function ProjectList() {
   const { projects, sessions, sessionSearchQuery } = useSessionDiscoveryStore();
-  const { sessions: uiSessions, sessionId, hiddenSessionIds } = useChatStore();
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const { sessions: uiSessions, sessionId, hiddenSessionIds, collapsedProjects, toggleProjectCollapse } = useChatStore();
 
   // Split sessions into user and system sessions
   const userSessions = sessions.filter(s => !s.isSystem);
@@ -21,17 +19,6 @@ export function ProjectList() {
     return text.toLowerCase().includes(query.toLowerCase());
   };
 
-  const toggleProject = (projectId: string) => {
-    setExpandedProjects((prev) => {
-      const next = new Set(prev);
-      if (next.has(projectId)) {
-        next.delete(projectId);
-      } else {
-        next.add(projectId);
-      }
-      return next;
-    });
-  };
 
   // Ensure /workspace project always exists when there are browser sessions
   const workspaceExists = projects.some(p => p.path === '/workspace');
@@ -50,15 +37,6 @@ export function ProjectList() {
         ...projects,
       ];
 
-  // Auto-expand workspace if it has sessions
-  useEffect(() => {
-    if (workspaceExists || hasBrowserSessions) {
-      const workspaceId = projects.find(p => p.path === '/workspace')?.id || '-workspace';
-      if (!expandedProjects.has(workspaceId)) {
-        setExpandedProjects(new Set([...expandedProjects, workspaceId]));
-      }
-    }
-  }, [workspaceExists, hasBrowserSessions, projects, expandedProjects]);
 
   if (displayProjects.length === 0) {
     return (
@@ -110,7 +88,7 @@ export function ProjectList() {
           return bTime - aTime;
         });
 
-        const isExpanded = expandedProjects.has(project.id);
+        const isExpanded = !collapsedProjects.has(project.id);
 
         // Skip projects with no matching sessions when searching
         if (sessionSearchQuery && allProjectSessions.length === 0) {
@@ -121,7 +99,7 @@ export function ProjectList() {
           <div key={project.id} className="space-y-1">
             {/* Project header */}
             <button
-              onClick={() => toggleProject(project.id)}
+              onClick={() => toggleProjectCollapse(project.id)}
               className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-left"
             >
               <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -173,13 +151,13 @@ export function ProjectList() {
         <div className="space-y-1 mt-4">
           {/* System Sessions header */}
           <button
-            onClick={() => toggleProject('__system__')}
+            onClick={() => toggleProjectCollapse('__system__')}
             className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-left"
           >
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <svg
                 className={`w-4 h-4 flex-shrink-0 transition-transform ${
-                  expandedProjects.has('__system__') ? 'rotate-90' : ''
+                  !collapsedProjects.has('__system__') ? 'rotate-90' : ''
                 }`}
                 fill="none"
                 stroke="currentColor"
@@ -199,7 +177,7 @@ export function ProjectList() {
           </button>
 
           {/* System sessions list */}
-          {expandedProjects.has('__system__') && (
+          {!collapsedProjects.has('__system__') && (
             <div className="ml-6 space-y-1">
               {systemSessions
                 .filter((s) =>
