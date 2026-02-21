@@ -280,6 +280,8 @@ RUN if [ "$ENABLE_FIREWALL" = "true" ]; then \
     chmod +x /usr/local/bin/init-firewall.sh; \
   fi && \
   # Sudoers entry needed for both modes (postStartCommand compatibility)
+  echo "node ALL=(root) NOPASSWD: /bin/rm -f /usr/local/bin/python /usr/local/bin/python3" > /etc/sudoers.d/node-python && \
+  chmod 0440 /etc/sudoers.d/node-python && \
   echo "node ALL=(root) NOPASSWD: SETENV: /usr/local/bin/init-firewall.sh" > /etc/sudoers.d/node-firewall && \
   chmod 0440 /etc/sudoers.d/node-firewall && \
   rm -rf /tmp/firewall

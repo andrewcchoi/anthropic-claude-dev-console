@@ -23,6 +23,64 @@ function decodeProjectPath(encoded: string): string {
   return '/' + encoded.replace(/-/g, '/');
 }
 
+/**
+ * Scan .jsonl files directly as fallback when sessions-index.json is missing
+ */
+async function scanSessionFiles(projectPath: string, projectId: string): Promise<CLISession[]> {
+  const sessions: CLISession[] = [];
+
+  try {
+    const files = await fs.readdir(projectPath);
+
+    for (const file of files) {
+      if (!file.endsWith('.jsonl')) continue;
+
+      const filePath = join(projectPath, file);
+      const stats = await fs.stat(filePath);
+      const sessionId = file.replace('.jsonl', '');
+
+      // Read first line for session name
+      let name = 'Untitled Session';
+      let firstPrompt = '';
+      try {
+        const handle = await fs.open(filePath, 'r');
+        const buffer = Buffer.alloc(1024);
+        await handle.read(buffer, 0, 1024, 0);
+        await handle.close();
+
+        const firstLine = buffer.toString('utf-8').split('\n')[0];
+        if (firstLine) {
+          const parsed = JSON.parse(firstLine);
+          // Extract name from first user message
+          if (parsed.type === 'user' && parsed.message?.content) {
+            firstPrompt = parsed.message.content;
+            name = firstPrompt.slice(0, 100);
+          }
+        }
+      } catch { /* Use default name */ }
+
+      // Detect system sessions
+      const isSystem = firstPrompt.startsWith('Context: This summary will be shown');
+
+      sessions.push({
+        id: sessionId,
+        projectId,
+        source: 'cli',
+        filePath,
+        fileSize: stats.size,
+        name,
+        modifiedAt: stats.mtimeMs,
+        createdAt: stats.birthtimeMs || stats.mtimeMs,
+        isSystem,
+      });
+    }
+  } catch (error) {
+    console.warn(`Failed to scan session files for ${projectId}:`, error);
+  }
+
+  return sessions;
+}
+
 
 /**
  * Discover all CLI sessions across all projects
@@ -42,6 +100,7 @@ async function discoverSessions(quick: boolean = true): Promise<DiscoverResponse
         projects: [],
         sessions: [],
         totalSessions: 0,
+        systemSessionCount: 0,
         scanDurationMs: Date.now() - startTime,
       };
     }
@@ -66,6 +125,9 @@ async function discoverSessions(quick: boolean = true): Promise<DiscoverResponse
         // Map index entries to CLISession
         let lastActivity = 0;
         for (const entry of index.entries) {
+          // Detect system sessions
+          const isSystem = entry.firstPrompt?.startsWith('Context: This summary will be shown') || false;
+
           const session: CLISession = {
             id: entry.sessionId,
             projectId,
@@ -77,6 +139,7 @@ async function discoverSessions(quick: boolean = true): Promise<DiscoverResponse
             modifiedAt: new Date(entry.modified).getTime(),
             createdAt: new Date(entry.created).getTime(),
             gitBranch: entry.gitBranch || undefined,
+            isSystem,
           };
           sessions.push(session);
           if (session.modifiedAt > lastActivity) {
@@ -92,8 +155,30 @@ async function discoverSessions(quick: boolean = true): Promise<DiscoverResponse
           lastActivity,
         });
       } catch (error) {
-        // Index doesn't exist or is invalid - skip this project
-        console.warn(`No session index for project ${projectId}:`, error);
+        // Index doesn't exist or is invalid - fall back to file scanning
+        const isEnoent = (error as NodeJS.ErrnoException).code === 'ENOENT';
+        if (!isEnoent) {
+          console.warn(`Invalid session index for ${projectId}:`, error);
+        }
+
+        // Scan .jsonl files directly
+        const scannedSessions = await scanSessionFiles(projectPath, projectId);
+
+        if (scannedSessions.length > 0) {
+          sessions.push(...scannedSessions);
+
+          let lastActivity = 0;
+          for (const s of scannedSessions) {
+            if (s.modifiedAt > lastActivity) lastActivity = s.modifiedAt;
+          }
+
+          projects.push({
+            id: projectId,
+            path: decodeProjectPath(projectId),
+            sessionCount: scannedSessions.length,
+            lastActivity,
+          });
+        }
       }
     }
 
@@ -103,10 +188,14 @@ async function discoverSessions(quick: boolean = true): Promise<DiscoverResponse
     // Sort sessions by modified time
     sessions.sort((a, b) => b.modifiedAt - a.modifiedAt);
 
+    // Count system sessions
+    const systemSessionCount = sessions.filter(s => s.isSystem).length;
+
     return {
       projects,
       sessions,
       totalSessions: sessions.length,
+      systemSessionCount,
       scanDurationMs: Date.now() - startTime,
     };
   } catch (error) {
@@ -115,6 +204,7 @@ async function discoverSessions(quick: boolean = true): Promise<DiscoverResponse
       projects: [],
       sessions: [],
       totalSessions: 0,
+      systemSessionCount: 0,
       scanDurationMs: Date.now() - startTime,
     };
   }

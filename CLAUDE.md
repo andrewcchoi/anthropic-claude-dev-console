@@ -294,6 +294,15 @@ enableDebug()   // or disableDebug(), toggleDebug()
 **Solution:** Don't persist transient IDs; use atomic session switching in Zustand store.
 **Docs:** `docs/troubleshooting/TROUBLESHOOTING_GUIDE.md` (Problem 4, 6, 7)
 
+### Workspace Auto-Expand (Fixed)
+**Problem:** Clicking to collapse "Current Workspace" in sidebar caused it to immediately re-expand, making it impossible to keep collapsed.
+**Root Cause:** A `useEffect` in `ProjectList.tsx` auto-expanded workspace whenever `expandedProjects` changed. User click → remove from set → effect detects change → re-adds to set → bounces back.
+**Solution:** Moved collapse state from local component state to Zustand store (`collapsedProjects: Set<string>`). Removed auto-expand `useEffect`. Inverted logic to track collapsed projects instead of expanded projects.
+**Why Zustand:** Persists across sidebar unmount/remount and page refreshes via localStorage. Follows existing `hiddenSessionIds` pattern in codebase.
+**Key Decision:** User explicitly requested persistence across sidebar lifecycle (not just within mount), ruling out `useRef` solution.
+**Files:** `src/lib/store/index.ts` (collapsedProjects state + toggleProjectCollapse action), `src/components/sidebar/ProjectList.tsx` (removed local state + useEffect)
+**Commit:** c88f727
+
 ### Dark Mode Visibility
 **Problem:** Interactive elements (hover states, borders) have insufficient contrast in dark mode.
 **Solution:** Use 2+ step jumps in Tailwind gray scale for hover states (gray-600 on gray-800, not gray-700). Add thicker borders (border-2) and subtle glow effects for containers. Include focus rings for accessibility.
@@ -410,6 +419,40 @@ Two distinct terminal components serve different purposes:
   * `docs/troubleshooting/DARK_MODE_STYLING.md` - Updated Issue 3 with improved patterns, added Issue 2b for terminal transparency
 - **Accessibility**: All interactive elements now have focus rings (`focus:ring-2 focus:ring-blue-500/50`) and proper border transitions
 - **Lesson**: When implementing dark mode, test with actual background colors - gray-700 on gray-800 provides insufficient contrast for interactive feedback. Active/selected states need even stronger contrast than hover states - don't be afraid to use bright colors with higher opacity.
+
+#### Workspace Auto-Expand Fix (2026-02-21)
+- **Problem**: Clicking to collapse "Current Workspace" in sidebar caused immediate re-expand, making collapse impossible
+- **Root Cause**: `useEffect` in `ProjectList.tsx` (L54-61) auto-expanded workspace whenever `expandedProjects` state changed
+  * User click → `toggleProject()` removes workspace from `expandedProjects`
+  * State change triggers `useEffect`
+  * Condition `!expandedProjects.has(workspaceId)` now true
+  * Effect re-adds workspace → appears to "bounce back"
+- **Solution**: Moved state from local component to Zustand store with localStorage persistence
+  * Added `collapsedProjects: Set<string>` to ChatStore (inverted logic: track collapsed instead of expanded)
+  * Added `toggleProjectCollapse(projectId)` action
+  * Removed problematic `useEffect` entirely
+  * Removed local `useState` and `expandedProjects` state
+- **Why Zustand over useRef**: User explicitly requested persistence across sidebar unmount/remount and page refreshes
+- **Implementation Pattern**: Follows existing `hiddenSessionIds` pattern
+  * Store Set as Array in `partialize` for JSON serialization
+  * Convert Array back to Set in `onRehydrateStorage`
+  * State persists in localStorage via Zustand persist middleware
+- **Alternatives Considered**:
+  1. useRef - simpler but resets on unmount (rejected)
+  2. **Zustand store (selected)** - persists across lifecycle and refreshes
+  3. localStorage directly - duplicates existing pattern (rejected)
+  4. Remove from deps - requires lint suppression (rejected)
+- **Edge Cases Handled**:
+  * Normal collapse/expand: ✅ Works, state in Zustand
+  * Page refresh: ✅ State persists via localStorage
+  * Sidebar unmount/remount: ✅ State persists in Zustand
+  * Sessions appear after load: ✅ No auto-expand (user controls state)
+  * Clear browser storage: Resets to default (expanded) - acceptable
+- **Files Modified**:
+  * `src/lib/store/index.ts` - Added collapsedProjects state, toggleProjectCollapse action, persistence
+  * `src/components/sidebar/ProjectList.tsx` - Removed local state/useEffect, use store state/action
+- **Commit**: c88f727
+- **Key Lesson**: When state needs to fight against reactive effects, the effect is usually wrong. Move state to proper layer (global store) instead of trying to fix effect dependencies. Auto-expand behaviors should respect user actions, not override them.
 
 #### Ultrathink Workflow System (2026-02-03)
 - Implemented comprehensive multi-phase agent workflow framework

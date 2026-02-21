@@ -91,8 +91,7 @@ export function InteractiveTerminal({
       {/* Terminal container */}
       <div
         ref={terminalRef}
-        className="h-full w-full"
-        style={{ padding: '8px' }}
+        className="absolute inset-2"
       />
     </div>
   );

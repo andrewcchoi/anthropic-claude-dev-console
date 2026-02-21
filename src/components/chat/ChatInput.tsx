@@ -335,7 +335,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
         {/* Attachment preview */}
         <AttachmentPreview attachments={attachments} onRemove={removeAttachment} />
 
-        <div className="flex gap-2 relative">
+        <div className="flex gap-2 relative" suppressHydrationWarning>
           {/* Command palette */}
           {showCommandPalette && (
             <CommandPalette

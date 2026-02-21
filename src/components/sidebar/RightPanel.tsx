@@ -1,31 +1,34 @@
 'use client';
 
 import { useChatStore } from '@/lib/store';
-import { Settings, X, Terminal, ExternalLink, Bug } from 'lucide-react';
+import { Settings, X, Terminal, ExternalLink, Info } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { ModelSelector } from '@/components/ui/ModelSelector';
 import { ProviderSelector } from '@/components/ui/ProviderSelector';
 import { DefaultModeSelector } from '@/components/ui/DefaultModeSelector';
+import { DebugToggle } from '@/components/ui/DebugToggle';
+import { useDebug } from '@/components/providers/DebugProvider';
 import { createLogger } from '@/lib/logger';
-import { showToast } from '@/lib/utils/toast';
 
 const log = createLogger('RightPanel');
 
 export function RightPanel() {
-  const { rightPanelOpen, toggleRightPanel, sessionId } = useChatStore();
+  const { rightPanelOpen, toggleRightPanel, sessionId, setStatusPanelOpen } = useChatStore();
+  const { debugEnabled } = useDebug();
 
   if (!rightPanelOpen) {
     // Collapsed state: Show vertical strip on right edge
     return (
-      <div className="fixed right-0 top-0 h-screen w-10 bg-gray-100 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col items-center py-4 z-40">
+      <div className="fixed right-0 top-0 h-screen w-10 bg-gray-100 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col items-center py-4 gap-2 z-40">
         <button
           onClick={toggleRightPanel}
           aria-label="Open settings"
-          className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+          className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 active:scale-[0.98] active:bg-gray-300 dark:active:bg-gray-600 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-all duration-150"
           title="Open settings"
         >
           <Settings className="h-5 w-5" />
         </button>
+        {debugEnabled && <DebugToggle variant="compact" />}
       </div>
     );
   }
@@ -44,7 +47,7 @@ export function RightPanel() {
         <button
           onClick={toggleRightPanel}
           aria-label="Close settings panel"
-          className="p-1 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 transition-colors"
+          className="p-1 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 active:scale-[0.98] active:bg-gray-300 dark:active:bg-gray-700 text-gray-600 dark:text-gray-400 transition-all duration-150"
         >
           <X className="h-5 w-5" />
         </button>
@@ -52,11 +55,24 @@ export function RightPanel() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="p-4 space-y-2">
+        <div className="p-4 space-y-2" suppressHydrationWarning>
           <ThemeToggle />
           <ProviderSelector />
           <ModelSelector />
           <DefaultModeSelector />
+
+          {/* Session Status Button */}
+          <button
+            onClick={() => {
+              log.info('Opening status panel');
+              setStatusPanelOpen(true);
+            }}
+            aria-label="Open session status"
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 active:scale-[0.98] active:bg-gray-300 dark:active:bg-gray-600 text-gray-900 dark:text-gray-100 transition-all duration-150"
+          >
+            <Info className="h-4 w-4" />
+            <span className="text-sm font-medium">Session Status</span>
+          </button>
 
           {/* Open Terminal Button */}
           <button
@@ -74,7 +90,7 @@ export function RightPanel() {
               window.open(url, '_blank');
             }}
             aria-label="Open terminal in new tab"
-            className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 active:scale-[0.98] active:bg-gray-300 dark:active:bg-gray-600 text-gray-900 dark:text-gray-100 transition-all duration-150"
           >
             <div className="flex items-center gap-2">
               <Terminal className="h-4 w-4" />
@@ -83,26 +99,8 @@ export function RightPanel() {
             <ExternalLink className="h-4 w-4" />
           </button>
 
-          {/* Debug Logs Button */}
-          <button
-            onClick={() => {
-              // Enable debug mode
-              localStorage.setItem('DEBUG_MODE', 'true');
-              log.info('Debug mode enabled, opening logs');
-              showToast('Debug mode enabled', 'success');
-
-              // Open logs in new tab
-              window.open('/logs', '_blank');
-            }}
-            aria-label="Enable debug mode and open logs"
-            className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <Bug className="h-4 w-4" />
-              <span className="text-sm font-medium">Debug Logs</span>
-            </div>
-            <ExternalLink className="h-4 w-4" />
-          </button>
+          {/* Debug Toggle */}
+          <DebugToggle variant="full" openLogs className="w-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700" />
         </div>
       </div>
     </div>
