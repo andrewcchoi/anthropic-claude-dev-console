@@ -21,7 +21,7 @@ export function MessageList({ messages, isLoadingHistory }: MessageListProps) {
   }, [messages]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex-1 overflow-y-auto scrollbar-stable p-4 space-y-4">
       {isLoadingHistory && (
         <div className="flex h-full items-center justify-center text-gray-500 dark:text-gray-400">
           <div className="text-center">

@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { useSessionDiscoveryStore } from '@/lib/store/sessions';
 import { useChatStore } from '@/lib/store';
 import { SessionItem } from './SessionItem';
@@ -8,8 +7,11 @@ import { UISessionItem } from './UISessionItem';
 
 export function ProjectList() {
   const { projects, sessions, sessionSearchQuery } = useSessionDiscoveryStore();
-  const { sessions: uiSessions, sessionId, hiddenSessionIds } = useChatStore();
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const { sessions: uiSessions, sessionId, hiddenSessionIds, collapsedProjects, toggleProjectCollapse } = useChatStore();
+
+  // Split sessions into user and system sessions
+  const userSessions = sessions.filter(s => !s.isSystem);
+  const systemSessions = sessions.filter(s => s.isSystem);
 
   // Helper to check if text matches search query
   const matchesSearch = (text: string | undefined, query: string): boolean => {
@@ -17,19 +19,26 @@ export function ProjectList() {
     return text.toLowerCase().includes(query.toLowerCase());
   };
 
-  const toggleProject = (projectId: string) => {
-    setExpandedProjects((prev) => {
-      const next = new Set(prev);
-      if (next.has(projectId)) {
-        next.delete(projectId);
-      } else {
-        next.add(projectId);
-      }
-      return next;
-    });
-  };
 
-  if (projects.length === 0) {
+  // Ensure /workspace project always exists when there are browser sessions
+  const workspaceExists = projects.some(p => p.path === '/workspace');
+  const hasBrowserSessions = uiSessions.filter(s => !hiddenSessionIds.has(s.id)).length > 0;
+
+  // Create virtual workspace project if needed
+  const displayProjects = workspaceExists || !hasBrowserSessions
+    ? projects
+    : [
+        {
+          id: '-workspace',
+          path: '/workspace',
+          sessionCount: 0,
+          lastActivity: Date.now(),
+        },
+        ...projects,
+      ];
+
+
+  if (displayProjects.length === 0) {
     return (
       <div className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">
         No projects found
@@ -39,11 +48,11 @@ export function ProjectList() {
 
   return (
     <div className="space-y-2">
-      {projects.map((project) => {
+      {displayProjects.map((project) => {
         const isWorkspace = project.path === '/workspace';
 
-        // Get CLI sessions for this project
-        let cliSessions = sessions.filter((s) => s.projectId === project.id);
+        // Get CLI sessions for this project (excluding system sessions)
+        let cliSessions = userSessions.filter((s) => s.projectId === project.id);
 
         // For workspace: mix in browser sessions (excluding current and hidden)
         let browserSessions = isWorkspace
@@ -79,7 +88,7 @@ export function ProjectList() {
           return bTime - aTime;
         });
 
-        const isExpanded = expandedProjects.has(project.id);
+        const isExpanded = !collapsedProjects.has(project.id);
 
         // Skip projects with no matching sessions when searching
         if (sessionSearchQuery && allProjectSessions.length === 0) {
@@ -90,7 +99,7 @@ export function ProjectList() {
           <div key={project.id} className="space-y-1">
             {/* Project header */}
             <button
-              onClick={() => toggleProject(project.id)}
+              onClick={() => toggleProjectCollapse(project.id)}
               className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-left"
             >
               <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -136,6 +145,53 @@ export function ProjectList() {
           </div>
         );
       })}
+
+      {/* System Sessions - separate collapsible section */}
+      {systemSessions.length > 0 && (
+        <div className="space-y-1 mt-4">
+          {/* System Sessions header */}
+          <button
+            onClick={() => toggleProjectCollapse('__system__')}
+            className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-left"
+          >
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <svg
+                className={`w-4 h-4 flex-shrink-0 transition-transform ${
+                  !collapsedProjects.has('__system__') ? 'rotate-90' : ''
+                }`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                  System Sessions
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {systemSessions.length} session{systemSessions.length !== 1 ? 's' : ''}
+                </div>
+              </div>
+            </div>
+          </button>
+
+          {/* System sessions list */}
+          {!collapsedProjects.has('__system__') && (
+            <div className="ml-6 space-y-1">
+              {systemSessions
+                .filter((s) =>
+                  !sessionSearchQuery ||
+                  matchesSearch(s.name, sessionSearchQuery) ||
+                  matchesSearch(s.gitBranch, sessionSearchQuery)
+                )
+                .map((session) => (
+                  <SessionItem key={`system-${session.id}`} session={session} />
+                ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

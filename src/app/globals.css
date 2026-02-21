@@ -3,6 +3,11 @@
 
 @variant dark (&:where(.dark, .dark *));
 
+/* Reserve space for scrollbar to prevent layout shift */
+.scrollbar-stable {
+  scrollbar-gutter: stable;
+}
+
 :root {
   /* Light theme colors */
   --background: 255 255 255;
