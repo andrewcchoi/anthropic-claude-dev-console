@@ -36,7 +36,6 @@ Open in VS Code and use "Reopen in Container" to start the DevContainer. This br
 
 Set in `.env` or inherited from host:
 - `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GITHUB_TOKEN` - inherited from host
-- `ENABLE_FIREWALL=false` - firewall is disabled by default (YOLO mode)
 - `NODE_OPTIONS=--max-old-space-size=4096` - Node.js memory limit
 
 ## Commands
