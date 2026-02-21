@@ -23,6 +23,58 @@ function decodeProjectPath(encoded: string): string {
   return '/' + encoded.replace(/-/g, '/');
 }
 
+/**
+ * Scan .jsonl files directly as fallback when sessions-index.json is missing
+ */
+async function scanSessionFiles(projectPath: string, projectId: string): Promise<CLISession[]> {
+  const sessions: CLISession[] = [];
+
+  try {
+    const files = await fs.readdir(projectPath);
+
+    for (const file of files) {
+      if (!file.endsWith('.jsonl')) continue;
+
+      const filePath = join(projectPath, file);
+      const stats = await fs.stat(filePath);
+      const sessionId = file.replace('.jsonl', '');
+
+      // Read first line for session name
+      let name = 'Untitled Session';
+      try {
+        const handle = await fs.open(filePath, 'r');
+        const buffer = Buffer.alloc(1024);
+        await handle.read(buffer, 0, 1024, 0);
+        await handle.close();
+
+        const firstLine = buffer.toString('utf-8').split('\n')[0];
+        if (firstLine) {
+          const parsed = JSON.parse(firstLine);
+          // Extract name from first user message
+          if (parsed.type === 'user' && parsed.message?.content) {
+            name = parsed.message.content.slice(0, 100);
+          }
+        }
+      } catch { /* Use default name */ }
+
+      sessions.push({
+        id: sessionId,
+        projectId,
+        source: 'cli',
+        filePath,
+        fileSize: stats.size,
+        name,
+        modifiedAt: stats.mtimeMs,
+        createdAt: stats.birthtimeMs || stats.mtimeMs,
+      });
+    }
+  } catch (error) {
+    console.warn(`Failed to scan session files for ${projectId}:`, error);
+  }
+
+  return sessions;
+}
+
 
 /**
  * Discover all CLI sessions across all projects
@@ -92,8 +144,30 @@ async function discoverSessions(quick: boolean = true): Promise<DiscoverResponse
           lastActivity,
         });
       } catch (error) {
-        // Index doesn't exist or is invalid - skip this project
-        console.warn(`No session index for project ${projectId}:`, error);
+        // Index doesn't exist or is invalid - fall back to file scanning
+        const isEnoent = (error as NodeJS.ErrnoException).code === 'ENOENT';
+        if (!isEnoent) {
+          console.warn(`Invalid session index for ${projectId}:`, error);
+        }
+
+        // Scan .jsonl files directly
+        const scannedSessions = await scanSessionFiles(projectPath, projectId);
+
+        if (scannedSessions.length > 0) {
+          sessions.push(...scannedSessions);
+
+          let lastActivity = 0;
+          for (const s of scannedSessions) {
+            if (s.modifiedAt > lastActivity) lastActivity = s.modifiedAt;
+          }
+
+          projects.push({
+            id: projectId,
+            path: decodeProjectPath(projectId),
+            sessionCount: scannedSessions.length,
+            lastActivity,
+          });
+        }
       }
     }
 

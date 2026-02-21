@@ -26,6 +26,7 @@ interface ChatStore {
   currentSession: Session | null;
   isLoadingHistory: boolean;
   hiddenSessionIds: Set<string>;
+  pendingSessionId: string | null;
   setSessionId: (id: string) => void;
   setCurrentSession: (session: Session | null) => void;
   addSession: (session: Session) => void;
@@ -166,6 +167,7 @@ export const useChatStore = create<ChatStore>()(
       currentSession: null,
       isLoadingHistory: false,
       hiddenSessionIds: new Set<string>(),
+      pendingSessionId: null,
       setSessionId: (id) => set({ sessionId: id }),
       setCurrentSession: (session) => set({ currentSession: session }),
       addSession: (session) =>
@@ -178,10 +180,20 @@ export const useChatStore = create<ChatStore>()(
         }
 
         const newSessionId = uuidv4();
+        const newSession: Session = {
+          id: newSessionId,
+          name: 'New Chat',
+          created_at: Date.now(),
+          updated_at: Date.now(),
+          cwd: '/workspace',
+        };
+
         log.debug('Starting new session', { id: newSessionId });
         set({
           sessionId: newSessionId,
-          currentSession: null,
+          currentSession: null,  // Keep null - not confirmed yet
+          pendingSessionId: newSessionId,  // Track as pending
+          sessions: [newSession, ...get().sessions],
           messages: [],
           toolExecutions: [],
           sessionUsage: null,
@@ -193,14 +205,32 @@ export const useChatStore = create<ChatStore>()(
 
       switchSession: async (id, projectId) => {
         const currentId = get().sessionId;
-        const localSession = get().sessions.find((s) => s.id === id);
+        const { pendingSessionId, sessions } = get();
+        const localSession = sessions.find((s) => s.id === id);
 
         // Cache current session before switching
         if (currentId && currentId !== id) {
           get().cacheCurrentSession();
         }
 
-        log.debug('Switching session', { from: currentId, to: id, projectId, hasLocal: !!localSession });
+        log.debug('Switching session', { from: currentId, to: id, projectId, hasLocal: !!localSession, isPending: id === pendingSessionId });
+
+        // If switching to a pending session (no messages sent yet), don't fetch from API
+        if (id === pendingSessionId) {
+          const pendingSession = sessions.find(s => s.id === id);
+          if (pendingSession) {
+            log.debug('Switching to pending session', { id });
+            set({
+              sessionId: id,
+              currentSession: null,  // Still pending
+              messages: [],
+              toolExecutions: [],
+              sessionUsage: null,
+              isLoadingHistory: false,
+            });
+            return;
+          }
+        }
 
         // Check cache first
         const cached = get().getCachedSession(id);
@@ -305,29 +335,42 @@ export const useChatStore = create<ChatStore>()(
       },
 
       saveCurrentSession: () => {
-        const { sessionId, sessions, messages, currentSession } = get();
+        const { sessionId, sessions, messages, pendingSessionId } = get();
+        if (!sessionId) return;
 
-        // Already saved a session for this conversation - don't duplicate
-        if (currentSession) return;
+        const name = messages.find((m) => m.role === 'user')?.content?.[0]?.text?.slice(0, 50) || 'New Chat';
 
-        if (!sessionId || sessions.some((s) => s.id === sessionId)) return;
+        // Find existing session (may have been added as pending)
+        const existingIndex = sessions.findIndex(s => s.id === pendingSessionId || s.id === sessionId);
 
-        log.debug('Saving session', { id: sessionId });
-
-        const name =
-          messages.find((m) => m.role === 'user')?.content?.[0]?.text?.slice(0, 50) ||
-          'New Chat';
-        const newSession: Session = {
-          id: sessionId,
-          name,
-          created_at: Date.now(),
-          updated_at: Date.now(),
-          cwd: '/workspace',
-        };
-        set((state) => ({
-          sessions: [newSession, ...state.sessions],
-          currentSession: newSession,
-        }));
+        if (existingIndex >= 0) {
+          // Update existing session - sync ID if CLI provided different one
+          log.debug('Updating existing session', { pendingId: pendingSessionId, finalId: sessionId });
+          set((state) => ({
+            sessions: state.sessions.map((s, i) =>
+              i === existingIndex
+                ? { ...s, id: sessionId, name, updated_at: Date.now() }
+                : s
+            ),
+            currentSession: { ...state.sessions[existingIndex], id: sessionId, name },
+            pendingSessionId: null,  // No longer pending
+          }));
+        } else {
+          // Shouldn't happen but handle gracefully
+          log.debug('Creating new session (no pending found)', { id: sessionId });
+          const newSession: Session = {
+            id: sessionId,
+            name,
+            created_at: Date.now(),
+            updated_at: Date.now(),
+            cwd: '/workspace',
+          };
+          set((state) => ({
+            sessions: [newSession, ...state.sessions],
+            currentSession: newSession,
+            pendingSessionId: null,
+          }));
+        }
       },
 
       deleteSession: (id) =>
@@ -562,6 +605,7 @@ export const useChatStore = create<ChatStore>()(
         defaultMode: state.defaultMode,
         sidebarTab: state.sidebarTab,
         hiddenSessionIds: Array.from(state.hiddenSessionIds), // Convert Set to Array for JSON
+        // pendingSessionId: NOT persisted - resets on refresh
       }),
       onRehydrateStorage: () => (state) => {
         // Convert Array back to Set after rehydration

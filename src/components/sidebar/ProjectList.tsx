@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSessionDiscoveryStore } from '@/lib/store/sessions';
 import { useChatStore } from '@/lib/store';
 import { SessionItem } from './SessionItem';
@@ -29,7 +29,34 @@ export function ProjectList() {
     });
   };
 
-  if (projects.length === 0) {
+  // Ensure /workspace project always exists when there are browser sessions
+  const workspaceExists = projects.some(p => p.path === '/workspace');
+  const hasBrowserSessions = uiSessions.filter(s => !hiddenSessionIds.has(s.id)).length > 0;
+
+  // Create virtual workspace project if needed
+  const displayProjects = workspaceExists || !hasBrowserSessions
+    ? projects
+    : [
+        {
+          id: '-workspace',
+          path: '/workspace',
+          sessionCount: 0,
+          lastActivity: Date.now(),
+        },
+        ...projects,
+      ];
+
+  // Auto-expand workspace if it has sessions
+  useEffect(() => {
+    if (workspaceExists || hasBrowserSessions) {
+      const workspaceId = projects.find(p => p.path === '/workspace')?.id || '-workspace';
+      if (!expandedProjects.has(workspaceId)) {
+        setExpandedProjects(new Set([...expandedProjects, workspaceId]));
+      }
+    }
+  }, [workspaceExists, hasBrowserSessions, projects, expandedProjects]);
+
+  if (displayProjects.length === 0) {
     return (
       <div className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">
         No projects found
@@ -39,7 +66,7 @@ export function ProjectList() {
 
   return (
     <div className="space-y-2">
-      {projects.map((project) => {
+      {displayProjects.map((project) => {
         const isWorkspace = project.path === '/workspace';
 
         // Get CLI sessions for this project
