@@ -3,10 +3,11 @@
 ## Implementation Status
 
 **Status:** Partially Implemented (CLI Subprocess Approach)
-**Last Updated:** 2026-02-03
+**Last Updated:** 2026-02-22
 
 ### Recent Fixes
 
+- ✅ **Clipboard Paste Support** (2026-02-22) - Added full clipboard paste support for images and files. Features include cross-browser compatibility (Chrome/Firefox/Safari), SVG security blocking, modern format support (HEIC/AVIF), extension fallback for empty MIME types, and proper error handling with toast notifications.
 - ✅ **ANSI Color Display** (2026-01-27) - Fixed terminal output to properly render ANSI color codes instead of showing escaped sequences like `\033[31m`. Tool results are now captured from Claude CLI `user` messages and displayed in the Terminal component.
 
 ### Key Architectural Change
@@ -56,6 +57,13 @@ Instead of implementing provider SDKs directly in the Next.js app, the applicati
 - ✅ Toast notifications (ToastContainer)
 - ✅ Zustand state management with localStorage persistence
 - ✅ Troubleshoot-recorder plugin v2.0 (hooks + commands)
+- ✅ File attachment system
+  - ✅ Drag-and-drop file upload
+  - ✅ File picker with type filtering
+  - ✅ Clipboard paste for images and files
+  - ✅ Attachment preview with thumbnails
+  - ✅ File validation (size, count, type)
+  - ✅ Support for images (PNG, JPG, GIF, WebP, HEIC, AVIF), text files, and PDFs
 
 ### What's NOT Implemented
 

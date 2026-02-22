@@ -11,7 +11,7 @@ export interface FileAttachment {
   error?: string;
 }
 
-export const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
+export const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.heic', '.avif'];
 export const MAX_FILE_SIZE = 10 * 1024 * 1024;      // 10MB per file
 export const MAX_TOTAL_SIZE = 20 * 1024 * 1024;     // 20MB total
 export const MAX_FILES = 10;
