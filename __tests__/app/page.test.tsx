@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import Home from './page';
+import Home from '@/app/page';
 import { useChatStore } from '@/lib/store';
 import { useClaudeChat } from '@/hooks/useClaudeChat';
 

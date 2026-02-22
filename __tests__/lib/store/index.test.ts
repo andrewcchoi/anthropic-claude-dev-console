@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useChatStore } from './index';
+import { useChatStore } from '@/lib/store';
 
 describe('ChatStore - Right Panel State', () => {
   beforeEach(() => {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { FileContextMenuProps } from './types';
 import { FilePlus, FolderPlus, Edit, Trash2 } from 'lucide-react';
 
