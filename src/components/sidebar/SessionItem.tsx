@@ -6,6 +6,9 @@ import { useChatStore } from '@/lib/store';
 import { useSessionDiscoveryStore } from '@/lib/store/sessions';
 import { formatSmartTime, formatDuration } from '@/lib/utils/time';
 import { cn } from '@/lib/utils';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('SessionItem');
 
 interface SessionItemProps {
   session: CLISession;
@@ -22,6 +25,11 @@ export function SessionItem({ session }: SessionItemProps) {
   };
 
   const handleClick = async () => {
+    log.debug('Session clicked', {
+      id: session.id,
+      projectId: session.projectId,
+      filePath: session.filePath,
+    });
     // Update the store to use this session
     await switchSession(session.id, session.projectId);
   };
