@@ -7,13 +7,14 @@ import { useChatStore } from '@/lib/store';
 
 interface MessageContentProps {
   content: MessageContentType[];
+  hasToolUse?: boolean;
 }
 
-export function MessageContent({ content }: MessageContentProps) {
+export function MessageContent({ content, hasToolUse = false }: MessageContentProps) {
   const toolExecutions = useChatStore((state) => state.toolExecutions);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 min-w-0 overflow-hidden">
       {content.map((block, index) => {
         // Skip system_info blocks - handled by SystemMessage component
         if (block.type === 'system_info') {
@@ -21,8 +22,10 @@ export function MessageContent({ content }: MessageContentProps) {
         }
 
         if (block.type === 'text') {
+          // When message has tools, constrain text width for readability
+          // but let tool outputs use full available width
           return (
-            <div key={index} className="whitespace-pre-wrap">
+            <div key={index} className={`whitespace-pre-wrap ${hasToolUse ? 'max-w-[85%]' : ''}`}>
               {block.text}
             </div>
           );
@@ -40,6 +43,8 @@ export function MessageContent({ content }: MessageContentProps) {
           const status = toolExecution?.status || 'pending';
           const output = toolExecution?.output;
 
+          // ToolExecution now uses full available width naturally
+          // No need to break out of parent padding since message bubble uses w-full
           return (
             <ToolExecution
               key={block.id || index}

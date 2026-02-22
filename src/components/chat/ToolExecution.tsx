@@ -15,6 +15,21 @@ const Terminal = dynamic(
   { ssr: false }
 );
 
+const DiffViewer = dynamic(
+  () => import('@/components/editor/DiffViewer').then((mod) => ({ default: mod.DiffViewer })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full bg-gray-800 animate-pulse flex items-center justify-center">
+        <div className="flex gap-2 items-center text-gray-400 text-sm">
+          <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+          <span>Loading diff viewer...</span>
+        </div>
+      </div>
+    ),
+  }
+);
+
 interface ToolInput {
   command?: string;
   cwd?: string;
@@ -187,7 +202,7 @@ export function ToolExecution({
 
   return (
     <div
-      className={`mt-2 rounded border-l-4 ${getBorderColor()} border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 overflow-hidden`}
+      className={`mt-2 rounded border-l-4 ${getBorderColor()} border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 overflow-hidden min-w-0`}
     >
       <button
         onClick={() => setExpanded(!expanded)}
@@ -202,7 +217,7 @@ export function ToolExecution({
         </span>
       </button>
       {expanded && (
-        <div className="border-t border-gray-300 dark:border-gray-600 px-3 py-2 space-y-2">
+        <div className="border-t border-gray-300 dark:border-gray-600 px-3 py-2 space-y-2 min-w-0 overflow-hidden">
           <div>
             <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
               Input:
@@ -248,8 +263,19 @@ export function ToolExecution({
                   minHeight={80}
                   maxHeight={300}
                   initialCommand={viewMode === 'interactive' ? claudeCommand : undefined}
+                  className="w-full"
                 />
-              ) : (name === 'Read' || name === 'Edit') && typeof output === 'string' ? (
+<<<<<<< HEAD
+              ) : name === 'Edit' && (input as ToolInput)?.old_string && (input as ToolInput)?.new_string ? (
+                <DiffViewer
+                  original={(input as ToolInput).old_string as string}
+                  modified={(input as ToolInput).new_string as string}
+                  filePath={(input as ToolInput)?.file_path as string}
+                  height={400}
+                  theme="auto"
+                  showHeader={true}
+                />
+              ) : (name === 'Read' || name === 'Edit' || name === 'Write') && typeof output === 'string' ? (
                 <CodeViewer
                   content={output}
                   filePath={(input as ToolInput)?.file_path as string}
