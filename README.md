@@ -119,12 +119,12 @@ Common issues:
 
 ## Future Enhancements
 
-- [ ] Session history and search
-- [ ] File browser panel
-- [ ] Terminal emulator (xterm.js)
-- [ ] Settings page
-- [ ] Multiple provider support
-- [ ] Syntax highlighting for code blocks
+- [x] Session history and search
+- [x] File browser panel
+- [x] Terminal emulator (xterm.js)
+- [x] Settings page
+- [x] Multiple provider support
+- [x] Syntax highlighting for code blocks
 - [ ] Diff view for file changes
 - [ ] Task visualization
 

@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { EditorSkeleton } from './EditorSkeleton';
 import { EditorErrorBoundary } from './EditorErrorBoundary';
 import { detectLanguage } from '@/lib/utils/languageDetection';

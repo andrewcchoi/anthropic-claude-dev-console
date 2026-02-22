@@ -21,7 +21,7 @@ Instead of implementing provider SDKs directly in the Next.js app, the applicati
 
 ### What's Implemented
 
-- ✅ Next.js 14+ app with App Router
+- ✅ Next.js 16 app with App Router
 - ✅ SSE streaming chat interface
 - ✅ CLI subprocess integration (`claude -p --output-format stream-json`)
 - ✅ Session management UI

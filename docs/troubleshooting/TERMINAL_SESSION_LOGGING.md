@@ -516,7 +516,7 @@ If terminal session resumption isn't working:
 
 ## Related Documentation
 
-- [Terminal Architecture](../architecture/TERMINAL.md)
-- [WebSocket Protocol](../protocols/WEBSOCKET.md)
-- [Session Management](./SESSION_MANAGEMENT.md)
+- [Terminal Architecture](../architecture/TERMINAL.md) _(TODO: Document to be created)_
+- [WebSocket Protocol](../protocols/WEBSOCKET.md) _(TODO: Document to be created)_
+- [Session Management](./SESSION_MANAGEMENT.md) _(TODO: Document to be created)_
 - [General Troubleshooting](./TROUBLESHOOTING_GUIDE.md)
