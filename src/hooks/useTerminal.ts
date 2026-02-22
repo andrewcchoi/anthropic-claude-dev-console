@@ -12,6 +12,7 @@ interface UseTerminalOptions {
   onConnected?: (sessionId: string) => void;
   onDisconnected?: () => void;
   onError?: (error: string) => void;
+  onData?: (data: string) => void; // Called when terminal receives data
 }
 
 interface UseTerminalReturn {
@@ -24,7 +25,7 @@ interface UseTerminalReturn {
 }
 
 export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn {
-  const { cwd, theme = 'dark', initialCommand, onConnected, onDisconnected, onError } = options;
+  const { cwd, theme = 'dark', initialCommand, onConnected, onDisconnected, onError, onData } = options;
 
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
@@ -155,6 +156,7 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
             },
             onData: (data: string) => {
               xtermRef.current?.write(data);
+              onData?.(data); // Notify parent component of data
             },
             onError: (errorMsg: string) => {
               // Check if still mounted before updating state

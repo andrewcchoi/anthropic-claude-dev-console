@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTerminal } from '@/hooks/useTerminal';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import '@xterm/xterm/css/xterm.css';
@@ -27,6 +27,8 @@ export function InteractiveTerminal({
   onError,
 }: InteractiveTerminalProps) {
   const { resolvedTheme } = useAppTheme();
+  const [hasReceivedOutput, setHasReceivedOutput] = useState(false);
+
   const {
     terminalRef,
     isConnected,
@@ -41,6 +43,12 @@ export function InteractiveTerminal({
     onConnected,
     onDisconnected,
     onError,
+    onData: (data) => {
+      // Mark that we've received output to hide the loading spinner
+      if (!hasReceivedOutput && data.trim()) {
+        setHasReceivedOutput(true);
+      }
+    },
   });
 
   // Track if connection has been initiated to prevent duplicates in Strict Mode
@@ -106,10 +114,24 @@ export function InteractiveTerminal({
         </div>
       )}
 
-      {/* Terminal container */}
+      {/* Loading spinner - shown until we receive terminal output */}
+      {!hasReceivedOutput && !error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+          <div className="flex flex-col items-center gap-3">
+            <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Starting Claude session...
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Terminal container - hidden until we receive output */}
       <div
         ref={terminalRef}
-        className="h-full w-full"
+        className={`h-full w-full transition-opacity duration-300 ${
+          hasReceivedOutput ? 'opacity-100' : 'opacity-0'
+        }`}
       />
     </div>
   );
