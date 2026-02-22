@@ -14,7 +14,7 @@ export function MessageContent({ content, hasToolUse = false }: MessageContentPr
   const toolExecutions = useChatStore((state) => state.toolExecutions);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 min-w-0 overflow-hidden">
       {content.map((block, index) => {
         // Skip system_info blocks - handled by SystemMessage component
         if (block.type === 'system_info') {
@@ -43,17 +43,16 @@ export function MessageContent({ content, hasToolUse = false }: MessageContentPr
           const status = toolExecution?.status || 'pending';
           const output = toolExecution?.output;
 
-          // Wrap in full-width container that breaks out of parent padding
-          // This allows DiffViewer and Terminal to fill available space
+          // ToolExecution now uses full available width naturally
+          // No need to break out of parent padding since message bubble uses w-full
           return (
-            <div key={block.id || index} className="-mx-4 px-4">
-              <ToolExecution
-                name={block.name || 'unknown'}
-                input={(toolExecution?.input ?? block.input ?? {}) as Record<string, unknown>}
-                status={status}
-                output={output as any}
-              />
-            </div>
+            <ToolExecution
+              key={block.id || index}
+              name={block.name || 'unknown'}
+              input={(toolExecution?.input ?? block.input ?? {}) as Record<string, unknown>}
+              status={status}
+              output={output as any}
+            />
           );
         } else if (block.type === 'tool_result') {
           return (

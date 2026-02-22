@@ -21,7 +21,7 @@ export function MessageList({ messages, isLoadingHistory }: MessageListProps) {
   }, [messages]);
 
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-stable p-4 space-y-4">
+    <div className="flex-1 min-w-0 overflow-y-auto scrollbar-stable p-4 space-y-4">
       {isLoadingHistory && (
         <div className="flex h-full items-center justify-center text-gray-500 dark:text-gray-400">
           <div className="text-center">
@@ -75,18 +75,18 @@ export function MessageList({ messages, isLoadingHistory }: MessageListProps) {
         // Apply max-width constraint based on content type:
         // - User messages: always 80% for readability
         // - Assistant messages without tools: 80% for readability
-        // - Assistant messages with tools: wider to accommodate DiffViewer/Terminal
-        const widthClass = message.role === 'user' || !hasToolUse ? 'max-w-[80%]' : 'max-w-[95%]';
+        // - Assistant messages with tools: full width (layout margins handle panel spacing)
+        const widthClass = message.role === 'user' ? 'max-w-[80%]' : (hasToolUse ? 'w-full' : 'max-w-[80%]');
 
         return (
           <div
             key={message.id}
-            className={`flex ${
+            className={`flex min-w-0 ${
               message.role === 'user' ? 'justify-end' : 'justify-start'
             }`}
           >
             <div
-              className={`${widthClass} rounded-lg p-4 ${
+              className={`${widthClass} min-w-0 overflow-hidden rounded-lg p-4 ${
                 message.role === 'user'
                   ? 'bg-blue-600 dark:bg-blue-500 text-white'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'

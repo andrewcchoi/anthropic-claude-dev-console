@@ -202,7 +202,7 @@ export function ToolExecution({
 
   return (
     <div
-      className={`mt-2 rounded border-l-4 ${getBorderColor()} border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 overflow-hidden`}
+      className={`mt-2 rounded border-l-4 ${getBorderColor()} border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 overflow-hidden min-w-0`}
     >
       <button
         onClick={() => setExpanded(!expanded)}
@@ -217,7 +217,7 @@ export function ToolExecution({
         </span>
       </button>
       {expanded && (
-        <div className="border-t border-gray-300 dark:border-gray-600 px-3 py-2 space-y-2">
+        <div className="border-t border-gray-300 dark:border-gray-600 px-3 py-2 space-y-2 min-w-0 overflow-hidden">
           <div>
             <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
               Input:
@@ -263,6 +263,7 @@ export function ToolExecution({
                   minHeight={80}
                   maxHeight={300}
                   initialCommand={viewMode === 'interactive' ? claudeCommand : undefined}
+                  className="w-full"
                 />
               ) : name === 'Edit' && (input as ToolInput)?.old_string && (input as ToolInput)?.new_string ? (
                 <DiffViewer

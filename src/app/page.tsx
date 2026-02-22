@@ -24,7 +24,7 @@ export default function Home() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-white dark:bg-gray-900">
+    <div className="flex min-w-0 h-screen overflow-hidden bg-white dark:bg-gray-900">
       <Sidebar />
       <HelpPanel />
       <StatusPanel />
@@ -33,11 +33,11 @@ export default function Home() {
       <RenameDialog />
       <ToastContainer />
       {previewOpen ? (
-        <div className={`flex-1 flex isolate transition-[margin] duration-300 ease-in-out will-change-[margin] ${sidebarOpen ? '' : 'ml-10'} ${rightPanelOpen ? 'mr-64' : 'mr-10'}`}>
-          <div className="flex-1 flex flex-col">
+        <div className={`flex-1 flex min-w-0 isolate transition-[margin] duration-300 ease-in-out will-change-[margin] ${sidebarOpen ? '' : 'ml-10'} ${rightPanelOpen ? 'mr-64' : 'mr-10'}`}>
+          <div className="flex-1 flex flex-col min-w-0">
             <FilePreviewPane />
           </div>
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col min-w-0">
             {error && (
               <div className="bg-red-600 text-white px-4 py-3 text-sm">
                 Error: {error}
@@ -49,7 +49,7 @@ export default function Home() {
           </div>
         </div>
       ) : (
-        <div className={`flex-1 flex flex-col isolate transition-[margin] duration-300 ease-in-out will-change-[margin] ${sidebarOpen ? '' : 'ml-10'} ${rightPanelOpen ? 'mr-64' : 'mr-10'}`}>
+        <div className={`flex-1 flex flex-col min-w-0 isolate transition-[margin] duration-300 ease-in-out will-change-[margin] ${sidebarOpen ? '' : 'ml-10'} ${rightPanelOpen ? 'mr-64' : 'mr-10'}`}>
           {error && (
             <div className="bg-red-600 text-white px-4 py-3 text-sm">
               Error: {error}
