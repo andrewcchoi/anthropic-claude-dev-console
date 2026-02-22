@@ -28,7 +28,7 @@ Open in VS Code and use "Reopen in Container" to start the DevContainer. This br
 | Port | Service |
 |------|---------|
 | 3000 | Frontend (Next.js) |
-| 8000 | Backend API |
+| 3001 | Terminal WebSocket Server |
 | 5432 | PostgreSQL |
 | 6379 | Redis |
 
@@ -59,23 +59,25 @@ black .                 # Python formatting
 ruff check .            # Python linting
 ```
 
-## Architecture (Planned)
+## Architecture
 
 ```
 Browser → Next.js Frontend (React 19)
               ↓
          API Routes (Node.js)
-         ├── Provider Layer (Anthropic/Bedrock/Vertex/Azure)
-         ├── Tool Layer (File I/O, Bash, Git, MCP)
-         └── SQLite (sessions, settings)
+         ├── Claude CLI Subprocess (spawn + stream-json)
+         ├── Tool Execution (Read, Write, Bash, Edit, etc.)
+         └── Session Management (persisted by CLI)
 ```
 
-Key directories (to be created):
-- `app/` - Next.js pages and API routes
-- `components/` - React components (chat, sidebar, terminal, editor)
-- `lib/providers/` - AI provider abstraction
-- `lib/tools/` - Tool implementations (read, write, bash, git, etc.)
-- `lib/db/` - SQLite database layer
+Key directories:
+- `app/` - Next.js pages and API routes (chat, terminal, logs)
+- `components/` - React components (chat, sidebar, terminal, editor, files)
+- `hooks/` - React hooks (useClaudeChat, useTerminal, useFileUpload)
+- `lib/` - Utilities (logger, store, commands, terminal, utils)
+- `types/` - TypeScript type definitions
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture documentation.
 
 ## Security Considerations
 
@@ -268,6 +270,35 @@ The DiffViewer uses Monaco's built-in responsive behavior. On narrow screens, Mo
 - `src/components/editor/CodeViewer.tsx` - Dynamic import wrapper
 - `src/components/chat/ToolExecution.tsx` - Tool routing logic
 
+### Middleware to Proxy Migration
+
+**Decision**: Migrated from Next.js middleware to standalone proxy server for terminal WebSocket.
+
+**Context**: Initial design used Next.js middleware to proxy WebSocket connections from frontend to terminal PTY server. This approach had several issues:
+1. Next.js middleware cannot handle WebSocket upgrade requests (HTTP → WebSocket)
+2. Middleware runs on every request (performance overhead)
+3. Limited control over WebSocket lifecycle management
+
+**Solution**: Standalone Express server on port 3001 with `http-proxy-middleware`
+
+**Implementation**:
+- `src/proxy.ts` - Express server with WebSocket proxy
+- Proxies `/terminal` WebSocket connections to PTY manager
+- Full control over connection lifecycle, error handling, and cleanup
+- Runs independently of Next.js server
+
+**Trade-offs Accepted**:
+- Additional server process (port 3001)
+- Slightly more complex deployment (two servers)
+
+**Benefits**:
+- WebSocket upgrade support
+- No middleware overhead on regular HTTP requests
+- Better error handling and logging
+- Clear separation of concerns
+
+**Reference**: `docs/plans/2026-02-21-middleware-to-proxy-design.md`
+
 ## Debugging Infrastructure
 
 ### Logging System (5 Components)
@@ -367,31 +398,147 @@ npm run test:connectivity
 
 ```
 src/
-├── app/                    # Next.js App Router pages
-│   ├── api/claude/         # SSE streaming endpoint
-│   ├── api/sessions/       # Session discovery and message retrieval
-│   ├── api/logs/stream/    # Log streaming SSE
-│   ├── terminal/           # Interactive terminal page
-│   └── logs/               # Log viewer page
-├── components/
-│   ├── chat/               # ChatInput, MessageList, ToolExecution
-│   ├── terminal/           # ReadOnlyTerminal, InteractiveTerminal
-│   ├── editor/             # DiffViewer, MonacoViewer, CodeViewer
-│   ├── sidebar/            # Sidebar, SessionList
-│   ├── panels/             # HelpPanel, StatusPanel
-│   └── error/              # ErrorBoundary, TerminalErrorBoundary
-├── hooks/
-│   ├── useClaudeChat.ts    # Main chat hook (SSE, CLI subprocess)
-│   └── useTerminal.ts      # Interactive terminal hook
-├── lib/
-│   ├── commands/router.ts  # Slash command routing
-│   ├── logger/             # Structured logging
-│   ├── debug/              # Debug mode utilities
-│   ├── store/              # Zustand state management
-│   └── terminal/           # WebSocket client, PTY manager
-└── types/
-    └── claude.ts           # SDKMessage, ToolUse interfaces
+├── app/                           # Next.js App Router pages
+│   ├── api/                       # API routes
+│   │   ├── claude/                # Chat endpoints
+│   │   │   ├── route.ts           # SSE streaming (main chat)
+│   │   │   └── init/route.ts      # CLI prewarm (skills/commands)
+│   │   ├── sessions/              # Session management
+│   │   │   ├── discover/route.ts  # List all sessions
+│   │   │   └── [id]/messages/route.ts  # Load session messages
+│   │   ├── files/                 # File operations
+│   │   │   ├── route.ts           # List workspace files
+│   │   │   ├── git-status/route.ts  # Git status
+│   │   │   └── [...path]/route.ts  # Read file content
+│   │   ├── upload/route.ts        # File upload
+│   │   ├── uploads/               # Upload serving
+│   │   │   ├── serve/route.ts     # Serve uploaded files
+│   │   │   └── cleanup/route.ts   # Delete old uploads
+│   │   ├── settings/route.ts      # Settings storage
+│   │   ├── logs/stream/route.ts   # Log streaming (SSE)
+│   │   └── debug/route.ts         # Debug utilities
+│   ├── terminal/page.tsx          # Interactive terminal
+│   ├── logs/page.tsx              # Log viewer
+│   ├── preview/page.tsx           # File preview
+│   ├── page.tsx                   # Main chat interface
+│   ├── layout.tsx                 # Root layout
+│   ├── error.tsx                  # Error page
+│   └── globals.css                # Global styles
+├── components/                    # React components (59 files)
+│   ├── chat/                      # Chat UI (8 files)
+│   │   ├── ChatInput.tsx          # Message input with attachments
+│   │   ├── MessageList.tsx        # Message display
+│   │   ├── MessageContent.tsx     # Markdown rendering
+│   │   ├── ToolExecution.tsx      # Tool output routing
+│   │   ├── CommandPalette.tsx     # Command search
+│   │   ├── AttachmentPreview.tsx  # File attachment preview
+│   │   ├── ImageThumbnail.tsx     # Image thumbnails
+│   │   └── SystemMessage.tsx      # System messages
+│   ├── editor/                    # Code viewers (6 files)
+│   │   ├── DiffViewer.tsx         # Monaco DiffEditor (Edit tool)
+│   │   ├── MonacoViewer.tsx       # Monaco single-file viewer
+│   │   ├── CodeViewer.tsx         # Syntax-highlighted code (Read/Write)
+│   │   ├── EditorSkeleton.tsx     # Loading skeleton
+│   │   ├── DiffViewerSkeleton.tsx # Diff loading skeleton
+│   │   └── EditorErrorBoundary.tsx # Editor error boundary
+│   ├── files/                     # File browser (6 files)
+│   │   ├── FileTree.tsx           # Tree view
+│   │   ├── FileTreeItem.tsx       # Tree item
+│   │   ├── FileTreeToolbar.tsx    # Toolbar (refresh, search)
+│   │   ├── FilePreviewPane.tsx    # File preview
+│   │   ├── FileContextMenu.tsx    # Right-click menu
+│   │   └── types.ts               # File types
+│   ├── panels/                    # UI panels (6 files)
+│   │   ├── HelpPanel.tsx          # Help panel (/help)
+│   │   ├── StatusPanel.tsx        # Status panel (/status)
+│   │   ├── ModelPanel.tsx         # Model selection (/model)
+│   │   ├── TodosPanel.tsx         # Todos panel (/todos)
+│   │   ├── RenameDialog.tsx       # Rename dialog (/rename)
+│   │   └── index.ts               # Barrel export
+│   ├── sidebar/                   # Session sidebar (9 files)
+│   │   ├── Sidebar.tsx            # Main sidebar
+│   │   ├── SessionList.tsx        # Session list
+│   │   ├── SessionItem.tsx        # Session item
+│   │   ├── UISessionItem.tsx      # UI session item
+│   │   ├── SessionPanel.tsx       # Session panel
+│   │   ├── SessionSearch.tsx      # Session search
+│   │   ├── ProjectList.tsx        # Project grouping
+│   │   ├── RefreshButton.tsx      # Refresh button
+│   │   └── RightPanel.tsx         # Right panel (file browser)
+│   ├── terminal/                  # Terminal components (5 files)
+│   │   ├── ReadOnlyTerminal.tsx   # Bash tool output (chat)
+│   │   ├── InteractiveTerminal.tsx # Full PTY shell (/terminal)
+│   │   ├── Terminal.tsx           # Base terminal
+│   │   ├── TerminalTheme.ts       # xterm.js themes
+│   │   └── index.ts               # Barrel export
+│   ├── ui/                        # Reusable UI (9 files)
+│   │   ├── button.tsx             # Button component
+│   │   ├── JsonViewer.tsx         # JSON display
+│   │   ├── ThemeToggle.tsx        # Theme switcher
+│   │   ├── ToastContainer.tsx     # Toast notifications
+│   │   ├── ModelSelector.tsx      # Model selector
+│   │   ├── ProviderSelector.tsx   # Provider selector
+│   │   ├── DefaultModeSelector.tsx # Permission mode selector
+│   │   ├── DebugToggle.tsx        # Debug toggle
+│   │   └── index.ts               # Barrel export
+│   ├── providers/                 # Context providers (2 files)
+│   │   ├── ThemeProvider.tsx      # Theme context
+│   │   └── DebugProvider.tsx      # Debug context
+│   ├── error/                     # Error boundaries (2 files)
+│   │   ├── ErrorBoundary.tsx      # General error boundary
+│   │   └── TerminalErrorBoundary.tsx # Terminal error boundary
+│   ├── debug/                     # Debug UI (1 file)
+│   │   └── LogViewer.tsx          # Log viewer component
+│   └── usage/                     # Usage display (1 file)
+│       └── UsageDisplay.tsx       # Token/cost display
+├── hooks/                         # React hooks (6 files)
+│   ├── useClaudeChat.ts           # Main chat logic (SSE streaming)
+│   ├── useTerminal.ts             # Terminal WebSocket
+│   ├── useFileUpload.ts           # File upload handling
+│   ├── useAppTheme.ts             # Theme management
+│   ├── useEditorSelection.ts      # Editor selection tracking
+│   └── useCliPrewarm.ts           # CLI initialization
+├── lib/                           # Shared utilities (20 files)
+│   ├── api/                       # API helpers (1 file)
+│   │   └── withLogging.ts         # Request logging wrapper
+│   ├── commands/                  # Slash command routing (1 file)
+│   │   └── router.ts              # Command router
+│   ├── debug/                     # Debug utilities (1 file)
+│   │   └── index.ts               # Debug mode toggle
+│   ├── logger/                    # Logging system (3 files)
+│   │   ├── index.ts               # Client logger
+│   │   ├── server.ts              # Server logger
+│   │   └── log-stream.ts          # Log streaming
+│   ├── store/                     # Zustand store (2 files)
+│   │   ├── index.ts               # Main store
+│   │   └── sessions.ts            # Session store
+│   ├── terminal/                  # Terminal utilities (2 files)
+│   │   ├── websocket-client.ts    # WebSocket client
+│   │   └── pty-manager.ts         # PTY manager
+│   ├── utils/                     # General utilities (10 files)
+│   │   ├── cn.ts                  # Class name merger
+│   │   ├── errorUtils.ts          # Error handling
+│   │   ├── fileUtils.ts           # File utilities
+│   │   ├── jsonHighlight.ts       # JSON syntax highlighting
+│   │   ├── languageDetection.ts   # Language detection
+│   │   ├── theme.ts               # Theme utilities
+│   │   ├── time.ts                # Time formatting
+│   │   ├── toast.ts               # Toast notifications
+│   │   └── index.ts               # Barrel export
+│   └── telemetry.ts               # CLI telemetry filtering
+├── types/                         # TypeScript types (5 files)
+│   ├── claude.ts                  # Claude SDK types (SDKMessage, ToolUse)
+│   ├── logger.ts                  # Logger types
+│   ├── sessions.ts                # Session types
+│   ├── terminal.ts                # Terminal types
+│   └── upload.ts                  # Upload types
+├── __tests__/                     # Test files (1 file)
+│   └── proxy.test.ts              # Proxy tests
+├── proxy.ts                       # Terminal WebSocket proxy
+└── middleware.ts                  # Next.js middleware (future)
 ```
+
+**Total**: 107 TypeScript/TSX files across app, components, hooks, lib, and types directories.
 
 ## Memory
 
@@ -603,6 +750,36 @@ Two distinct terminal components serve different purposes:
 - Temporal mode adds: Checkpoints, retroactive edits, speculative execution, prophecy (peek ahead)
 - Token costs: Enhanced Hybrid ~450-600, Adversarial ~700-1000, Temporal ~900-9000 (variable)
 - Integration: Skills invocable via `/ultrathink`, `/ultrathink-adversarial`, `/ultrathink-temporal`
+
+#### Documentation Suite Update (2026-02-22)
+- Created comprehensive documentation for new developers
+- **Files Created**:
+  * `docs/FEATURES.md` (~200 lines) - Complete feature documentation
+  * `docs/ARCHITECTURE.md` (~150 lines) - System architecture and design decisions
+  * `docs/DEVELOPMENT.md` (~100 lines) - Development setup and debugging guide
+  * `docs/COMMANDS.md` (~80 lines) - Slash command reference
+- **Files Updated**:
+  * `README.md` - Complete rewrite with full feature list, project structure (~180 lines)
+  * `CLAUDE.md` - Updated Architecture section, Ports table, Project Structure (~50+ files), added Middleware to Proxy ADR
+- **Key Improvements**:
+  * README now shows all 50+ implemented features (was only 6)
+  * Project structure expanded from ~15 items to 107 files with full paths
+  * Added cross-references between docs (Features → Architecture → Development → Commands)
+  * Fixed outdated "Architecture (Planned)" and "(to be created)" phrases
+  * Added comprehensive troubleshooting and debugging guides
+  * Port 3001 added for Terminal WebSocket Server
+- **Documentation Coverage**:
+  * Chat interface (streaming, markdown, keyboard shortcuts)
+  * Editors & viewers (DiffViewer, CodeViewer, Terminal, JsonViewer)
+  * File management (browser, preview, upload with 3 methods)
+  * Export functionality (HTML, JSON, Markdown)
+  * 12 local slash commands + CLI passthrough
+  * Terminal components (ReadOnlyTerminal vs InteractiveTerminal)
+  * Session management, debugging, logging, theming
+  * Usage statistics and cost tracking
+- **Target Audience**: Developers new to the project
+- **Verification**: All internal links resolved, feature descriptions match implementation
+- **Key Lesson**: Documentation is a living artifact that must stay synchronized with implementation. Outdated docs mislead developers. Comprehensive docs with clear structure and cross-references significantly improve onboarding.
 
 ### Blockers
 - None
