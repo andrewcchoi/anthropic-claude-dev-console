@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTerminal } from '@/hooks/useTerminal';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import '@xterm/xterm/css/xterm.css';
@@ -39,15 +39,21 @@ export function InteractiveTerminal({
     onError,
   });
 
+  // Track if connection has been initiated to prevent duplicates in Strict Mode
+  const hasInitiatedConnectionRef = useRef(false);
+
   // Auto-connect on mount with debounce to avoid React Strict Mode race condition
   // Strict Mode: mount → unmount → remount happens synchronously
   // setTimeout(0) defers connect() until after this cycle completes
+  // Use hasInitiatedConnectionRef to prevent duplicate connections across mount/unmount cycles
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     let isCancelled = false;
 
     const timeoutId = setTimeout(() => {
-      if (!isCancelled) {
+      // Only connect if not cancelled AND haven't already initiated a connection
+      if (!isCancelled && !hasInitiatedConnectionRef.current) {
+        hasInitiatedConnectionRef.current = true;
         connect();
       }
     }, 0);
@@ -55,6 +61,7 @@ export function InteractiveTerminal({
     return () => {
       isCancelled = true;
       clearTimeout(timeoutId);
+      // Don't reset hasInitiatedConnectionRef here - let it persist to prevent duplicate connections
       disconnect();
     };
   }, []); // connect/disconnect are stable refs from useTerminal
