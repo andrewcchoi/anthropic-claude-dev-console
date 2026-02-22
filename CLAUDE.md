@@ -399,8 +399,8 @@ src/
 
 ### Current State
 - Project phase: **Active Development**
-- Core functionality implemented: chat interface, SSE streaming, CLI subprocess integration, session management, tool execution visualization (DiffViewer for Edit, CodeViewer for Read/Write, ReadOnlyTerminal for Bash)
-- Recent additions: Monaco DiffEditor for Edit tool changes, Write tool syntax highlighting, Terminal Strict Mode fix, Middleware to Proxy migration
+- Core functionality implemented: chat interface, SSE streaming, CLI subprocess integration, session management, tool execution visualization (DiffViewer for Edit, CodeViewer for Read/Write, ReadOnlyTerminal for Bash), file attachment system with clipboard paste
+- Recent additions: Clipboard paste support for images/files, Monaco DiffEditor for Edit tool changes, Write tool syntax highlighting, Terminal Strict Mode fix, Middleware to Proxy migration
 - See PLAN.md for detailed implementation status
 
 ### Key Decisions
@@ -518,6 +518,33 @@ Two distinct terminal components serve different purposes:
   * `src/components/files/FilePreviewPane.tsx`, `src/components/chat/MessageList.tsx` - Added min-w-0 for flex chain
 - **PRs**: #8 (Write tool to CodeViewer), #5 (DiffViewer), #34 (Responsive layout fixes)
 - **Key Lesson**: Monaco DiffEditor is much simpler than xterm.js - just pass props and it renders. Pattern reuse accelerated implementation (estimated 5-7 hours, actual ~2 hours). Flexbox children need min-w-0 to prevent overflow (default min-width: auto prevents shrinking below content size).
+
+#### Clipboard Paste Support (2026-02-22)
+- **Feature**: Full clipboard paste support for images and files in chat textarea
+- **Implementation**: Multi-iteration refinement through Ralph Loop critical review process
+  * Iteration 1-2: Fixed browser compatibility, file filtering, disabled state, extension fallbacks, error messaging
+  * Iteration 3: Fixed image counting for extension fallback, excluded SVG for security, added modern formats (HEIC/AVIF)
+  * Iteration 4: Updated IMAGE_EXTENSIONS constant, fixed preview generation for empty MIME types, avoided duplicate code
+- **Key Decisions**:
+  * Check both `clipboardData.items` (Chrome/Firefox) and `clipboardData.files` (Safari) for cross-browser support
+  * Exclude `image/svg+xml` to prevent XSS from embedded scripts
+  * Extension fallback: check file extension when MIME type is empty (some browsers)
+  * Reuse existing `IMAGE_EXTENSIONS` constant from `src/types/upload.ts` instead of duplicating
+  * Unified error handling: use toast notifications instead of alerts
+- **Files Modified**:
+  * `src/types/upload.ts` - Added HEIC and AVIF to IMAGE_EXTENSIONS
+  * `src/hooks/useFileUpload.ts` - Fixed generatePreview() to check both MIME type and extension
+  * `src/components/chat/ChatInput.tsx` - Added handlePaste(), updated error handling to use toast
+- **Security**: SVG files blocked (can contain `<script>` tags), MIME type validation, file size/count limits enforced
+- **UX Features**:
+  * Toast notifications show image count or file count
+  * Rejection count displayed when some files are skipped
+  * Paste disabled during streaming (respects disabled prop)
+  * Text paste continues to work normally (only prevents default for file paste)
+- **Cross-browser**: Tested pattern handles Chrome, Firefox, Safari differences in ClipboardEvent API
+- **Modern formats**: Added HEIC (iPhone photos) and AVIF (modern web format) support
+- **Pattern Consistency**: Image detection logic matches useFileUpload hook's isImageFile() implementation
+- **Key Lesson**: Browser clipboard APIs vary significantly - always check both DataTransferItemList and FileList. Empty MIME types are common, so extension fallback is critical. Security first: always validate and sanitize file types, especially for formats like SVG that can execute code.
 
 #### Ultrathink Workflow System (2026-02-03)
 - Implemented comprehensive multi-phase agent workflow framework
