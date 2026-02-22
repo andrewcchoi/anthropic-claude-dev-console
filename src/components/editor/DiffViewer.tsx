@@ -33,9 +33,12 @@ interface DiffViewerProps {
 }
 
 /**
- * Monaco DiffEditor component for side-by-side diff viewing
- * Shows old_string vs new_string for Edit tool
- * Read-only, side-by-side layout only (no inline mode in v1)
+ * Monaco DiffEditor component for diff viewing
+ *
+ * Layout behavior:
+ * - Side-by-side view when container has sufficient width
+ * - Automatically switches to inline (stacked) view when container is narrow
+ * - This is built-in Monaco responsive behavior, not a bug
  */
 export function DiffViewer({
   original,
@@ -168,7 +171,9 @@ export function DiffViewer({
           onMount={handleEditorDidMount}
           options={{
             readOnly: true,
-            renderSideBySide: true, // Side-by-side only (no inline mode in v1)
+            // Monaco automatically falls back to inline view when container is too narrow,
+            // regardless of this setting. This is expected responsive behavior.
+            renderSideBySide: true,
             enableSplitViewResizing: true,
             renderOverviewRuler: false,
             scrollBeyondLastLine: false,
