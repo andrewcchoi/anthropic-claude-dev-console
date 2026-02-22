@@ -249,7 +249,7 @@ export function ToolExecution({
                   maxHeight={300}
                   initialCommand={viewMode === 'interactive' ? claudeCommand : undefined}
                 />
-              ) : (name === 'Read' || name === 'Edit') && typeof output === 'string' ? (
+              ) : (name === 'Read' || name === 'Edit' || name === 'Write') && typeof output === 'string' ? (
                 <CodeViewer
                   content={output}
                   filePath={(input as ToolInput)?.file_path as string}
