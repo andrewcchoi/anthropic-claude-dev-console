@@ -115,6 +115,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       switch (message.type) {
         case 'input':
           if (message.data) {
+            // Simply write to PTY - no special handling
             ptyManager.write(sessionId, message.data);
           }
           break;
