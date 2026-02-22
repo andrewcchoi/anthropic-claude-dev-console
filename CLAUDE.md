@@ -9,8 +9,8 @@ This is a DevContainer-based development environment for building a Next.js 16 w
 ## Technology Stack
 
 - **Runtime**: Node.js 20 + Python 3.12
-- **Planned Frontend**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, shadcn/ui
-- **Planned Backend**: Next.js API routes with SQLite (better-sqlite3)
+- **Frontend**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, shadcn/ui
+- **Backend**: Next.js API routes (sessions managed by Claude CLI)
 - **Services**: PostgreSQL 16, Redis 7 (via Docker Compose)
 - **Package Managers**: npm (primary), pnpm, yarn, uv (Python)
 
@@ -36,7 +36,6 @@ Open in VS Code and use "Reopen in Container" to start the DevContainer. This br
 
 Set in `.env` or inherited from host:
 - `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GITHUB_TOKEN` - inherited from host
-- `ENABLE_FIREWALL=false` - firewall is disabled by default (YOLO mode)
 - `NODE_OPTIONS=--max-old-space-size=4096` - Node.js memory limit
 
 ## Commands
@@ -113,7 +112,6 @@ Or use the Skill tool: `Skill(skill: "ultrathink")`
 |----------|----------|---------|
 | **Skills** | `.claude/skills/ultrathink*.md` | Full workflow specifications |
 | **README** | `.claude/docs/ultrathink-README.md` | Getting started guide |
-| **Reference** | `.claude/docs/ultrathink-reference.md` | Quick reference cards |
 | **Examples** | `.claude/docs/ultrathink-examples.md` | Real-world usage examples |
 | **Verification** | `.claude/docs/ultrathink-verification.md` | Test cases and validation |
 
@@ -371,7 +369,7 @@ npm run test:connectivity
 src/
 ├── app/                    # Next.js App Router pages
 │   ├── api/claude/         # SSE streaming endpoint
-│   ├── api/sessions/       # Session CRUD
+│   ├── api/sessions/       # Session discovery and message retrieval
 │   ├── api/logs/stream/    # Log streaming SSE
 │   ├── terminal/           # Interactive terminal page
 │   └── logs/               # Log viewer page
@@ -529,7 +527,6 @@ Two distinct terminal components serve different purposes:
   * `.claude/skills/ultrathink-adversarial.md` - Adversarial mode (~400 tokens)
   * `.claude/skills/ultrathink-temporal.md` - Temporal mode (~450 tokens)
   * `.claude/docs/ultrathink-README.md` - Getting started guide
-  * `.claude/docs/ultrathink-reference.md` - Quick reference cards
   * `.claude/docs/ultrathink-examples.md` - Real-world usage examples
   * `.claude/docs/ultrathink-verification.md` - Test cases and validation
 - Key features:

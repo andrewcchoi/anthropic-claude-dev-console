@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { RightPanel } from './RightPanel';
+import { RightPanel } from '@/components/sidebar/RightPanel';
 import { useChatStore } from '@/lib/store';
 
 // Mock the child components

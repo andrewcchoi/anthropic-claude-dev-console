@@ -113,7 +113,6 @@ The workflow will automatically:
 
 | Document | Purpose | Location |
 |----------|---------|----------|
-| **Quick Reference** | Compact reference cards, notation guide | `.claude/docs/ultrathink-reference.md` |
 | **Usage Examples** | Real-world examples for each variant | `.claude/docs/ultrathink-examples.md` |
 | **Verification Guide** | Test cases and validation procedures | `.claude/docs/ultrathink-verification.md` |
 | **This README** | Overview and getting started | `.claude/docs/ultrathink-README.md` |

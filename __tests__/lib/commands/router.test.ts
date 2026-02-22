@@ -1,4 +1,4 @@
-import { routeCommand } from '../router';
+import { routeCommand } from '@/lib/commands/router';
 
 describe('routeCommand', () => {
   it('routes built-in commands to local handlers', () => {
