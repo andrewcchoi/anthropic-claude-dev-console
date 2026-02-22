@@ -236,6 +236,40 @@ Commands are routed in `ChatInput.tsx` via `src/lib/commands/router.ts`:
 - Works even if CLI connection fails
 - Better UX for UI-specific features
 
+### Tool Output Visualization
+
+Different tools are routed to appropriate viewers in `ToolExecution.tsx`:
+
+| Tool | Viewer | Condition |
+|------|--------|-----------|
+| **Edit** | DiffViewer | Has old_string & new_string (shows side-by-side diff) |
+| **Edit** | CodeViewer | String output only (shows final result) |
+| **Read, Write** | CodeViewer | String output (syntax highlighted code) |
+| **Bash** | ReadOnlyTerminal | String output (terminal with ANSI colors) |
+| **Other** | JsonViewer | Fallback for structured data |
+
+**DiffViewer Features:**
+- Monaco DiffEditor for side-by-side comparison
+- Automatic language detection from file path
+- Theme support (auto, light, dark)
+- "Copy New" button to copy new content
+- Responsive: Monaco automatically switches between side-by-side and inline views based on container width
+- Read-only (no editing in MVP)
+
+**Pattern Reuse:**
+- Dynamic import from CodeViewer (code splitting)
+- Theme integration from MonacoViewer
+- Language detection from fileUtils
+
+**Implementation Note:**
+The DiffViewer uses Monaco's built-in responsive behavior. On narrow screens, Monaco automatically switches from side-by-side to inline diff view. This is intentional Monaco behavior, not a bug. The component maintains `renderSideBySide: true` as a preference, but Monaco overrides this based on available width.
+
+**Files:**
+- `src/components/editor/DiffViewer.tsx` - Monaco DiffEditor wrapper
+- `src/components/editor/MonacoViewer.tsx` - Single-file code viewer
+- `src/components/editor/CodeViewer.tsx` - Dynamic import wrapper
+- `src/components/chat/ToolExecution.tsx` - Tool routing logic
+
 ## Debugging Infrastructure
 
 ### Logging System (5 Components)
@@ -274,10 +308,12 @@ enableDebug()   // or disableDebug(), toggleDebug()
 **Solution:** Two-effect pattern in ReadOnlyTerminal.tsx - Effect 1 initializes and writes synchronously after `xterm.open()`, Effect 2 handles incremental updates.
 **Files:** `src/components/terminal/ReadOnlyTerminal.tsx` (L39-137)
 
-### React Strict Mode WebSocket
-**Problem:** Strict Mode double-mounting caused WebSocket race conditions in InteractiveTerminal.
-**Solution:** Debounced connect with `isCancelled` flag and cleanup in useEffect return.
-**Files:** `src/components/terminal/InteractiveTerminal.tsx`, `src/hooks/useTerminal.ts`
+### React Strict Mode WebSocket (Fixed)
+**Problem:** Strict Mode double-mounting caused WebSocket race conditions in InteractiveTerminal, leading to duplicate connections and duplicate initial command execution.
+**Root Cause:** React Strict Mode mounts → unmounts → remounts components. Both the first mount and remount would schedule connection attempts via `setTimeout(0)`, causing duplicates.
+**Solution:** Added persistent `hasInitiatedConnectionRef` useRef to track connection initiation across mount cycles. Once set to true on first connection attempt, prevents any subsequent attempts even after unmount/remount.
+**Known Limitation:** Ref never resets, blocking reconnection after intentional disconnect and remount. Acceptable for current use case (dedicated /terminal page).
+**Files:** `src/components/terminal/InteractiveTerminal.tsx` (hasInitiatedConnectionRef guard), `src/hooks/useTerminal.ts` (isMountedRef cleanup)
 
 ### Monaco Error Suppression
 **Problem:** Monaco Editor throws objects (not Error instances), causing `[object Object]` in console.
@@ -342,6 +378,7 @@ src/
 ├── components/
 │   ├── chat/               # ChatInput, MessageList, ToolExecution
 │   ├── terminal/           # ReadOnlyTerminal, InteractiveTerminal
+│   ├── editor/             # DiffViewer, MonacoViewer, CodeViewer
 │   ├── sidebar/            # Sidebar, SessionList
 │   ├── panels/             # HelpPanel, StatusPanel
 │   └── error/              # ErrorBoundary, TerminalErrorBoundary
@@ -364,7 +401,8 @@ src/
 
 ### Current State
 - Project phase: **Active Development**
-- Core functionality implemented: chat interface, SSE streaming, CLI subprocess integration, session management, tool execution visualization
+- Core functionality implemented: chat interface, SSE streaming, CLI subprocess integration, session management, tool execution visualization (DiffViewer for Edit, CodeViewer for Read/Write, ReadOnlyTerminal for Bash)
+- Recent additions: Monaco DiffEditor for Edit tool changes, Write tool syntax highlighting, Terminal Strict Mode fix, Middleware to Proxy migration
 - See PLAN.md for detailed implementation status
 
 ### Key Decisions
@@ -453,6 +491,35 @@ Two distinct terminal components serve different purposes:
   * `src/components/sidebar/ProjectList.tsx` - Removed local state/useEffect, use store state/action
 - **Commit**: c88f727
 - **Key Lesson**: When state needs to fight against reactive effects, the effect is usually wrong. Move state to proper layer (global store) instead of trying to fix effect dependencies. Auto-expand behaviors should respect user actions, not override them.
+
+#### DiffViewer Implementation (2026-02-21)
+- **Feature**: Monaco DiffEditor for Edit tool changes, showing old_string vs new_string side-by-side
+- **Implementation Approach**: Reused existing patterns to minimize development time
+  * Dynamic import pattern from CodeViewer (code splitting)
+  * Theme integration from MonacoViewer (claude-dark/claude-light)
+  * Language detection from fileUtils
+  * Monaco DiffEditor handles lifecycle internally (no manual dimension checks needed)
+- **Key Decisions**:
+  * MVP scope: Read-only, side-by-side only, no navigation controls, no error boundary (can add later)
+  * Routing in ToolExecution.tsx: Edit tool with old_string/new_string → DiffViewer, Edit with only output → CodeViewer (final result)
+  * Also added Write tool to CodeViewer routing (was previously only Read and Edit)
+- **Challenges & Solutions**:
+  1. **Height calculation**: Initial implementation used h-full class which collapsed to 0 when parent had no explicit height
+     * Solution: Use explicit pixel height style + min-h-0 for proper flex child shrinking
+  2. **Monaco disposal error**: "TextModel got disposed before DiffEditorWidget model got reset" during React Strict Mode
+     * Solution: Added isMountedRef guard and cleanup effect with safe disposal handling
+  3. **Width overflow**: Tool bubbles overflowed viewport when developer panel open
+     * Solution: Added min-w-0 throughout flex chain from root to Monaco editors to allow proper shrinking
+- **Responsive Behavior**: Monaco automatically switches between side-by-side and inline diff views based on container width (built-in feature, not a bug)
+- **Files Created**:
+  * `src/components/editor/DiffViewer.tsx` - Monaco DiffEditor wrapper (204 lines)
+  * `src/components/editor/DiffViewerSkeleton.tsx` - Loading skeleton (16 lines)
+- **Files Modified**:
+  * `src/components/chat/ToolExecution.tsx` - Tool routing logic
+  * `src/app/page.tsx` - Added min-w-0 to layout flex containers
+  * `src/components/files/FilePreviewPane.tsx`, `src/components/chat/MessageList.tsx` - Added min-w-0 for flex chain
+- **PRs**: #8 (Write tool to CodeViewer), #5 (DiffViewer), #34 (Responsive layout fixes)
+- **Key Lesson**: Monaco DiffEditor is much simpler than xterm.js - just pass props and it renders. Pattern reuse accelerated implementation (estimated 5-7 hours, actual ~2 hours). Flexbox children need min-w-0 to prevent overflow (default min-width: auto prevents shrinking below content size).
 
 #### Ultrathink Workflow System (2026-02-03)
 - Implemented comprehensive multi-phase agent workflow framework
