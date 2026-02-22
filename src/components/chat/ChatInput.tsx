@@ -86,7 +86,9 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
   // Show/hide command palette based on input
   useEffect(() => {
     const trimmed = input.trim();
-    if (trimmed.startsWith('/') && trimmed.length > 0) {
+    // Show palette if input starts with / and doesn't end with a space
+    // (ending with space means a command was just selected)
+    if (trimmed.startsWith('/') && trimmed.length > 0 && !input.endsWith(' ')) {
       setShowCommandPalette(true);
     } else {
       setShowCommandPalette(false);
@@ -164,30 +166,330 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
           setModelPanelOpen(true);
           break;
         case 'exportConversation': {
-          // Export messages as JSON
-          const exportData = {
-            sessionId: currentSession?.id,
-            sessionName: currentSession?.name,
-            exportedAt: new Date().toISOString(),
-            messages: messages.map(m => ({
-              role: m.role,
-              content: m.content,
-              timestamp: m.timestamp
-            }))
-          };
-          const blob = new Blob([JSON.stringify(exportData, null, 2)], {
-            type: 'application/json'
-          });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          const filename = currentSession?.name
-            ? `${currentSession.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${Date.now()}.json`
-            : `conversation-${Date.now()}.json`;
-          a.download = filename;
-          a.click();
-          URL.revokeObjectURL(url);
-          showToast('Exported conversation', 'success');
+          // Check export format (e.g., "/export json", "/export markdown")
+          const inputLower = trimmed.toLowerCase();
+          const wantsJson = inputLower.includes('json');
+          const wantsMarkdown = inputLower.includes('markdown') || inputLower.includes('md');
+
+          if (wantsJson) {
+            // Export as JSON
+            const exportData = {
+              sessionId: currentSession?.id,
+              sessionName: currentSession?.name,
+              exportedAt: new Date().toISOString(),
+              messages: messages.map(m => ({
+                role: m.role,
+                content: m.content,
+                timestamp: m.timestamp
+              }))
+            };
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+              type: 'application/json'
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const filename = currentSession?.name
+              ? `${currentSession.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${Date.now()}.json`
+              : `conversation-${Date.now()}.json`;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Exported conversation as JSON', 'success');
+          } else if (wantsMarkdown) {
+            // Export as Markdown
+            const formatTimestamp = (ts: number) => {
+              return new Date(ts).toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+              });
+            };
+
+            const formatContent = (content: any[]): string => {
+              return content.map(block => {
+                if (typeof block === 'string') {
+                  return block;
+                }
+                if (block.type === 'text') {
+                  return block.text || '';
+                }
+                if (block.type === 'tool_use') {
+                  return `\n**[Tool Use: ${block.name}]**\n\`\`\`json\n${JSON.stringify(block.input, null, 2)}\n\`\`\`\n`;
+                }
+                if (block.type === 'tool_result') {
+                  const content = block.content || block.output || '';
+                  return `\n**[Tool Result]**\n\`\`\`\n${content}\n\`\`\`\n`;
+                }
+                if (block.type === 'thinking') {
+                  return `\n**[Thinking]**\n${block.thinking || ''}\n`;
+                }
+                if (block.type === 'image') {
+                  return `\n**[Image: ${block.source?.type || 'attached'}]**\n`;
+                }
+                return JSON.stringify(block);
+              }).join('\n');
+            };
+
+            const markdown = [
+              `# Conversation Export`,
+              ``,
+              `**Session:** ${currentSession?.name || 'Untitled'}`,
+              `**Session ID:** ${currentSession?.id || 'Unknown'}`,
+              `**Exported:** ${new Date().toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+              })}`,
+              `**Messages:** ${messages.length}`,
+              ``,
+              `---`,
+              ``,
+              ...messages.map(msg => {
+                const roleLabel = msg.role === 'user' ? '👤 User' :
+                                msg.role === 'assistant' ? '🤖 Assistant' :
+                                msg.role === 'system' ? '⚙️  System' : msg.role;
+                return [
+                  `## ${roleLabel}`,
+                  `*${formatTimestamp(msg.timestamp)}*`,
+                  ``,
+                  formatContent(msg.content),
+                  ``,
+                  `---`,
+                  ``
+                ].join('\n');
+              })
+            ].join('\n');
+
+            const blob = new Blob([markdown], {
+              type: 'text/markdown'
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const filename = currentSession?.name
+              ? `${currentSession.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${Date.now()}.md`
+              : `conversation-${Date.now()}.md`;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Exported conversation as Markdown', 'success');
+          } else {
+            // Export as HTML (default - Word-ready)
+            const formatTimestamp = (ts: number) => {
+              return new Date(ts).toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+              });
+            };
+
+            const escapeHtml = (text: string): string => {
+              return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+            };
+
+            const formatContentHtml = (content: any[]): string => {
+              return content.map(block => {
+                if (typeof block === 'string') {
+                  return `<p>${escapeHtml(block)}</p>`;
+                }
+                if (block.type === 'text') {
+                  const text = block.text || '';
+                  // Preserve line breaks
+                  return `<p>${escapeHtml(text).replace(/\n/g, '<br>')}</p>`;
+                }
+                if (block.type === 'tool_use') {
+                  return `
+                    <div class="tool-block">
+                      <strong>🔧 Tool Use: ${escapeHtml(block.name)}</strong>
+                      <pre><code>${escapeHtml(JSON.stringify(block.input, null, 2))}</code></pre>
+                    </div>`;
+                }
+                if (block.type === 'tool_result') {
+                  const content = block.content || block.output || '';
+                  return `
+                    <div class="tool-block">
+                      <strong>📤 Tool Result</strong>
+                      <pre><code>${escapeHtml(String(content))}</code></pre>
+                    </div>`;
+                }
+                if (block.type === 'thinking') {
+                  return `
+                    <div class="thinking-block">
+                      <strong>💭 Thinking</strong>
+                      <p>${escapeHtml(block.thinking || '').replace(/\n/g, '<br>')}</p>
+                    </div>`;
+                }
+                if (block.type === 'image') {
+                  return `<p><em>🖼️ Image: ${escapeHtml(block.source?.type || 'attached')}</em></p>`;
+                }
+                return `<pre><code>${escapeHtml(JSON.stringify(block))}</code></pre>`;
+              }).join('\n');
+            };
+
+            const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(currentSession?.name || 'Conversation Export')}</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.6;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      color: #333;
+    }
+    h1 {
+      color: #2563eb;
+      border-bottom: 3px solid #2563eb;
+      padding-bottom: 10px;
+      margin-bottom: 30px;
+    }
+    .meta {
+      background: #f3f4f6;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+    }
+    .meta p {
+      margin: 5px 0;
+      color: #6b7280;
+    }
+    .meta strong {
+      color: #374151;
+    }
+    .message {
+      margin: 30px 0;
+      padding: 20px;
+      border-left: 4px solid #e5e7eb;
+      background: #fafafa;
+      border-radius: 4px;
+      page-break-inside: avoid;
+    }
+    .message.user {
+      border-left-color: #3b82f6;
+      background: #eff6ff;
+    }
+    .message.assistant {
+      border-left-color: #10b981;
+      background: #f0fdf4;
+    }
+    .message.system {
+      border-left-color: #f59e0b;
+      background: #fffbeb;
+    }
+    .message-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .role {
+      font-weight: 600;
+      font-size: 18px;
+    }
+    .timestamp {
+      color: #6b7280;
+      font-size: 14px;
+    }
+    .content p {
+      margin: 10px 0;
+      white-space: pre-wrap;
+    }
+    .tool-block, .thinking-block {
+      margin: 15px 0;
+      padding: 15px;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+    }
+    .tool-block strong, .thinking-block strong {
+      display: block;
+      margin-bottom: 10px;
+      color: #1f2937;
+    }
+    pre {
+      background: #1f2937;
+      color: #f3f4f6;
+      padding: 15px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 10px 0;
+    }
+    code {
+      font-family: "Monaco", "Courier New", monospace;
+      font-size: 13px;
+    }
+    @media print {
+      body {
+        padding: 20px;
+      }
+      .message {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>📄 Conversation Export</h1>
+  <div class="meta">
+    <p><strong>Session:</strong> ${escapeHtml(currentSession?.name || 'Untitled')}</p>
+    <p><strong>Session ID:</strong> ${escapeHtml(currentSession?.id || 'Unknown')}</p>
+    <p><strong>Exported:</strong> ${formatTimestamp(Date.now())}</p>
+    <p><strong>Messages:</strong> ${messages.length}</p>
+  </div>
+  ${messages.map(msg => {
+    const roleLabel = msg.role === 'user' ? '👤 User' :
+                    msg.role === 'assistant' ? '🤖 Assistant' :
+                    msg.role === 'system' ? '⚙️ System' : escapeHtml(msg.role);
+    const roleClass = msg.role;
+    return `
+      <div class="message ${roleClass}">
+        <div class="message-header">
+          <div class="role">${roleLabel}</div>
+          <div class="timestamp">${formatTimestamp(msg.timestamp)}</div>
+        </div>
+        <div class="content">
+          ${formatContentHtml(msg.content)}
+        </div>
+      </div>`;
+  }).join('\n')}
+</body>
+</html>`;
+
+            const blob = new Blob([html], {
+              type: 'text/html'
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const filename = currentSession?.name
+              ? `${currentSession.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${Date.now()}.html`
+              : `conversation-${Date.now()}.html`;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('Exported conversation as HTML', 'success');
+          }
           break;
         }
         case 'openTodosPanel':
