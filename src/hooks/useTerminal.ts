@@ -33,6 +33,7 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
+  const initialCommandSentRef = useRef(false);
 
   const [isConnected, setIsConnected] = useState(false);
   const isConnectedRef = useRef(false);
@@ -48,6 +49,7 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
   // Cleanup function
   const cleanup = () => {
     isMountedRef.current = false;
+    initialCommandSentRef.current = false;
 
     if (resizeTimeoutRef.current) {
       clearTimeout(resizeTimeoutRef.current);
@@ -137,11 +139,16 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
               setSessionId(sid);
               onConnected?.(sid);
 
-              // Send initial command if provided
-              if (initialCommand && wsClientRef.current) {
+              // Send initial command - only if not already sent
+              if (initialCommand && wsClientRef.current && !initialCommandSentRef.current) {
                 // Small delay to ensure terminal is ready
                 setTimeout(() => {
-                  wsClientRef.current?.sendInput(initialCommand);
+                  // Only mark as sent AFTER verifying connection is still active
+                  if (wsClientRef.current?.isConnected()) {
+                    wsClientRef.current.sendInput(initialCommand);
+                    initialCommandSentRef.current = true;
+                  }
+                  // If disconnected during 100ms, ref stays false, retry on next onConnected
                 }, 100);
               }
             },
