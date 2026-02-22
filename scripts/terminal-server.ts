@@ -115,16 +115,8 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       switch (message.type) {
         case 'input':
           if (message.data) {
-            if (message.suppressEcho) {
-              // Clear current line before sending command to hide the echo
-              // \r moves to beginning, \x1b[K clears from cursor to end of line
-              const clearLine = '\r\x1b[K';
-              const wrappedCommand = `${clearLine}${message.data}`;
-              ptyManager.write(sessionId, wrappedCommand);
-              log.debug('Sent input with cleared echo', { sessionId });
-            } else {
-              ptyManager.write(sessionId, message.data);
-            }
+            // Simply write to PTY - no special handling
+            ptyManager.write(sessionId, message.data);
           }
           break;
 

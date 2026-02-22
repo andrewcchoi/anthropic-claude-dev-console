@@ -27,7 +27,9 @@ export function InteractiveTerminal({
   onError,
 }: InteractiveTerminalProps) {
   const { resolvedTheme } = useAppTheme();
-  const [hasReceivedOutput, setHasReceivedOutput] = useState(!initialCommand); // Show immediately if no initial command
+  const [isReady, setIsReady] = useState(!initialCommand); // Ready immediately if no command
+  const outputAccumulatorRef = useRef('');
+  const detectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const {
     terminalRef,
@@ -43,11 +45,29 @@ export function InteractiveTerminal({
     onConnected,
     onDisconnected,
     onError,
-    suppressInitialEcho: !!initialCommand, // Suppress echo when using initial command
     onData: (data) => {
-      // Show terminal once we receive any data (the hook handles buffering)
-      if (!hasReceivedOutput) {
-        setHasReceivedOutput(true);
+      if (!isReady && initialCommand) {
+        outputAccumulatorRef.current += data;
+
+        // Check for Claude patterns
+        const hasClaudeSignature =
+          outputAccumulatorRef.current.includes('Claude Code') ||
+          outputAccumulatorRef.current.includes('▐▛███▜') ||
+          outputAccumulatorRef.current.includes('claude.ai');
+
+        if (hasClaudeSignature) {
+          // Clear timeout and reveal terminal
+          if (detectionTimeoutRef.current) {
+            clearTimeout(detectionTimeoutRef.current);
+            detectionTimeoutRef.current = null;
+          }
+          // Small delay to let Claude's output accumulate
+          setTimeout(() => {
+            const xtermElement = terminalRef.current?.querySelector('.xterm') as HTMLElement | null;
+            xtermElement?.focus();
+            setIsReady(true);
+          }, 100);
+        }
       }
     },
   });
@@ -78,6 +98,21 @@ export function InteractiveTerminal({
       disconnect();
     };
   }, []); // connect/disconnect are stable refs from useTerminal
+
+  // Set timeout fallback when initial command is present
+  useEffect(() => {
+    if (initialCommand && !isReady) {
+      detectionTimeoutRef.current = setTimeout(() => {
+        setIsReady(true); // Show anyway after 3 seconds
+      }, 3000);
+    }
+    return () => {
+      if (detectionTimeoutRef.current) {
+        clearTimeout(detectionTimeoutRef.current);
+        detectionTimeoutRef.current = null;
+      }
+    };
+  }, [initialCommand, isReady]);
 
   return (
     <div
@@ -115,25 +150,25 @@ export function InteractiveTerminal({
         </div>
       )}
 
-      {/* Loading spinner - shown until we receive terminal output */}
-      {!hasReceivedOutput && !error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900">
+      {/* Terminal container - always renders and receives data */}
+      <div
+        ref={terminalRef}
+        className={`h-full w-full transition-opacity duration-300 ${
+          isReady ? 'opacity-100' : 'opacity-0'
+        }`}
+      />
+
+      {/* Loading spinner overlay - completely covers terminal until ready */}
+      {!isReady && !error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
           <div className="flex flex-col items-center gap-3">
             <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
-            <span className="text-sm text-gray-600 dark:text-gray-400">
+            <span className="text-sm text-gray-400">
               Starting Claude session...
             </span>
           </div>
         </div>
       )}
-
-      {/* Terminal container - hidden until we receive output */}
-      <div
-        ref={terminalRef}
-        className={`h-full w-full transition-opacity duration-300 ${
-          hasReceivedOutput ? 'opacity-100' : 'opacity-0'
-        }`}
-      />
     </div>
   );
 }

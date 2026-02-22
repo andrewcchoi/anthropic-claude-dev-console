@@ -13,7 +13,6 @@ interface UseTerminalOptions {
   onDisconnected?: () => void;
   onError?: (error: string) => void;
   onData?: (data: string) => void; // Called when terminal receives data
-  suppressInitialEcho?: boolean; // If true, buffer output until Claude starts
 }
 
 interface UseTerminalReturn {
@@ -26,7 +25,7 @@ interface UseTerminalReturn {
 }
 
 export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn {
-  const { cwd, theme = 'dark', initialCommand, onConnected, onDisconnected, onError, onData, suppressInitialEcho = false } = options;
+  const { cwd, theme = 'dark', initialCommand, onConnected, onDisconnected, onError, onData } = options;
 
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
@@ -36,8 +35,6 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
   const initialCommandSentRef = useRef(false);
-  const outputBufferRef = useRef<string>('');
-  const shouldDisplayOutputRef = useRef(!suppressInitialEcho); // Start false if suppressing
 
   const [isConnected, setIsConnected] = useState(false);
   const isConnectedRef = useRef(false);
@@ -149,8 +146,7 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
                 setTimeout(() => {
                   // Only mark as sent AFTER verifying connection is still active
                   if (wsClientRef.current?.isConnected()) {
-                    // Suppress echo for initial command to avoid showing it twice
-                    wsClientRef.current.sendInput(initialCommand, { suppressEcho: true });
+                    wsClientRef.current.sendInput(initialCommand);
                     initialCommandSentRef.current = true;
                   }
                   // If disconnected during 100ms, ref stays false, retry on next onConnected
@@ -158,42 +154,11 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
               }
             },
             onData: (data: string) => {
-              if (suppressInitialEcho && !shouldDisplayOutputRef.current) {
-                // Buffer output and check if we should start displaying
-                outputBufferRef.current += data;
+              // Always write data directly to xterm - no buffering
+              xtermRef.current?.write(data);
 
-                // Detect Claude's output patterns
-                if (
-                  outputBufferRef.current.includes('Claude') ||
-                  outputBufferRef.current.includes('▐▛███▜▌') || // Claude logo
-                  outputBufferRef.current.length > 500 // Or substantial output
-                ) {
-                  // Found Claude output! Start displaying from this point
-                  shouldDisplayOutputRef.current = true;
-
-                  // Find where Claude's output starts and only write from there
-                  const claudeIndex = Math.max(
-                    outputBufferRef.current.indexOf('Claude'),
-                    outputBufferRef.current.indexOf('▐▛███▜▌'),
-                    0
-                  );
-
-                  // Write everything from Claude's output onward
-                  const relevantOutput = outputBufferRef.current.substring(claudeIndex);
-                  if (relevantOutput) {
-                    xtermRef.current?.write(relevantOutput);
-                  }
-
-                  // Clear buffer
-                  outputBufferRef.current = '';
-                }
-                // Otherwise, keep buffering (don't write to terminal yet)
-              } else {
-                // Normal mode or already started displaying
-                xtermRef.current?.write(data);
-              }
-
-              onData?.(data); // Always notify parent component of data
+              // Notify parent for detection logic
+              onData?.(data);
             },
             onError: (errorMsg: string) => {
               // Check if still mounted before updating state
