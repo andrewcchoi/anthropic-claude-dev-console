@@ -3,6 +3,7 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { ChatMessage, MessageContent, ToolExecution } from '@/types/claude';
+import { createServerLogger } from '@/lib/logger/server';
 
 interface CLIMessage {
   type: string;
@@ -74,6 +75,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const log = createServerLogger('SessionAPI');
+
   try {
     const { id } = await params;
 
@@ -83,13 +86,15 @@ export async function GET(
 
     // Path to CLI session file
     const sessionPath = join(homedir(), '.claude', 'projects', projectId, `${id}.jsonl`);
+    log.debug('Loading session', { id, projectId, sessionPath });
 
     // Check if file exists
     try {
       await fs.access(sessionPath);
-    } catch {
+    } catch (error) {
       // File doesn't exist - new session or deleted session
-      return NextResponse.json({ messages: [], toolExecutions: [] });
+      log.debug('File not found', { sessionPath, error: String(error) });
+      return NextResponse.json({ messages: [], toolExecutions: [] }, { status: 404 });
     }
 
     // Read and parse JSONL file
@@ -205,7 +210,15 @@ export async function GET(
       }
     }
 
-    console.log(`Processed ${processedCount} lines, included ${includedCount} messages, ${toolExecutions.length} tool executions`);
+    log.debug('Processed session lines', {
+      processedCount,
+      includedCount,
+      toolExecutionsCount: toolExecutions.length,
+    });
+    log.debug('Returning session data', {
+      messageCount: messages.length,
+      toolCount: toolExecutions.length,
+    });
 
     const response: SessionHistoryResponse = {
       messages,
