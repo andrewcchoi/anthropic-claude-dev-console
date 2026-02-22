@@ -173,10 +173,6 @@ export function ToolExecution({
     ? `claude --allow-dangerously-skip-permissions --resume ${sessionId}\n`
     : undefined;
 
-  // Handle toggle between readonly and interactive
-  const handleToggleInteractive = () => {
-    setViewMode((prev) => (prev === 'readonly' ? 'interactive' : 'readonly'));
-  };
 
   const getStatusIcon = () => {
     switch (status) {
@@ -233,21 +229,21 @@ export function ToolExecution({
                 {isBashTool && bashOutput && (status === 'success' || status === 'error') && (
                   <div className="flex gap-1">
                     <button
-                      onClick={handleToggleInteractive}
-                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                      onClick={() => setViewMode('readonly')}
+                      className={`px-2 py-1 text-xs rounded transition-all ${
                         viewMode === 'readonly'
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                          ? 'bg-blue-500 text-white active:scale-95 active:bg-blue-600'
+                          : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 active:scale-95 active:bg-gray-400 dark:active:bg-gray-500'
                       }`}
                     >
                       Output
                     </button>
                     <button
-                      onClick={handleToggleInteractive}
-                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                      onClick={() => setViewMode('interactive')}
+                      className={`px-2 py-1 text-xs rounded transition-all ${
                         viewMode === 'interactive'
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                          ? 'bg-blue-500 text-white active:scale-95 active:bg-blue-600'
+                          : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 active:scale-95 active:bg-gray-400 dark:active:bg-gray-500'
                       }`}
                     >
                       Interactive ▶
