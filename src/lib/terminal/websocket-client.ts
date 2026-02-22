@@ -205,7 +205,7 @@ export class WebSocketClient {
   /**
    * Send input to terminal
    */
-  sendInput(data: string): void {
+  sendInput(data: string, options?: { suppressEcho?: boolean }): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       log.error('Cannot send input - WebSocket not connected', {
         readyState: this.ws?.readyState,
@@ -218,7 +218,8 @@ export class WebSocketClient {
     if (data.includes('claude')) {
       log.info('Sending Claude CLI command to terminal', {
         command: data.trim(),
-        sessionId: this.sessionId?.slice(0, 8) || 'none'
+        sessionId: this.sessionId?.slice(0, 8) || 'none',
+        suppressEcho: options?.suppressEcho || false
       });
     } else {
       log.debug('Sending input to terminal', { dataLength: data.length });
@@ -227,6 +228,7 @@ export class WebSocketClient {
     const message: TerminalClientMessage = {
       type: 'input',
       data,
+      suppressEcho: options?.suppressEcho,
     };
 
     this.ws.send(JSON.stringify(message));

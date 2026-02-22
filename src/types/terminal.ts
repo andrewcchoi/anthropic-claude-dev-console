@@ -31,6 +31,7 @@ export type TerminalMessage =
 export interface TerminalInputMessage {
   type: 'input';
   data: string;
+  suppressEcho?: boolean; // If true, temporarily disable terminal echo for this input
 }
 
 export interface TerminalResizeMessage {
@@ -98,4 +99,5 @@ export interface TerminalClientMessage {
   data?: string;
   cols?: number;
   rows?: number;
+  suppressEcho?: boolean; // If true, temporarily disable terminal echo for this input
 }

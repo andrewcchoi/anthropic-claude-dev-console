@@ -145,7 +145,8 @@ export function useTerminal(options: UseTerminalOptions = {}): UseTerminalReturn
                 setTimeout(() => {
                   // Only mark as sent AFTER verifying connection is still active
                   if (wsClientRef.current?.isConnected()) {
-                    wsClientRef.current.sendInput(initialCommand);
+                    // Suppress echo for initial command to avoid showing it twice
+                    wsClientRef.current.sendInput(initialCommand, { suppressEcho: true });
                     initialCommandSentRef.current = true;
                   }
                   // If disconnected during 100ms, ref stays false, retry on next onConnected
