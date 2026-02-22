@@ -8,22 +8,24 @@ This document provides patterns and solutions for common dark mode visibility is
 
 ### Issue 1: Insufficient Contrast for Interactive Elements
 
-**Symptom:** Hover states or borders are barely visible in dark mode.
+**Symptom:** Hover states or borders are barely visible in dark mode, or active/selected states blend with unselected items.
 
-**Root Cause:** Using adjacent Tailwind color steps (e.g., gray-700 hover on gray-800 background) provides insufficient visual contrast.
+**Root Cause:** Using adjacent Tailwind color steps (e.g., gray-700 hover on gray-800 background) provides insufficient visual contrast. Active states with pale colors lack clear distinction.
 
 **Solution:**
 - Use **minimum 2-step jumps** in color scale for hover states
 - For backgrounds on gray-800/900, use gray-600 for hover states
 - For borders on dark backgrounds, use gray-500 or lighter
+- **Active states need even stronger contrast than hover states** - use bright colors with higher opacity
+- When items appear washed out, darken the container background to improve item contrast
 
-**Examples:**
+**Basic Examples:**
 
 ```tsx
-// ❌ Bad - Insufficient contrast
+// ❌ Bad - Insufficient hover contrast
 className="bg-gray-800 hover:bg-gray-700"
 
-// ✅ Good - Clear contrast
+// ✅ Good - Clear hover contrast
 className="bg-gray-800 hover:bg-gray-600"
 
 // ❌ Bad - Border barely visible
@@ -32,6 +34,39 @@ className="border dark:border-gray-600"
 // ✅ Good - Border clearly visible
 className="border-2 dark:border-gray-500"
 ```
+
+**Advanced Pattern - Dropdown with Active States:**
+
+```tsx
+// Container - darken background for better item contrast
+<div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-600 ...">
+
+// Dropdown item
+<button className={`
+  px-3 py-2 text-sm
+  hover:bg-gray-100 dark:hover:bg-gray-700
+  transition-colors
+  ${isActive
+    ? 'bg-blue-100 dark:bg-blue-600/40 border-l-2 border-blue-500'
+    : ''
+  }
+`}>
+```
+
+**Key Insights:**
+1. **Container darkening**: When items lack pop, darken container from `dark:bg-gray-800` to `dark:bg-gray-900`
+2. **Active state colors**:
+   - ❌ Too subtle: `bg-blue-50 dark:bg-blue-900/30`
+   - ✅ Clear: `bg-blue-100 dark:bg-blue-600/40`
+3. **Hover states adjust to container**: Darker container (gray-900) → hover gray-700; lighter container (gray-800) → hover gray-600
+4. **Visual hierarchy**: Active state > Hover state > Default state (each needs clear separation)
+
+**Recent Fixes:**
+- Permission Mode Selector (2026-02-05): Container `dark:bg-gray-800` → `dark:bg-gray-900`, active state `dark:bg-blue-900/30` → `dark:bg-blue-600/40`
+- Terminal borders (2026-02-05): `border dark:border-gray-600` → `border-2 dark:border-gray-500` with shadow glow
+- All interactive hover states: Updated from `dark:hover:bg-gray-700` to `dark:hover:bg-gray-600` for 2-step minimum contrast
+
+**Fixed in:** `src/components/chat/ChatInput.tsx`, `src/components/ui/DefaultModeSelector.tsx`, `src/components/terminal/ReadOnlyTerminal.tsx` (2026-02-05)
 
 ### Issue 2: Terminal/Code Output Border Visibility
 
