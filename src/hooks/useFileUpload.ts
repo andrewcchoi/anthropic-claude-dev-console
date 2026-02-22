@@ -11,7 +11,10 @@ export function useFileUpload() {
   };
 
   const generatePreview = async (file: File): Promise<string | undefined> => {
-    if (!file.type.startsWith('image/')) {
+    // Check both MIME type and extension (some browsers have empty MIME)
+    const hasImageMime = file.type.startsWith('image/');
+    const hasImageExt = isImageFile(file.name);
+    if (!hasImageMime && !hasImageExt) {
       return undefined;
     }
 

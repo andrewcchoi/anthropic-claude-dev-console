@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useRef, useEffect, KeyboardEvent, DragEvent } from 'react';
+import { useState, useRef, useEffect, KeyboardEvent, DragEvent, ClipboardEvent } from 'react';
 import { Paperclip, Shield } from 'lucide-react';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { AttachmentPreview } from './AttachmentPreview';
 import { CommandPalette } from './CommandPalette';
-import { FileAttachment } from '@/types/upload';
+import { FileAttachment, IMAGE_EXTENSIONS } from '@/types/upload';
 import { useChatStore } from '@/lib/store';
 import { routeCommand } from '@/lib/commands/router';
 import { showToast } from '@/lib/utils/toast';
@@ -239,7 +239,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
       try {
         await addFiles(e.target.files);
       } catch (error: any) {
-        alert(error.message || 'Failed to add files');
+        showToast(error.message || 'Failed to add files', 'error');
       }
       // Reset input so same file can be selected again
       if (fileInputRef.current) {
@@ -269,8 +269,96 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
       try {
         await addFiles(e.dataTransfer.files);
       } catch (error: any) {
-        alert(error.message || 'Failed to add files');
+        showToast(error.message || 'Failed to add files', 'error');
       }
+    }
+  };
+
+  const handlePaste = async (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    // Don't process paste while disabled (streaming)
+    if (disabled) return;
+
+    const clipboardData = e.clipboardData;
+    if (!clipboardData) return;
+
+    // Collect files from clipboard - check both items (Chrome/Firefox) and files (Safari fallback)
+    const files: File[] = [];
+
+    // Primary method: DataTransferItemList
+    if (clipboardData.items) {
+      for (let i = 0; i < clipboardData.items.length; i++) {
+        const item = clipboardData.items[i];
+        if (item.kind === 'file') {
+          const file = item.getAsFile();
+          if (file) files.push(file);
+        }
+      }
+    }
+
+    // Fallback: FileList (some browsers use this instead)
+    if (files.length === 0 && clipboardData.files && clipboardData.files.length > 0) {
+      files.push(...Array.from(clipboardData.files));
+    }
+
+    if (files.length === 0) return; // Let normal text paste through
+
+    // Filter to allowed file types (match the file input accept attribute)
+    // Check MIME type first, fall back to extension for empty MIME types
+    const isAllowedFile = (file: File) => {
+      const type = file.type;
+      // Exclude SVG for security (can contain scripts)
+      if (type === 'image/svg+xml') return false;
+      // MIME type check
+      if (type.startsWith('image/') || type.startsWith('text/') || type === 'application/pdf') {
+        return true;
+      }
+      // Extension fallback for empty MIME types (some browsers)
+      if (!type) {
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        return ['txt', 'md', 'json', 'csv', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'heic', 'avif'].includes(ext || '');
+      }
+      return false;
+    };
+
+    const validFiles = files.filter(isAllowedFile);
+    const rejectedCount = files.length - validFiles.length;
+
+    if (validFiles.length === 0) {
+      // Files present but none match allowed types
+      showToast('Unsupported file type. Allowed: images, text, PDF', 'error');
+      e.preventDefault();
+      return;
+    }
+
+    e.preventDefault();
+
+    try {
+      await addFiles(validFiles);
+      // Count images using same logic as useFileUpload hook
+      const imageCount = validFiles.filter(f => {
+        // Check MIME type first
+        if (f.type.startsWith('image/')) return true;
+        // Fall back to extension for empty MIME types
+        const ext = f.name.substring(f.name.lastIndexOf('.')).toLowerCase();
+        return IMAGE_EXTENSIONS.includes(ext);
+      }).length;
+
+      // Build success message
+      let message: string;
+      if (imageCount > 0) {
+        message = `${imageCount} image${imageCount > 1 ? 's' : ''} added`;
+      } else {
+        message = `${validFiles.length} file${validFiles.length > 1 ? 's' : ''} added`;
+      }
+
+      // Inform user if some files were rejected
+      if (rejectedCount > 0) {
+        message += ` (${rejectedCount} unsupported skipped)`;
+      }
+
+      showToast(message, 'success');
+    } catch (error: any) {
+      showToast(error.message || 'Failed to paste files', 'error');
     }
   };
 
@@ -369,6 +457,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder={disabled ? "Waiting for response..." : "Ask Claude Code... (Cmd/Ctrl+Enter to send)"}
             className="flex-1 resize-none rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
             rows={3}
