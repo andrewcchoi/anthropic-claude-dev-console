@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTerminal } from '@/hooks/useTerminal';
 import { useAppTheme } from '@/hooks/useAppTheme';
 import '@xterm/xterm/css/xterm.css';
@@ -8,6 +8,8 @@ import '@xterm/xterm/css/xterm.css';
 interface InteractiveTerminalProps {
   cwd?: string;
   className?: string;
+  minHeight?: number;
+  maxHeight?: number;
   initialCommand?: string;
   onConnected?: (sessionId: string) => void;
   onDisconnected?: () => void;
@@ -17,12 +19,18 @@ interface InteractiveTerminalProps {
 export function InteractiveTerminal({
   cwd,
   className = '',
+  minHeight = 200,
+  maxHeight = 400,
   initialCommand,
   onConnected,
   onDisconnected,
   onError,
 }: InteractiveTerminalProps) {
   const { resolvedTheme } = useAppTheme();
+  const [isReady, setIsReady] = useState(!initialCommand); // Ready immediately if no command
+  const outputAccumulatorRef = useRef('');
+  const detectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const {
     terminalRef,
     isConnected,
@@ -37,6 +45,31 @@ export function InteractiveTerminal({
     onConnected,
     onDisconnected,
     onError,
+    onData: (data) => {
+      if (!isReady && initialCommand) {
+        outputAccumulatorRef.current += data;
+
+        // Check for Claude patterns
+        const hasClaudeSignature =
+          outputAccumulatorRef.current.includes('Claude Code') ||
+          outputAccumulatorRef.current.includes('▐▛███▜') ||
+          outputAccumulatorRef.current.includes('claude.ai');
+
+        if (hasClaudeSignature) {
+          // Clear timeout and reveal terminal
+          if (detectionTimeoutRef.current) {
+            clearTimeout(detectionTimeoutRef.current);
+            detectionTimeoutRef.current = null;
+          }
+          // Small delay to let Claude's output accumulate
+          setTimeout(() => {
+            const xtermElement = terminalRef.current?.querySelector('.xterm') as HTMLElement | null;
+            xtermElement?.focus();
+            setIsReady(true);
+          }, 100);
+        }
+      }
+    },
   });
 
   // Track if connection has been initiated to prevent duplicates in Strict Mode
@@ -66,8 +99,30 @@ export function InteractiveTerminal({
     };
   }, []); // connect/disconnect are stable refs from useTerminal
 
+  // Set timeout fallback when initial command is present
+  useEffect(() => {
+    if (initialCommand && !isReady) {
+      detectionTimeoutRef.current = setTimeout(() => {
+        setIsReady(true); // Show anyway after 3 seconds
+      }, 3000);
+    }
+    return () => {
+      if (detectionTimeoutRef.current) {
+        clearTimeout(detectionTimeoutRef.current);
+        detectionTimeoutRef.current = null;
+      }
+    };
+  }, [initialCommand, isReady]);
+
   return (
-    <div className={`relative h-full w-full overflow-hidden ${className}`}>
+    <div
+      className={`relative overflow-hidden ${className}`}
+      style={{
+        minHeight: `${minHeight}px`,
+        maxHeight: `${maxHeight}px`,
+        height: `${maxHeight}px`
+      }}
+    >
       {/* Connection status indicator */}
       <div className="absolute top-2 right-2 z-10 flex items-center gap-2 text-xs">
         <div
@@ -95,11 +150,25 @@ export function InteractiveTerminal({
         </div>
       )}
 
-      {/* Terminal container */}
+      {/* Terminal container - always renders and receives data */}
       <div
         ref={terminalRef}
-        className="absolute inset-2"
+        className={`h-full w-full transition-opacity duration-300 ${
+          isReady ? 'opacity-100' : 'opacity-0'
+        }`}
       />
+
+      {/* Loading spinner overlay - completely covers terminal until ready */}
+      {!isReady && !error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+          <div className="flex flex-col items-center gap-3">
+            <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+            <span className="text-sm text-gray-400">
+              Starting Claude session...
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
