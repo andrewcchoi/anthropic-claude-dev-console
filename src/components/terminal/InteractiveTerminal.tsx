@@ -28,6 +28,7 @@ export function InteractiveTerminal({
 }: InteractiveTerminalProps) {
   const { resolvedTheme } = useAppTheme();
   const [hasReceivedOutput, setHasReceivedOutput] = useState(false);
+  const outputBufferRef = useRef('');
 
   const {
     terminalRef,
@@ -44,8 +45,22 @@ export function InteractiveTerminal({
     onDisconnected,
     onError,
     onData: (data) => {
-      // Mark that we've received output to hide the loading spinner
-      if (!hasReceivedOutput && data.trim()) {
+      // Only show terminal when we detect Claude's output (not just shell prompt)
+      if (!hasReceivedOutput && initialCommand) {
+        // Accumulate output to detect Claude
+        outputBufferRef.current += data;
+
+        // Look for Claude-specific output patterns
+        // Claude outputs its logo or "Claude Code" in the first few lines
+        if (
+          outputBufferRef.current.includes('Claude') ||
+          outputBufferRef.current.includes('▐▛███▜▌') || // Claude logo
+          outputBufferRef.current.length > 500 // Or substantial output
+        ) {
+          setHasReceivedOutput(true);
+        }
+      } else if (!hasReceivedOutput && !initialCommand) {
+        // If no initial command, show terminal immediately on first data
         setHasReceivedOutput(true);
       }
     },
