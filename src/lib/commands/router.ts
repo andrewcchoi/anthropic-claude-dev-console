@@ -33,7 +33,7 @@ export const LOCAL_COMMAND_INFO: CommandInfo[] = [
   { command: '/copy', handler: 'copyLastResponse', description: 'Copy last assistant response to clipboard' },
   { command: '/model', handler: 'openModelPanel', description: 'Open model selection panel' },
   { command: '/theme', handler: 'cycleTheme', description: 'Cycle through available themes' },
-  { command: '/export', handler: 'exportConversation', description: 'Export conversation as JSON file' },
+  { command: '/export', handler: 'exportConversation', description: 'Export as HTML (Word-ready), or use "/export json" or "/export markdown"' },
   { command: '/todos', handler: 'openTodosPanel', description: 'Show tasks and todos panel' },
   { command: '/rename', handler: 'openRenameDialog', description: 'Rename the current session' },
 ];
