@@ -27,8 +27,7 @@ export function InteractiveTerminal({
   onError,
 }: InteractiveTerminalProps) {
   const { resolvedTheme } = useAppTheme();
-  const [hasReceivedOutput, setHasReceivedOutput] = useState(false);
-  const outputBufferRef = useRef('');
+  const [hasReceivedOutput, setHasReceivedOutput] = useState(!initialCommand); // Show immediately if no initial command
 
   const {
     terminalRef,
@@ -44,23 +43,10 @@ export function InteractiveTerminal({
     onConnected,
     onDisconnected,
     onError,
+    suppressInitialEcho: !!initialCommand, // Suppress echo when using initial command
     onData: (data) => {
-      // Only show terminal when we detect Claude's output (not just shell prompt)
-      if (!hasReceivedOutput && initialCommand) {
-        // Accumulate output to detect Claude
-        outputBufferRef.current += data;
-
-        // Look for Claude-specific output patterns
-        // Claude outputs its logo or "Claude Code" in the first few lines
-        if (
-          outputBufferRef.current.includes('Claude') ||
-          outputBufferRef.current.includes('▐▛███▜▌') || // Claude logo
-          outputBufferRef.current.length > 500 // Or substantial output
-        ) {
-          setHasReceivedOutput(true);
-        }
-      } else if (!hasReceivedOutput && !initialCommand) {
-        // If no initial command, show terminal immediately on first data
+      // Show terminal once we receive any data (the hook handles buffering)
+      if (!hasReceivedOutput) {
         setHasReceivedOutput(true);
       }
     },
