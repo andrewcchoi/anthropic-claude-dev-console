@@ -115,13 +115,13 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       switch (message.type) {
         case 'input':
           if (message.data) {
-            // If suppressEcho is true, wrap command with stty to disable echo
             if (message.suppressEcho) {
-              // Disable echo, run command, re-enable echo
-              // Use process substitution to avoid showing stty commands
-              const wrappedCommand = `stty -echo 2>/dev/null; ${message.data.trimEnd()}; stty echo 2>/dev/null\n`;
+              // Clear current line before sending command to hide the echo
+              // \r moves to beginning, \x1b[K clears from cursor to end of line
+              const clearLine = '\r\x1b[K';
+              const wrappedCommand = `${clearLine}${message.data}`;
               ptyManager.write(sessionId, wrappedCommand);
-              log.debug('Sent input with suppressed echo', { sessionId });
+              log.debug('Sent input with cleared echo', { sessionId });
             } else {
               ptyManager.write(sessionId, message.data);
             }
