@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Terminal, Zap, Package } from 'lucide-react';
 import { LOCAL_COMMAND_INFO, CommandInfo } from '@/lib/commands/router';
 import { useChatStore } from '@/lib/store';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('CommandPalette');
 
 interface CommandPaletteProps {
   inputValue: string;
@@ -16,8 +19,8 @@ export function CommandPalette({ inputValue, onSelectCommand, onClose }: Command
   const [selectedIndex, setSelectedIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Extract search query (everything after /)
-  const searchQuery = inputValue.slice(1).toLowerCase();
+  // Extract search query (everything after /, trimmed)
+  const searchQuery = inputValue.slice(1).toLowerCase().trim();
 
   // Combine all available commands
   const allCommands: Array<CommandInfo & { type: 'local' | 'skill' | 'command' }> = [
@@ -36,12 +39,39 @@ export function CommandPalette({ inputValue, onSelectCommand, onClose }: Command
     })),
   ];
 
+  log.debug('Combined commands', {
+    inputValue,
+    searchQuery,
+    localCount: LOCAL_COMMAND_INFO.length,
+    skillsCount: availableSkills?.length || 0,
+    commandsCount: availableCommands?.length || 0,
+    totalBeforeDedup: allCommands.length,
+    sampleCommands: allCommands.slice(0, 10).map(c => c.command),
+  });
+
+  // Deduplicate by command name (keeps first occurrence = higher priority)
+  const uniqueCommands = allCommands.filter((cmd, index, self) =>
+    index === self.findIndex(c => c.command === cmd.command)
+  );
+
+  log.debug('After deduplication', {
+    uniqueCount: uniqueCommands.length,
+    duplicatesRemoved: allCommands.length - uniqueCommands.length,
+    sampleUnique: uniqueCommands.slice(0, 10).map(c => c.command),
+  });
+
   // Filter commands based on search query
   const filteredCommands = searchQuery
-    ? allCommands.filter(cmd =>
+    ? uniqueCommands.filter(cmd =>
         cmd.command.toLowerCase().includes(searchQuery)
       )
-    : allCommands;
+    : uniqueCommands;
+
+  log.debug('After filtering', {
+    searchQuery,
+    filteredCount: filteredCommands.length,
+    sampleFiltered: filteredCommands.slice(0, 5).map(c => c.command),
+  });
 
   // Reset selection when filtered list changes
   useEffect(() => {

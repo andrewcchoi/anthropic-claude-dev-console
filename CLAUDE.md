@@ -428,6 +428,42 @@ Two distinct terminal components serve different purposes:
 ### Learnings
 <!-- Updated during multi-agent execution -->
 
+#### CommandPalette Deduplication & CLI Initialization Fix (2026-02-22)
+- **Problem 1**: ~130 React duplicate key warnings when opening CommandPalette
+  * Root cause: CLI returns commands in both `skills` and `slash_commands` arrays (all skills are also valid slash commands)
+  * CommandPalette combined three sources without deduplication: LOCAL_COMMAND_INFO, availableSkills, availableCommands
+  * Both skills and commands get `/` prefix added, creating duplicate keys like `/commit`, `/debug`, etc.
+- **Problem 2**: CommandPalette showed only 12 local commands, missing all skills/CLI commands
+  * Root cause: `availableSkills` and `availableCommands` were empty arrays
+  * CLI prewarm only ran when creating NEW chat (SessionPanel.tsx:48), not when loading existing sessions
+  * When switching to existing session, only messages/tool executions loaded - skills/commands never restored
+  * Skills and commands are **global to CLI** (not session-specific), should be loaded once on app startup
+- **Solution 1 - Deduplication**: Added filter to remove duplicate commands with priority order
+  * Priority: Local commands (highest) → Skills (middle) → CLI commands (lowest)
+  * Filter keeps first occurrence: `uniqueCommands.filter((cmd, index, self) => index === self.findIndex(c => c.command === cmd.command))`
+  * Added debug logging to track deduplication (shows counts, duplicates removed, samples)
+- **Solution 2 - App-Level Initialization**: Added CLI prewarm on app mount
+  * Added useEffect in `src/app/page.tsx` that runs once on mount
+  * Uses existing sessionId if available, otherwise generates temporary session with valid UUID (`uuidv4()`)
+  * Checks if skills/commands already loaded to avoid duplicate initialization
+  * Uses hasInitialized ref to ensure one-time execution
+  * **Important**: CLI requires pure UUID format - prefixes like `init-${uuid}` are rejected
+- **Files Modified**:
+  * `src/components/chat/CommandPalette.tsx` - Added deduplication logic, debug logging with createLogger
+  * `src/app/page.tsx` - Added app-level CLI initialization on mount
+- **Key Insights**:
+  * Skills appearing in both arrays is expected behavior (all skills are slash commands)
+  * Global CLI metadata (skills, commands, tools) should load on app startup, not per-session
+  * Session switching should only load session-specific data (messages, tool executions, usage)
+  * When debugging React warnings, enable debug mode first to see actual data flow
+- **Verification Steps**:
+  1. Refresh browser with existing session loaded
+  2. Enable debug mode: `enableDebug()` in console
+  3. Type `/` to open CommandPalette
+  4. Check logs: should show skills/commands loaded, duplicates removed, no React warnings
+  5. Verify command count matches expected total (local + skills + commands - duplicates)
+- **Key Lesson**: Distinguish between **session-specific state** (messages, executions) and **global CLI state** (skills, commands, tools). Global state should initialize once on app load, not per-session. Deduplication is necessary when CLI returns overlapping data structures.
+
 #### Dark Mode Visibility Improvements (2026-02-05)
 - Implemented CSS-only improvements for dark mode UI visibility
 - **Terminal borders**: Changed from `border dark:border-gray-600` to `border-2 dark:border-gray-500` with subtle glow effect `dark:shadow-[0_0_0_1px_rgba(107,114,128,0.3)]` for better visibility against dark terminal background (#1f2937)
