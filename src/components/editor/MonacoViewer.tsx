@@ -217,7 +217,7 @@ export function MonacoViewer({
   }, [monaco, editorReady, onInsertReference, onCopyReference, onSearchCodebase, onSelectionChange]);
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full h-full min-w-0 flex flex-col overflow-hidden">
       {showHeader && (
         <div className={`flex items-center justify-between px-3 py-2 border-b ${
           effectiveTheme === 'light'
@@ -255,7 +255,7 @@ export function MonacoViewer({
           </div>
         </div>
       )}
-      <div className="flex-1">
+      <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
         <Editor
           height={height}
           language={language}

@@ -5,6 +5,7 @@
   "scripts": {
     "postinstall": "node scripts/copy-monaco.js",
     "dev": "concurrently \"npm run dev:next\" \"npm run dev:terminal\"",
+    "dev:clean": "rm -rf .next && npm run dev",
     "dev:next": "next dev",
     "dev:terminal": "tsx watch scripts/terminal-server.ts",
     "terminal-server": "tsx scripts/terminal-server.ts",
