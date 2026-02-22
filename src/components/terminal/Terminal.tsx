@@ -66,10 +66,12 @@ export function Terminal({
 
   if (mode === 'interactive') {
     return (
-      <div className={`h-full w-full ${className}`}>
+      <div className={`w-full ${className}`}>
         <InteractiveTerminal
           cwd={cwd}
-          className="h-full w-full"
+          className="w-full"
+          minHeight={minHeight}
+          maxHeight={maxHeight}
           initialCommand={initialCommand}
           onConnected={onConnected}
           onDisconnected={onDisconnected}

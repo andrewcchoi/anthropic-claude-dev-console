@@ -265,7 +265,6 @@ export function ToolExecution({
                   initialCommand={viewMode === 'interactive' ? claudeCommand : undefined}
                   className="w-full"
                 />
-<<<<<<< HEAD
               ) : name === 'Edit' && (input as ToolInput)?.old_string && (input as ToolInput)?.new_string ? (
                 <DiffViewer
                   original={(input as ToolInput).old_string as string}
