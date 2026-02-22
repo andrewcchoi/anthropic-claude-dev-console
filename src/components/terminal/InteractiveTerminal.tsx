@@ -8,6 +8,8 @@ import '@xterm/xterm/css/xterm.css';
 interface InteractiveTerminalProps {
   cwd?: string;
   className?: string;
+  minHeight?: number;
+  maxHeight?: number;
   initialCommand?: string;
   onConnected?: (sessionId: string) => void;
   onDisconnected?: () => void;
@@ -17,6 +19,8 @@ interface InteractiveTerminalProps {
 export function InteractiveTerminal({
   cwd,
   className = '',
+  minHeight = 200,
+  maxHeight = 400,
   initialCommand,
   onConnected,
   onDisconnected,
@@ -67,7 +71,14 @@ export function InteractiveTerminal({
   }, []); // connect/disconnect are stable refs from useTerminal
 
   return (
-    <div className={`relative h-full w-full overflow-hidden ${className}`}>
+    <div
+      className={`relative overflow-hidden ${className}`}
+      style={{
+        minHeight: `${minHeight}px`,
+        maxHeight: `${maxHeight}px`,
+        height: `${maxHeight}px`
+      }}
+    >
       {/* Connection status indicator */}
       <div className="absolute top-2 right-2 z-10 flex items-center gap-2 text-xs">
         <div
@@ -98,7 +109,7 @@ export function InteractiveTerminal({
       {/* Terminal container */}
       <div
         ref={terminalRef}
-        className="absolute inset-2"
+        className="h-full w-full"
       />
     </div>
   );
