@@ -19,6 +19,7 @@ import {
 import { LimitError, NotFoundError, ConnectionError, wrapError } from './errors';
 import { LocalProvider } from './providers/LocalProvider';
 import { GitProvider } from './providers/GitProvider';
+import { SSHProvider } from './providers/SSHProvider';
 
 // Workspace colors for visual distinction
 const WORKSPACE_COLORS = [

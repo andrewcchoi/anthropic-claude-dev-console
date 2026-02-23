@@ -16,6 +16,7 @@ export {
   FileSystemError,
   TimeoutError,
   wrapError,
+  isWorkspaceError,
 } from './errors';
 
 // Provider interface
@@ -28,6 +29,7 @@ export { BaseProvider } from './providers/BaseProvider';
 export type { BaseProviderConfig } from './providers/BaseProvider';
 export { LocalProvider } from './providers/LocalProvider';
 export { GitProvider } from './providers/GitProvider';
+export { SSHProvider } from './providers/SSHProvider';
 
 // Security
 export { PathValidator } from './security/PathValidator';
