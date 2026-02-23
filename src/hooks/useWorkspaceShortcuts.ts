@@ -26,9 +26,6 @@ export function useWorkspaceShortcuts({
     if (!enabled) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const modKey = isMac ? event.metaKey : event.ctrlKey;
-
       // Ignore if typing in input/textarea
       const target = event.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' ||
@@ -36,19 +33,21 @@ target.isContentEditable) {
         return;
       }
 
-      // Cmd/Ctrl + P: Open workspace switcher
-      if (modKey && event.key === 'p') {
+      // Ctrl+Shift+P: Open workspace switcher
+      if (event.ctrlKey && event.shiftKey && !event.altKey && event.key.toLowerCase() === 'p') {
         event.preventDefault();
         onWorkspaceSwitcher();
         return;
       }
 
-      // Cmd/Ctrl + 1-9: Switch to workspace by index
-      if (modKey && event.key >= '1' && event.key <= '9') {
+      // Ctrl+Shift+1-9: Switch to workspace by index
+      // Use event.code because event.key with Shift gives symbols (!, @, #, etc.)
+      if (event.ctrlKey && event.shiftKey && !event.altKey && event.code.startsWith('Digit')) {
         event.preventDefault();
-        const index = parseInt(event.key, 10) - 1;
+        const digit = event.code.replace('Digit', '');
+        const index = parseInt(digit, 10) - 1;
 
-        if (index < workspaces.length) {
+        if (index >= 0 && index < 9 && index < workspaces.length) {
           onWorkspaceSelect(workspaces[index].id);
         }
         return;

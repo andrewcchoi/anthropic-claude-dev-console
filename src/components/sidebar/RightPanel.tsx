@@ -17,9 +17,9 @@ export function RightPanel() {
   const { debugEnabled } = useDebug();
 
   if (!rightPanelOpen) {
-    // Collapsed state: Show vertical strip on right edge
+    // Collapsed state: Show vertical strip on right edge (below workspace tab bar)
     return (
-      <div className="fixed right-0 top-0 h-screen w-10 bg-gray-100 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col items-center py-4 gap-2 z-40">
+      <div className="fixed right-0 top-[49px] h-[calc(100vh-49px)] w-10 bg-gray-100 dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col items-center py-4 gap-2 z-50">
         <button
           onClick={toggleRightPanel}
           aria-label="Open settings"
@@ -33,11 +33,11 @@ export function RightPanel() {
     );
   }
 
-  // Open state: Show full panel
+  // Open state: Show full panel (below workspace tab bar)
   return (
     <div
       data-panel="right"
-      className="fixed right-0 top-0 h-screen w-64 bg-gray-50 dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col z-50"
+      className="fixed right-0 top-[49px] h-[calc(100vh-49px)] w-64 bg-gray-50 dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex flex-col z-45"
     >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
