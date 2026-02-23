@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useChatStore } from '@/lib/store';
+import { useWorkspaceStore } from '@/lib/store/workspaces';
 import { ChatMessage, MessageContent, SDKMessage } from '@/types/claude';
 import { FileAttachment } from '@/types/upload';
 import { v4 as uuidv4 } from 'uuid';
@@ -9,6 +10,11 @@ import { serializeError } from '@/lib/utils/errorUtils';
 const log = createLogger('ClaudeChat');
 
 export function useClaudeChat() {
+  // Get workspace info from hook (not getState())
+  const activeWorkspaceId = useWorkspaceStore(state => state.activeWorkspaceId);
+  const workspaces = useWorkspaceStore(state => state.workspaces);
+  const activeWorkspace = activeWorkspaceId ? workspaces.get(activeWorkspaceId) : null;
+
   const {
     messages,
     addMessage,
@@ -27,7 +33,18 @@ export function useClaudeChat() {
   const [currentMessageId, setCurrentMessageId] = useState<string | null>(null);
 
   const sendMessage = useCallback(
-    async (prompt: string, cwd?: string, attachments?: FileAttachment[]) => {
+    async (prompt: string, cwdOverride?: string, attachments?: FileAttachment[]) => {
+      // Use explicit cwd override, or workspace context, or default
+      const effectiveCwd = cwdOverride || activeWorkspace?.rootPath || '/workspace';
+
+      log.debug('Sending message with workspace context', {
+        sessionId: sessionId,
+        workspaceId: activeWorkspace?.id,
+        cwd: effectiveCwd,
+        isWorkspaceContext: !!activeWorkspace,
+        isOverride: !!cwdOverride,
+      });
+
       let enhancedPrompt = prompt;
       let userMessageContent: MessageContent[] = [{ type: 'text', text: prompt }];
 
@@ -123,7 +140,7 @@ export function useClaudeChat() {
           body: JSON.stringify({
             prompt: enhancedPrompt,
             sessionId: currentSessionId,
-            cwd,
+            cwd: effectiveCwd,
             model: preferredModel || 'opusplan',
             provider,
             providerConfig,
@@ -371,6 +388,8 @@ export function useClaudeChat() {
       }
     },
     [
+      activeWorkspace,
+      sessionId,
       addMessage,
       updateMessage,
       setSessionId,
