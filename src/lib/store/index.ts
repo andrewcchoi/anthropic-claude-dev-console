@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { ChatMessage, Session, ToolExecution, UsageStats, Provider, ProviderConfig, DefaultMode } from '@/types/claude';
 import { v4 as uuidv4 } from 'uuid';
 import { createLogger } from '../logger';
+import { storeSync } from './sync';
 
 const log = createLogger('ChatStore');
 
@@ -38,6 +39,11 @@ interface ChatStore {
   hideSession: (sessionId: string) => void;
   toggleProjectCollapse: (projectId: string) => void;
   saveCurrentSession: () => void;
+
+  // NEW: Workspace-session linking
+  unlinkSessionFromWorkspace: (sessionId: string) => void;
+  linkSessionToWorkspace: (sessionId: string, workspaceId: string) => void;
+  unlinkMultipleSessionsFromWorkspace: (sessionIds: string[]) => void;  // NEW: Batch unlink
 
   // Init data from CLI
   availableCommands: string[];
@@ -412,6 +418,101 @@ export const useChatStore = create<ChatStore>()(
             s.id === id ? { ...s, name, updated_at: Date.now() } : s
           ),
         })),
+
+      unlinkSessionFromWorkspace: (sessionId) => {
+        try {
+          let previousWorkspaceId: string | undefined;
+
+          set((state) => {
+            const session = state.sessions.find(s => s.id === sessionId);
+            previousWorkspaceId = session?.workspaceId;
+
+            if (!session || !previousWorkspaceId) return state;
+
+            log.debug('Unlinking session from workspace', {
+              sessionId,
+              previousWorkspaceId,
+              reason: 'workspace_deleted',
+            });
+
+            return {
+              sessions: state.sessions.map(s =>
+                s.id === sessionId ? { ...s, workspaceId: undefined } : s
+              ),
+              ...(state.sessionId === sessionId ? { currentSession: { ...session, workspaceId: undefined } } : {}),
+            };
+          });
+
+          // Emit sync event AFTER state update completes
+          if (previousWorkspaceId) {
+            storeSync.sessionUnlinked(sessionId, previousWorkspaceId);
+          }
+        } catch (error) {
+          log.error('Failed to unlink session from workspace', { error, sessionId });
+        }
+      },
+
+      linkSessionToWorkspace: (sessionId, workspaceId) => {
+        try {
+          let shouldEmitEvent = false;
+
+          set((state) => {
+            const session = state.sessions.find(s => s.id === sessionId);
+            if (!session) {
+              log.warn('Session not found for linking', { sessionId });
+              return state;
+            }
+
+            log.debug('Linking session to workspace', {
+              sessionId,
+              workspaceId,
+              previousWorkspaceId: session.workspaceId,
+            });
+
+            shouldEmitEvent = true;
+
+            return {
+              sessions: state.sessions.map(s =>
+                s.id === sessionId ? { ...s, workspaceId } : s
+              ),
+              ...(state.sessionId === sessionId ? { currentSession: { ...session, workspaceId } } : {}),
+            };
+          });
+
+          // Emit sync event AFTER state update completes
+          if (shouldEmitEvent) {
+            storeSync.sessionLinked(sessionId, workspaceId);
+          }
+        } catch (error) {
+          log.error('Failed to link session to workspace', { error, sessionId, workspaceId });
+        }
+      },
+
+      // NEW: Batch unlink for workspace deletion (performance optimization)
+      unlinkMultipleSessionsFromWorkspace: (sessionIds: string[]) => {
+        try {
+          set((state) => {
+            log.debug('Batch unlinking sessions', {
+              count: sessionIds.length,
+            });
+
+            // Check if current session needs unlinking (with null safety)
+            const currentSessionUpdate =
+              state.sessionId && sessionIds.includes(state.sessionId) && state.currentSession
+                ? { currentSession: { ...state.currentSession, workspaceId: undefined } }
+                : {};
+
+            return {
+              sessions: state.sessions.map(s =>
+                sessionIds.includes(s.id) ? { ...s, workspaceId: undefined } : s
+              ),
+              ...currentSessionUpdate,
+            };
+          });
+        } catch (error) {
+          log.error('Failed to batch unlink sessions', { error, sessionIds });
+        }
+      },
 
       // Tool executions
       toolExecutions: [],
