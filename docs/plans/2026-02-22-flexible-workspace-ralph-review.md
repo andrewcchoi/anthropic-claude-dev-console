@@ -1346,3 +1346,184 @@ export async function POST(req: NextRequest) {
 
 Added 10 new recommendations across accessibility, operations, deployment, and compatibility.
 Total recommendations: 59 (46 from iteration 1 + 13 new).
+
+---
+
+## Iteration 3: Risk Assessment & Final Consolidation
+
+### Implementation Risk Matrix
+
+| Risk | Likelihood | Impact | Mitigation | Owner |
+|------|------------|--------|------------|-------|
+| SSH library vulnerabilities | Medium | Critical | Pin versions, security audits, dependabot | Security |
+| Keytar native build failures | High | Medium | Fallback to encrypted file, clear docs | DevOps |
+| Connection pool exhaustion | Medium | High | Monitoring, alerts, auto-scaling limits | Backend |
+| Credential storage corruption | Low | Critical | Backup/recovery, checksums, WAL | Backend |
+| CSRF bypass | Low | Critical | Security audit, penetration testing | Security |
+| Migration data loss | Low | Critical | Dry-run mode, backup before migrate | Backend |
+| Performance regression | Medium | Medium | Benchmarks in CI, performance budgets | Frontend |
+| Accessibility failures | Medium | Medium | Automated a11y testing, manual audit | UX |
+
+### Recommendation Dependency Graph
+
+```
+                    ┌─────────────────────────────────────────┐
+                    │         FOUNDATION (Week 1-2)           │
+                    │  WorkspaceProvider, LocalProvider,      │
+                    │  PathValidator, CommandValidator        │
+                    └──────────────────┬──────────────────────┘
+                                       │
+            ┌──────────────────────────┼──────────────────────────┐
+            │                          │                          │
+            ▼                          ▼                          ▼
+┌───────────────────┐    ┌───────────────────┐    ┌───────────────────┐
+│   GIT PROVIDER    │    │   SSH PROVIDER    │    │    CREDENTIALS    │
+│   (Week 3)        │    │   (Week 4-5)      │    │    (Week 6)       │
+│                   │    │                   │    │                   │
+│ - URL validation  │    │ - Host key verify │    │ - Keychain store  │
+│ - Clone progress  │    │ - Conn pooling    │    │ - Encrypted file  │
+│ - Storage LRU     │    │ - Atomic writes   │    │ - CSRF tokens     │
+└─────────┬─────────┘    └─────────┬─────────┘    └─────────┬─────────┘
+          │                        │                        │
+          └────────────────────────┼────────────────────────┘
+                                   │
+                    ┌──────────────▼──────────────┐
+                    │      UI COMPONENTS          │
+                    │      (Week 7-8)             │
+                    │                             │
+                    │ - WorkspaceTabBar           │
+                    │ - AddWorkspaceDialog        │
+                    │ - Onboarding                │
+                    │ - Accessibility             │
+                    └──────────────┬──────────────┘
+                                   │
+                    ┌──────────────▼──────────────┐
+                    │         POLISH              │
+                    │        (Week 9)             │
+                    │                             │
+                    │ - Keyboard shortcuts        │
+                    │ - Error guidance            │
+                    │ - Migration strategy        │
+                    │ - Rate limiting             │
+                    └──────────────┬──────────────┘
+                                   │
+                    ┌──────────────▼──────────────┐
+                    │      TESTING & DOCS         │
+                    │        (Week 10)            │
+                    │                             │
+                    │ - Security audit            │
+                    │ - Performance benchmarks    │
+                    │ - User documentation        │
+                    └─────────────────────────────┘
+```
+
+### Rollback Strategies by Phase
+
+| Phase | Rollback Trigger | Strategy | Recovery Time |
+|-------|-----------------|----------|---------------|
+| Foundation | LocalProvider failures | Revert to hardcoded `/workspace` | < 1 hour |
+| Git Provider | Clone corruption | Delete `~/.claude-workspaces/`, re-clone | < 5 min |
+| SSH Provider | Connection instability | Disable SSH provider via feature flag | < 1 min |
+| Credentials | Keychain failures | Force encrypted file fallback | < 1 min |
+| UI Components | React crashes | Error boundary + fallback UI | Automatic |
+| Migration | Data loss detected | Restore from pre-migration backup | < 30 min |
+
+### Feature Flags for Gradual Rollout
+
+```typescript
+const FEATURE_FLAGS = {
+  // Provider enablement
+  'workspace.providers.local': true,      // Always on
+  'workspace.providers.git': false,       // Enable after testing
+  'workspace.providers.ssh': false,       // Enable after security audit
+
+  // Security features
+  'workspace.security.csrf': true,        // Always on
+  'workspace.security.rateLimit': true,   // Always on
+  'workspace.security.hostKeyVerify': true,
+
+  // UX features
+  'workspace.ui.multiTab': false,         // Start with single workspace
+  'workspace.ui.onboarding': true,
+  'workspace.ui.keyboardShortcuts': true,
+
+  // Operations
+  'workspace.ops.migration': false,       // Enable after testing
+  'workspace.ops.telemetry': true,
+};
+
+function isFeatureEnabled(flag: keyof typeof FEATURE_FLAGS): boolean {
+  // Check remote config first, fall back to defaults
+  return remoteConfig.get(flag) ?? FEATURE_FLAGS[flag];
+}
+```
+
+### Final Checklist Before Implementation
+
+#### Pre-Development
+- [ ] Security team sign-off on auth flows
+- [ ] UX review of onboarding mockups
+- [ ] Architecture review with team lead
+- [ ] Test infrastructure setup (testcontainers)
+- [ ] Performance baseline established
+- [ ] Feature flags configured in remote config
+
+#### Per-Phase Gates
+- [ ] **Phase 1:** LocalProvider passes security audit
+- [ ] **Phase 2:** Git clone tested with 10+ repos
+- [ ] **Phase 3:** SSH tested against 5+ server configurations
+- [ ] **Phase 4:** Credential storage penetration tested
+- [ ] **Phase 5:** Accessibility audit passed (WCAG 2.1 AA)
+- [ ] **Phase 6:** Error messages reviewed by UX
+
+#### Pre-Release
+- [ ] Full security penetration test
+- [ ] Performance benchmarks meet targets
+- [ ] Documentation complete and reviewed
+- [ ] Rollback procedures tested
+- [ ] On-call runbook created
+- [ ] User migration communication sent
+
+### Success Metrics (Revised)
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Security | 0 critical/high vulnerabilities | Penetration test report |
+| Performance: Workspace switch | < 100ms p95 | RUM metrics |
+| Performance: File list | < 500ms p95 | RUM metrics |
+| Reliability: Local provider | 99.99% uptime | Error tracking |
+| Reliability: SSH provider | 99.9% uptime | Error tracking |
+| UX: Time to first workspace | < 30 seconds | User testing |
+| UX: Onboarding completion | > 80% | Analytics |
+| Accessibility | WCAG 2.1 AA | Automated + manual audit |
+| Test coverage: Providers | > 90% | Coverage report |
+| Test coverage: Security code | 100% | Coverage report |
+
+### Executive Summary
+
+**Scope:** Full Hybrid Gateway with Local, Git, and SSH workspace providers.
+
+**Timeline:** 10 weeks (can parallelize to 8 with additional resources)
+
+**Key Risks:**
+1. SSH security complexity (mitigated by allowlist + host key verification)
+2. Native dependency issues (mitigated by encrypted file fallback)
+3. Migration data integrity (mitigated by backup + dry-run)
+
+**Critical Path:**
+Foundation → SSH Provider → Credentials → Security Audit → Release
+
+**Recommendations Summary:**
+- 10 critical issues (all addressed in refined plan)
+- 17 high priority improvements
+- 32 medium/low priority enhancements
+
+**Recommendation:** Proceed with implementation following the phased approach. SSH provider is highest risk; consider beta testing with limited users before full rollout.
+
+---
+
+**Review Complete - Iteration 3 (Final)**
+
+All perspectives covered, risks assessed, rollback strategies defined.
+Total recommendations: 59
+Ready for implementation.

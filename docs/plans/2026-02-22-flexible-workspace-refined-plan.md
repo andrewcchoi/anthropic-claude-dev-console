@@ -1024,6 +1024,81 @@ describe('SSHProvider', () => {
 
 ---
 
+## Feature Flags for Gradual Rollout
+
+```typescript
+const FEATURE_FLAGS = {
+  // Provider enablement
+  'workspace.providers.local': true,      // Always on after Phase 1
+  'workspace.providers.git': false,       // Enable after Phase 2 testing
+  'workspace.providers.ssh': false,       // Enable after Phase 3 security audit
+
+  // Security features (always on)
+  'workspace.security.csrf': true,
+  'workspace.security.rateLimit': true,
+  'workspace.security.hostKeyVerify': true,
+  'workspace.security.commandAllowlist': true,
+
+  // UX features
+  'workspace.ui.multiTab': false,         // Start with single workspace
+  'workspace.ui.onboarding': true,
+  'workspace.ui.keyboardShortcuts': true,
+  'workspace.ui.recentWorkspaces': true,
+
+  // Operations
+  'workspace.ops.migration': false,       // Enable after migration testing
+  'workspace.ops.telemetry': true,
+};
+
+// Usage in code
+if (isFeatureEnabled('workspace.providers.ssh')) {
+  registerProvider(SSHProvider);
+}
+```
+
+---
+
+## Rollback Procedures
+
+### Phase 1-2: LocalProvider/GitProvider Issues
+```bash
+# Revert to previous version
+git revert HEAD~N  # N = commits since phase start
+
+# Or disable via feature flag (immediate, no deploy)
+curl -X POST $CONFIG_SERVICE/flags/workspace.providers.git -d '{"enabled": false}'
+```
+
+### Phase 3: SSH Provider Critical Bug
+```bash
+# Immediate: Disable SSH via flag
+curl -X POST $CONFIG_SERVICE/flags/workspace.providers.ssh -d '{"enabled": false}'
+
+# Cleanup orphaned connections
+npm run workspace:cleanup-ssh-connections
+```
+
+### Phase 4: Credential Store Corruption
+```bash
+# Restore from backup
+cp ~/.claude/credentials.enc.backup ~/.claude/credentials.enc
+
+# Or reset credentials (user must re-enter)
+rm ~/.claude/credentials.enc
+# System will prompt for new master password
+```
+
+### Migration Rollback
+```bash
+# Restore pre-migration state
+cp ~/.claude/store-backup.json ~/.claude/store.json
+
+# Clear migrated workspace
+curl -X DELETE $API/workspace/$MIGRATED_WORKSPACE_ID
+```
+
+---
+
 ## Review Checklist
 
 Before implementation:
