@@ -8,6 +8,9 @@
 import { useState, useEffect } from 'react';
 import { X, Folder, ChevronRight, Home } from 'lucide-react';
 import { showToast } from '@/lib/utils/toast';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('DirectoryBrowser');
 
 interface DirectoryBrowserProps {
   initialPath?: string;
@@ -113,9 +116,17 @@ export function DirectoryBrowser({ initialPath = '/workspace', onSelect, onCance
   };
 
   const handleSelect = () => {
-    if (selectedPath) {
-      onSelect(selectedPath);
+    // Use selected path if available, otherwise use current browsing path
+    const pathToUse = selectedPath || currentPath;
+
+    // Validate path is within allowed boundaries (defense-in-depth)
+    if (!pathToUse.startsWith('/workspace')) {
+      showToast('Invalid path: must be within /workspace', 'error');
+      log.error('Path traversal attempt blocked', { path: pathToUse });
+      return;
     }
+
+    onSelect(pathToUse);
   };
 
   // Breadcrumb navigation
@@ -256,7 +267,12 @@ export function DirectoryBrowser({ initialPath = '/workspace', onSelect, onCance
                 </code>
               </div>
             ) : (
-              <span>Select a directory or double-click to navigate</span>
+              <div>
+                <span className="font-medium">Current:</span>{' '}
+                <code className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
+                  {currentPath}
+                </code>
+              </div>
             )}
           </div>
           <div className="flex gap-2">
@@ -268,10 +284,10 @@ export function DirectoryBrowser({ initialPath = '/workspace', onSelect, onCance
             </button>
             <button
               onClick={handleSelect}
-              disabled={!selectedPath}
+              disabled={!currentPath}
               className="px-4 py-2 rounded-lg bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              Select
+              {selectedPath ? 'Select' : 'Select Current Folder'}
             </button>
           </div>
         </div>
