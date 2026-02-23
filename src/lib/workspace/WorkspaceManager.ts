@@ -18,6 +18,7 @@ import {
 } from './types';
 import { LimitError, NotFoundError, ConnectionError, wrapError } from './errors';
 import { LocalProvider } from './providers/LocalProvider';
+import { GitProvider } from './providers/GitProvider';
 
 // Workspace colors for visual distinction
 const WORKSPACE_COLORS = [
@@ -121,8 +122,11 @@ export class WorkspaceManager {
         });
 
       case 'git':
-        // GitProvider will be implemented in Phase 2
-        throw new Error('Git provider not yet implemented');
+        return new GitProvider({
+          ...config,
+          id: config.id,
+          name: config.name,
+        });
 
       case 'ssh':
         // SSHProvider will be implemented in Phase 3
