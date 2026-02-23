@@ -777,9 +777,168 @@ function useWorkspaceEvent<E extends keyof WorkspaceEvents>(
 
 ---
 
+## Git Worktree Strategy
+
+Each phase is developed in an isolated git worktree, branching from the previous phase. This enables:
+- Parallel development (multiple phases can be worked on simultaneously)
+- Clean review boundaries (PR per phase)
+- Easy rollback (discard worktree without affecting others)
+- Isolated testing (each phase can run independently)
+
+### Branch Hierarchy
+
+```
+feature/50-flexible-workspace (base)
+    │
+    ├── 50-flexible-workspace/phase1-foundation
+    │       │
+    │       ├── 50-flexible-workspace/phase2-git-provider
+    │       │       │
+    │       │       ├── 50-flexible-workspace/phase3-ssh-provider
+    │       │       │       │
+    │       │       │       ├── 50-flexible-workspace/phase4-credentials
+    │       │       │       │       │
+    │       │       │       │       ├── 50-flexible-workspace/phase5-ui
+    │       │       │       │       │       │
+    │       │       │       │       │       ├── 50-flexible-workspace/phase6-polish
+    │       │       │       │       │       │       │
+    │       │       │       │       │       │       └── 50-flexible-workspace/phase7-testing
+```
+
+### Worktree Setup Commands
+
+```bash
+# Base directory for all worktrees
+WORKTREE_BASE="../claude-code-browser-worktrees"
+mkdir -p "$WORKTREE_BASE"
+
+# Phase 1: Foundation (branches from feature/50-flexible-workspace)
+git worktree add "$WORKTREE_BASE/phase1-foundation" -b 50-flexible-workspace/phase1-foundation feature/50-flexible-workspace
+
+# Phase 2: Git Provider (branches from Phase 1)
+cd "$WORKTREE_BASE/phase1-foundation"
+git worktree add "$WORKTREE_BASE/phase2-git-provider" -b 50-flexible-workspace/phase2-git-provider 50-flexible-workspace/phase1-foundation
+
+# Phase 3: SSH Provider (branches from Phase 2)
+cd "$WORKTREE_BASE/phase2-git-provider"
+git worktree add "$WORKTREE_BASE/phase3-ssh-provider" -b 50-flexible-workspace/phase3-ssh-provider 50-flexible-workspace/phase2-git-provider
+
+# Phase 4: Credentials (branches from Phase 3)
+cd "$WORKTREE_BASE/phase3-ssh-provider"
+git worktree add "$WORKTREE_BASE/phase4-credentials" -b 50-flexible-workspace/phase4-credentials 50-flexible-workspace/phase3-ssh-provider
+
+# Phase 5: UI Components (branches from Phase 4)
+cd "$WORKTREE_BASE/phase4-credentials"
+git worktree add "$WORKTREE_BASE/phase5-ui" -b 50-flexible-workspace/phase5-ui 50-flexible-workspace/phase4-credentials
+
+# Phase 6: Polish & UX (branches from Phase 5)
+cd "$WORKTREE_BASE/phase5-ui"
+git worktree add "$WORKTREE_BASE/phase6-polish" -b 50-flexible-workspace/phase6-polish 50-flexible-workspace/phase5-ui
+
+# Phase 7: Testing & Docs (branches from Phase 6)
+cd "$WORKTREE_BASE/phase6-polish"
+git worktree add "$WORKTREE_BASE/phase7-testing" -b 50-flexible-workspace/phase7-testing 50-flexible-workspace/phase6-polish
+```
+
+### Worktree Workflow
+
+```bash
+# 1. Start working on a phase
+cd "$WORKTREE_BASE/phase1-foundation"
+
+# 2. Develop and commit
+git add . && git commit -m "feat: implement WorkspaceProvider interface"
+
+# 3. Push branch for PR
+git push -u origin 50-flexible-workspace/phase1-foundation
+
+# 4. Create PR: phase1-foundation → feature/50-flexible-workspace
+gh pr create --base feature/50-flexible-workspace --title "Phase 1: Foundation"
+
+# 5. After PR merged, update downstream phases
+cd "$WORKTREE_BASE/phase2-git-provider"
+git fetch origin
+git rebase origin/50-flexible-workspace/phase1-foundation
+
+# 6. Cleanup completed worktree
+git worktree remove "$WORKTREE_BASE/phase1-foundation"
+```
+
+### Parallel Development
+
+With worktrees, multiple developers can work on different phases simultaneously:
+
+```
+Developer A: phase1-foundation → phase2-git-provider
+Developer B: phase3-ssh-provider (after phase2 PR merged)
+Developer C: phase5-ui (after phase4 PR merged)
+```
+
+### Merge Strategy
+
+Each phase PR should:
+1. Target the **previous phase branch** (not main/dev)
+2. Squash merge to keep history clean
+3. Trigger downstream rebase after merge
+
+```bash
+# After phase1 merged to feature/50-flexible-workspace
+# Update phase2 to include phase1 changes
+cd "$WORKTREE_BASE/phase2-git-provider"
+git fetch origin
+git rebase origin/feature/50-flexible-workspace
+git push --force-with-lease
+```
+
+### Final Integration
+
+After all phases complete:
+
+```bash
+# Merge final phase to feature branch
+gh pr create \
+  --base feature/50-flexible-workspace \
+  --head 50-flexible-workspace/phase7-testing \
+  --title "Phase 7: Testing & Documentation (Final)"
+
+# After merge, create PR to main/dev
+gh pr create \
+  --base dev \
+  --head feature/50-flexible-workspace \
+  --title "Feature: Flexible Workspace Configuration (#50)"
+```
+
+### Worktree Cleanup Script
+
+```bash
+#!/bin/bash
+# cleanup-worktrees.sh
+
+WORKTREE_BASE="../claude-code-browser-worktrees"
+
+echo "Removing all phase worktrees..."
+for phase in phase1-foundation phase2-git-provider phase3-ssh-provider \
+             phase4-credentials phase5-ui phase6-polish phase7-testing; do
+  if [ -d "$WORKTREE_BASE/$phase" ]; then
+    git worktree remove "$WORKTREE_BASE/$phase" --force
+    echo "Removed $phase"
+  fi
+done
+
+# Prune stale worktree references
+git worktree prune
+
+echo "Cleanup complete"
+```
+
+---
+
 ## Revised Implementation Phases
 
 ### Phase 1: Foundation (Week 1-2)
+
+**Worktree:** `50-flexible-workspace/phase1-foundation`
+**Branches from:** `feature/50-flexible-workspace`
 
 **Goal:** Core abstraction with local provider + security foundation
 
@@ -799,6 +958,9 @@ function useWorkspaceEvent<E extends keyof WorkspaceEvents>(
 
 ### Phase 2: Git Provider (Week 3)
 
+**Worktree:** `50-flexible-workspace/phase2-git-provider`
+**Branches from:** `50-flexible-workspace/phase1-foundation`
+
 **Goal:** Full git clone workflow with progress
 
 | Task | Priority | Effort |
@@ -813,6 +975,9 @@ function useWorkspaceEvent<E extends keyof WorkspaceEvents>(
 **Deliverable:** Git repos can be cloned and worked on
 
 ### Phase 3: SSH Provider (Week 4-5)
+
+**Worktree:** `50-flexible-workspace/phase3-ssh-provider`
+**Branches from:** `50-flexible-workspace/phase2-git-provider`
 
 **Goal:** Secure SSH with connection pooling
 
@@ -831,6 +996,9 @@ function useWorkspaceEvent<E extends keyof WorkspaceEvents>(
 
 ### Phase 4: Credentials & Security Polish (Week 6)
 
+**Worktree:** `50-flexible-workspace/phase4-credentials`
+**Branches from:** `50-flexible-workspace/phase3-ssh-provider`
+
 **Goal:** Secure credential management
 
 | Task | Priority | Effort |
@@ -845,6 +1013,9 @@ function useWorkspaceEvent<E extends keyof WorkspaceEvents>(
 **Deliverable:** Credentials securely stored, security review passed
 
 ### Phase 5: UI Components (Week 7-8)
+
+**Worktree:** `50-flexible-workspace/phase5-ui`
+**Branches from:** `50-flexible-workspace/phase4-credentials`
 
 **Goal:** Full workspace management UI
 
@@ -866,6 +1037,9 @@ function useWorkspaceEvent<E extends keyof WorkspaceEvents>(
 
 ### Phase 6: Polish & UX (Week 9)
 
+**Worktree:** `50-flexible-workspace/phase6-polish`
+**Branches from:** `50-flexible-workspace/phase5-ui`
+
 **Goal:** Keyboard shortcuts, error guidance, history
 
 | Task | Priority | Effort |
@@ -880,6 +1054,9 @@ function useWorkspaceEvent<E extends keyof WorkspaceEvents>(
 **Deliverable:** Polished, keyboard-friendly UX
 
 ### Phase 7: Testing & Documentation (Week 10)
+
+**Worktree:** `50-flexible-workspace/phase7-testing`
+**Branches from:** `50-flexible-workspace/phase6-polish`
 
 **Goal:** Production-ready with comprehensive tests
 
