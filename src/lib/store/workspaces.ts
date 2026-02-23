@@ -39,6 +39,7 @@ interface WorkspaceStore {
   activeWorkspaceId: string | null;
   workspaceOrder: string[];
   isInitialized: boolean;
+  hasMigratedSessions: boolean;
 
   // Actions
   addWorkspace: (config: ProviderConfig, options?: { name?: string; color?: string }) => Promise<string>;
@@ -114,6 +115,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         activeWorkspaceId: null,
         workspaceOrder: [],
         isInitialized: false,
+        hasMigratedSessions: false,
 
       // ========================================================================
       // Workspace Actions
@@ -508,6 +510,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         // Check for legacy workspace and migrate
         await get().migrateFromLegacy();
 
+        // Migrate existing sessions to default workspace (idempotent)
+        get().migrateExistingSessions();
+
         set({ isInitialized: true });
       },
 
@@ -541,7 +546,56 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       },
 
       migrateExistingSessions: () => {
-        // TODO: Implemented in Task 9
+        // Idempotency check - only migrate once
+        if (get().hasMigratedSessions) {
+          log.debug('Sessions already migrated, skipping');
+          return;
+        }
+
+        const state = get();
+
+        // Get chat store (both stores are singletons, already initialized)
+        // We can safely import at runtime since migration runs AFTER stores are created
+        const { useChatStore } = require('./index');
+        const { sessions } = useChatStore.getState();
+
+        // Only migrate if there are unlinked sessions
+        const unlinkedSessions = sessions.filter((s: any) => !s.workspaceId);
+        if (unlinkedSessions.length === 0) {
+          log.debug('No sessions to migrate');
+          set({ hasMigratedSessions: true });
+          return;
+        }
+
+        // Find "Current Workspace" (the /workspace one)
+        const defaultWorkspace = Array.from(state.workspaces.values())
+          .find(ws => ws.rootPath === '/workspace');
+
+        if (!defaultWorkspace) {
+          log.warn('No default workspace found for migration');
+          set({ hasMigratedSessions: true });
+          return;
+        }
+
+        log.info('Migrating existing sessions to default workspace', {
+          defaultWorkspaceId: defaultWorkspace.id,
+          unlinkedSessionCount: unlinkedSessions.length,
+          totalSessionCount: sessions.length,
+        });
+
+        // Link all unlinked sessions to default workspace
+        // Note: linkSessionToWorkspace emits session_linked event, which triggers
+        // workspace store subscription to call addSessionToWorkspace automatically
+        unlinkedSessions.forEach((session: any) => {
+          useChatStore.getState().linkSessionToWorkspace(session.id, defaultWorkspace.id);
+        });
+
+        log.info('Migration complete', {
+          migratedCount: unlinkedSessions.length,
+        });
+
+        // Mark migration as complete
+        set({ hasMigratedSessions: true });
       },
       };
     },
@@ -559,6 +613,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         })) as PersistedWorkspaceConfig[],
         workspaceOrder: state.workspaceOrder,
         activeWorkspaceId: state.activeWorkspaceId,
+        hasMigratedSessions: state.hasMigratedSessions,
       }),
 
       // Deserialize on rehydration

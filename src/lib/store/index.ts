@@ -217,21 +217,23 @@ export const useChatStore = create<ChatStore>()(
           hasWorkspace: !!workspaceId,
         });
 
-        // Emit sync event for workspace store to handle
-        if (workspaceId) {
-          storeSync.sessionCreated(newSessionId, workspaceId);
-        }
+        set((state) => {
+          // Emit sync event for workspace store to handle
+          if (workspaceId) {
+            storeSync.sessionCreated(newSessionId, workspaceId);
+          }
 
-        set({
-          sessionId: newSessionId,
-          currentSession: null,  // Keep null - not confirmed yet
-          pendingSessionId: newSessionId,  // Track as pending
-          sessions: [newSession, ...get().sessions],
-          messages: [],
-          toolExecutions: [],
-          sessionUsage: null,
-          error: null,
-          currentModel: null,
+          return {
+            sessionId: newSessionId,
+            currentSession: null,  // Keep null - not confirmed yet
+            pendingSessionId: newSessionId,  // Track as pending
+            sessions: [newSession, ...state.sessions],
+            messages: [],
+            toolExecutions: [],
+            sessionUsage: null,
+            error: null,
+            currentModel: null,
+          };
         });
         return newSessionId;
       },
