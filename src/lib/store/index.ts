@@ -32,7 +32,7 @@ interface ChatStore {
   setSessionId: (id: string) => void;
   setCurrentSession: (session: Session | null) => void;
   addSession: (session: Session) => void;
-  startNewSession: () => string;
+  startNewSession: (workspaceId?: string, cwd?: string) => string;
   switchSession: (sessionId: string, projectId?: string) => Promise<void>;
   updateSessionName: (sessionId: string, name: string) => void;
   deleteSession: (sessionId: string) => void;
@@ -182,11 +182,14 @@ export const useChatStore = create<ChatStore>()(
       addSession: (session) =>
         set((state) => ({ sessions: [...state.sessions, session] })),
 
-      startNewSession: () => {
+      startNewSession: (workspaceId?: string, cwd?: string) => {
         const currentId = get().sessionId;
         if (currentId) {
           get().cacheCurrentSession();
         }
+
+        // Use provided cwd or fallback to default
+        const effectiveCwd = cwd || '/workspace';
 
         const newSessionId = uuidv4();
         const newSession: Session = {
@@ -194,10 +197,22 @@ export const useChatStore = create<ChatStore>()(
           name: 'New Chat',
           created_at: Date.now(),
           updated_at: Date.now(),
-          cwd: '/workspace',
+          cwd: effectiveCwd,
+          workspaceId,  // Can be undefined for unassigned sessions
         };
 
-        log.debug('Starting new session', { id: newSessionId });
+        log.debug('Creating session with workspace context', {
+          sessionId: newSessionId,
+          workspaceId: workspaceId || 'none',
+          cwd: effectiveCwd,
+          hasWorkspace: !!workspaceId,
+        });
+
+        // Emit sync event for workspace store to handle
+        if (workspaceId) {
+          storeSync.sessionCreated(newSessionId, workspaceId);
+        }
+
         set({
           sessionId: newSessionId,
           currentSession: null,  // Keep null - not confirmed yet

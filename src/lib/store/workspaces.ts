@@ -96,8 +96,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
     (set, get) => {
       // Set up sync coordinator subscriptions INSIDE store creator
       storeSync.subscribe((event) => {
+        const state = get();
+
+        if (event.type === 'session_created' && event.payload.sessionId && event.payload.workspaceId) {
+          state.addSessionToWorkspace(event.payload.workspaceId, event.payload.sessionId);
+        }
+
         if (event.type === 'session_deleted' && event.payload.sessionId && event.payload.workspaceId) {
-          const state = get();
           state.removeSessionFromWorkspace(event.payload.workspaceId, event.payload.sessionId);
         }
       });

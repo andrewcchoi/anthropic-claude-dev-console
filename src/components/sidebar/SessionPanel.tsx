@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useChatStore } from '@/lib/store';
 import { useSessionDiscoveryStore } from '@/lib/store/sessions';
+import { useWorkspaceStore } from '@/lib/store/workspaces';
 import { useCliPrewarm } from '@/hooks/useCliPrewarm';
 import { SessionSearch } from './SessionSearch';
 import { RefreshButton } from './RefreshButton';
@@ -13,6 +14,7 @@ const STALE_THRESHOLD = 60000; // 60 seconds
 
 export function SessionPanel() {
   const { startNewSession, isPrewarming } = useChatStore();
+  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
   const {
     discoverSessions,
     lastDiscoveryTime,
@@ -44,7 +46,12 @@ export function SessionPanel() {
   }, [lastDiscoveryTime, isDiscovering, discoverSessions]);
 
   const handleNewChat = () => {
-    const newSessionId = startNewSession();
+    // Get active workspace context
+    const activeWorkspace = activeWorkspaceId ? workspaces.get(activeWorkspaceId) : null;
+
+    // Pass workspace context to session creation
+    const newSessionId = startNewSession(activeWorkspace?.id, activeWorkspace?.rootPath);
+
     prewarmCli(newSessionId);
   };
 
