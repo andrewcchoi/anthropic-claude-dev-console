@@ -204,6 +204,17 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
         if (!workspace) return;
 
+        // Unlink all sessions from this workspace (batch operation)
+        log.debug('Unlinking sessions before workspace removal', {
+          workspaceId: id,
+          sessionCount: workspace.sessionIds.length,
+        });
+
+        // Emit workspace deletion event to trigger batch unlink in chat store
+        if (workspace.sessionIds.length > 0) {
+          storeSync.workspaceDeleted(id, workspace.sessionIds);
+        }
+
         // Disconnect provider if connected
         const provider = state.providers.get(workspace.providerId);
         if (provider?.status === 'connected') {
@@ -225,6 +236,12 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           const newActiveId = state.activeWorkspaceId === id
             ? newOrder[0] ?? null
             : state.activeWorkspaceId;
+
+          log.debug('Workspace removed', {
+            workspaceId: id,
+            remainingWorkspaces: newOrder.length,
+            newActiveId,
+          });
 
           return {
             workspaces: newWorkspaces,

@@ -156,9 +156,18 @@ interface ChatStore {
 
 export const useChatStore = create<ChatStore>()(
   persist(
-    (set, get) => ({
-      // Messages
-      messages: [],
+    (set, get) => {
+      // Set up sync coordinator subscriptions INSIDE store creator
+      storeSync.subscribe((event) => {
+        if (event.type === 'workspace_deleted' && event.payload.sessionIds) {
+          const state = get();
+          state.unlinkMultipleSessionsFromWorkspace(event.payload.sessionIds);
+        }
+      });
+
+      return {
+        // Messages
+        messages: [],
       addMessage: (message) =>
         set((state) => ({ messages: [...state.messages, message] })),
       updateMessage: (id, updates) =>
@@ -740,7 +749,8 @@ export const useChatStore = create<ChatStore>()(
       setSearchQuery: (query) => set({ searchQuery: query }),
       clearExpandedFolders: () => set({ expandedFolders: new Set<string>() }),
       expandFolders: (paths) => set({ expandedFolders: new Set(paths) }),
-    }),
+      };
+    },
     {
       name: 'claude-code-sessions',
       partialize: (state) => ({
