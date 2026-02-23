@@ -32,6 +32,8 @@ export function useClaudeChat() {
     updateToolExecution,
     updateUsage,
     saveCurrentSession,
+    initializedSessionIds,
+    markSessionInitialized,
   } = useChatStore();
 
   const [currentMessageId, setCurrentMessageId] = useState<string | null>(null);
@@ -144,7 +146,15 @@ export function useClaudeChat() {
           contentLength: prompt.length
         });
 
-        log.debug('Starting stream', { endpoint: '/api/claude' });
+        // Check if this session has been initialized (sent at least one message)
+        const isSessionInitialized = currentSessionId ? initializedSessionIds.has(currentSessionId) : false;
+
+        log.debug('Starting stream', {
+          endpoint: '/api/claude',
+          sessionId: currentSessionId,
+          isSessionInitialized,
+        });
+
         const response = await fetch('/api/claude', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -156,6 +166,7 @@ export function useClaudeChat() {
             provider,
             providerConfig,
             defaultMode,
+            isSessionInitialized,
           }),
         });
 
@@ -354,6 +365,11 @@ export function useClaudeChat() {
                     receivedSuccessResult = true;
                     // Reset retry counter on successful completion
                     setSessionConflictRetries(0);
+                    // Mark session as initialized after first successful message
+                    if (currentSessionId && !initializedSessionIds.has(currentSessionId)) {
+                      markSessionInitialized(currentSessionId);
+                      log.debug('Session marked as initialized', { sessionId: currentSessionId });
+                    }
                     // Extract and update usage stats
                     if (message.total_cost_usd !== undefined || message.usage) {
                       updateUsage({
@@ -438,6 +454,8 @@ export function useClaudeChat() {
       updateToolExecution,
       updateUsage,
       saveCurrentSession,
+      initializedSessionIds,
+      markSessionInitialized,
     ]
   );
 

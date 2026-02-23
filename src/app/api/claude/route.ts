@@ -29,7 +29,7 @@ const sanitizeStderr = (stderr: string): string => {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { prompt, sessionId, cwd, model, provider, providerConfig, defaultMode } = body;
+    const { prompt, sessionId, cwd, model, provider, providerConfig, defaultMode, isSessionInitialized } = body;
 
     log.debug('Received chat request', {
       sessionId,
@@ -111,15 +111,16 @@ export async function POST(req: NextRequest) {
             args.push('--permission-mode', validatedMode);
           }
 
-          // Check if session file exists to determine whether to use --resume or --session-id
+          // Determine whether to use --resume or --session-id based on client state
           if (sessionId) {
-            const sessionPath = join(homedir(), '.claude', 'projects', '-workspace', `${sessionId}.jsonl`);
-            const sessionExists = existsSync(sessionPath);
-
-            if (sessionExists) {
+            // Use client-provided flag to determine if session has been initialized
+            // (avoids filesystem checks which fail due to CLI's cwd-based organization)
+            if (isSessionInitialized) {
               args.push('--resume', sessionId);  // Resume existing session
+              log.debug('Resuming existing session', { sessionId });
             } else {
               args.push('--session-id', sessionId);  // Create new session
+              log.debug('Creating new session', { sessionId });
               // Add model flag for new sessions only
               if (model) {
                 args.push('--model', model);

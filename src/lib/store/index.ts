@@ -29,7 +29,9 @@ interface ChatStore {
   hiddenSessionIds: Set<string>;
   collapsedProjects: Set<string>;
   pendingSessionId: string | null;
+  initializedSessionIds: Set<string>;  // Track sessions that have sent at least one message
   setSessionId: (id: string) => void;
+  markSessionInitialized: (id: string) => void;
   setCurrentSession: (session: Session | null) => void;
   addSession: (session: Session) => void;
   startNewSession: (workspaceId?: string, cwd?: string) => string;
@@ -186,8 +188,15 @@ export const useChatStore = create<ChatStore>()(
       hiddenSessionIds: new Set<string>(),
       collapsedProjects: new Set<string>(),
       pendingSessionId: null,
+      initializedSessionIds: new Set<string>(),
       setSessionId: (id) => set({ sessionId: id }),
       setCurrentSession: (session) => set({ currentSession: session }),
+      markSessionInitialized: (id) =>
+        set((state) => {
+          const newInitialized = new Set(state.initializedSessionIds);
+          newInitialized.add(id);
+          return { initializedSessionIds: newInitialized };
+        }),
       addSession: (session) =>
         set((state) => ({ sessions: [...state.sessions, session] })),
 
@@ -766,6 +775,7 @@ export const useChatStore = create<ChatStore>()(
         sidebarTab: state.sidebarTab,
         hiddenSessionIds: Array.from(state.hiddenSessionIds), // Convert Set to Array for JSON
         collapsedProjects: Array.from(state.collapsedProjects), // Convert Set to Array for JSON
+        initializedSessionIds: Array.from(state.initializedSessionIds), // Convert Set to Array for JSON
         // pendingSessionId: NOT persisted - resets on refresh
       }),
       onRehydrateStorage: () => (state) => {
@@ -780,6 +790,12 @@ export const useChatStore = create<ChatStore>()(
           state.collapsedProjects = new Set(state.collapsedProjects);
         } else if (state && !state.collapsedProjects) {
           state.collapsedProjects = new Set();
+        }
+
+        if (state && Array.isArray(state.initializedSessionIds)) {
+          state.initializedSessionIds = new Set(state.initializedSessionIds);
+        } else if (state && !state.initializedSessionIds) {
+          state.initializedSessionIds = new Set();
         }
 
         // Validate sessionId against currentSession to prevent orphaned state
