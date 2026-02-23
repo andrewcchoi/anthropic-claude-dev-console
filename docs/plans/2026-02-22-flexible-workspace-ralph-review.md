@@ -1085,6 +1085,264 @@ From the design document's Appendix B:
 
 ---
 
-**Review Complete - Iteration 1**
+## Iteration 2: Additional Findings
 
-Next iteration should address critical recommendations and incorporate feedback.
+### Gaps Identified in First Pass
+
+#### A1. Accessibility Not Addressed
+**Issue:** No mention of screen reader support, keyboard-only navigation, or WCAG compliance.
+
+**Recommendations:**
+- All workspace UI must be keyboard-navigable
+- Status indicators need aria-labels ("Connected", "Disconnected")
+- Error messages must be announced to screen readers
+- Color-coded status needs alternative indicators (icons, text)
+
+```tsx
+// Example: Accessible status indicator
+<span
+  role="status"
+  aria-live="polite"
+  aria-label={`Workspace ${workspace.name} is ${status}`}
+>
+  <StatusIcon status={status} />
+  <span className="sr-only">{status}</span>
+</span>
+```
+
+#### A2. Migration Strategy Missing
+**Issue:** How do existing `/workspace` users transition?
+
+**Recommendation:**
+```typescript
+// Auto-migration on first load
+async function migrateExistingWorkspace(): Promise<void> {
+  const hasLegacyWorkspace = await fs.exists('/workspace');
+  const hasNewWorkspaces = useWorkspaceStore.getState().workspaces.size > 0;
+
+  if (hasLegacyWorkspace && !hasNewWorkspaces) {
+    // Auto-create local workspace for /workspace
+    await addWorkspace({
+      type: 'local',
+      path: '/workspace',
+      name: 'Current Workspace (Migrated)',
+    });
+
+    // Show migration notice
+    toast.info('Your workspace has been migrated to the new system');
+  }
+}
+```
+
+#### A3. API Security: Missing CSRF Protection
+**Issue:** `/api/workspace/*` routes modify state but no CSRF tokens mentioned.
+
+**Recommendation:**
+```typescript
+// Add CSRF middleware
+export async function POST(req: NextRequest) {
+  const csrfToken = req.headers.get('X-CSRF-Token');
+  const sessionToken = req.cookies.get('csrf-secret');
+
+  if (!csrfToken || !verifyToken(csrfToken, sessionToken)) {
+    return NextResponse.json({ error: 'Invalid CSRF token' }, { status: 403 });
+  }
+
+  // Process request...
+}
+```
+
+#### A4. Observability Gaps
+**Issue:** No structured logging or metrics for workspace operations.
+
+**Recommendation:**
+```typescript
+// Add operation tracing
+class WorkspaceManager {
+  async connectProvider(id: string): Promise<void> {
+    const span = tracer.startSpan('workspace.connect', {
+      attributes: { providerId: id, providerType: this.getType(id) },
+    });
+
+    try {
+      await this._connect(id);
+      span.setStatus({ code: SpanStatusCode.OK });
+      metrics.increment('workspace.connect.success');
+    } catch (error) {
+      span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+      metrics.increment('workspace.connect.failure');
+      throw error;
+    } finally {
+      span.end();
+    }
+  }
+}
+```
+
+#### A5. Credential Backup/Recovery
+**Issue:** If keychain corrupted or machine lost, no way to recover.
+
+**Recommendation:**
+- Export encrypted credential backup (user must re-enter master password)
+- Import credentials on new machine
+- Clear documentation on credential recovery paths
+
+#### A6. Docker Deployment Considerations
+**Issue:** `keytar` requires native binaries that may not work in all containers.
+
+**Recommendation:**
+```dockerfile
+# Add to Dockerfile for keytar support
+RUN apt-get update && apt-get install -y \
+    libsecret-1-dev \
+    gnome-keyring
+
+# Or use encrypted file fallback in containers
+ENV CLAUDE_CREDENTIAL_STORE=file
+```
+
+#### A7. Browser Compatibility for WebCrypto
+**Issue:** EncryptedFileStore uses Node.js crypto, but browser may need WebCrypto API.
+
+**Recommendation:**
+```typescript
+// Isomorphic crypto
+async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+  if (typeof window !== 'undefined') {
+    // Browser: WebCrypto
+    const encoder = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(password),
+      'PBKDF2',
+      false,
+      ['deriveBits', 'deriveKey']
+    );
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+  } else {
+    // Node.js: crypto module
+    return nodeCrypto.scryptSync(password, salt, 32);
+  }
+}
+```
+
+#### A8. Performance Benchmarks Missing
+**Issue:** Success criteria mention "< 100ms workspace switch" but no measurement plan.
+
+**Recommendation:**
+```typescript
+// Add performance marks
+async function switchWorkspace(id: string): Promise<void> {
+  performance.mark('workspace-switch-start');
+
+  await this._switch(id);
+
+  performance.mark('workspace-switch-end');
+  performance.measure(
+    'workspace-switch',
+    'workspace-switch-start',
+    'workspace-switch-end'
+  );
+
+  const measure = performance.getEntriesByName('workspace-switch')[0];
+  if (measure.duration > 100) {
+    console.warn(`Slow workspace switch: ${measure.duration}ms`);
+  }
+}
+```
+
+#### A9. Internationalization (i18n)
+**Issue:** Error messages and UI text are hardcoded in English.
+
+**Recommendation:**
+```typescript
+// Use i18n for all user-facing text
+const ERROR_MESSAGES = {
+  'CONNECTION_ERROR': {
+    en: 'Connection failed',
+    es: 'Error de conexión',
+    zh: '连接失败',
+  },
+  // ...
+};
+
+function getErrorMessage(code: string, locale: string): string {
+  return ERROR_MESSAGES[code]?.[locale] || ERROR_MESSAGES[code]?.['en'] || code;
+}
+```
+
+#### A10. Rate Limiting at API Layer
+**Issue:** AuthRateLimiter is provider-level, but API routes unprotected.
+
+**Recommendation:**
+```typescript
+// API-level rate limiting
+import { Ratelimit } from '@upstash/ratelimit';
+
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(10, '10 s'),
+});
+
+export async function POST(req: NextRequest) {
+  const ip = req.ip ?? '127.0.0.1';
+  const { success, limit, remaining } = await ratelimit.limit(ip);
+
+  if (!success) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded' },
+      {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': limit.toString(),
+          'X-RateLimit-Remaining': remaining.toString(),
+        },
+      }
+    );
+  }
+}
+```
+
+### Updated Recommendation Counts
+
+| Category | Iteration 1 | Iteration 2 | Total |
+|----------|-------------|-------------|-------|
+| Security | 8 | 3 | 11 |
+| UX | 6 | 2 | 8 |
+| Robustness | 7 | 2 | 9 |
+| Scalability | 6 | 1 | 7 |
+| Maintainability | 4 | 2 | 6 |
+| Structure | 3 | 0 | 3 |
+| Wild | 5 | 0 | 5 |
+| Devil's Advocate | 7 | 0 | 7 |
+| **New: Accessibility** | 0 | 1 | 1 |
+| **New: Operations** | 0 | 2 | 2 |
+| **Total** | 46 | 13 | **59** |
+
+### Additional Critical Items
+
+| # | Category | Recommendation | Priority |
+|---|----------|----------------|----------|
+| 23 | Accessibility | Add keyboard navigation + ARIA labels | High |
+| 24 | Operations | Add migration strategy for existing users | Critical |
+| 25 | Security | Add CSRF protection to API routes | High |
+| 26 | Operations | Add structured logging/tracing | Medium |
+| 27 | Security | Document credential backup/recovery | Medium |
+| 28 | Deployment | Document Docker keytar workarounds | Medium |
+| 29 | Compatibility | Use isomorphic crypto (Node + Browser) | High |
+| 30 | Performance | Add performance measurement marks | Medium |
+| 31 | UX | Plan for i18n support | Low |
+| 32 | Security | Add API-level rate limiting | High |
+
+---
+
+**Review Complete - Iteration 2**
+
+Added 10 new recommendations across accessibility, operations, deployment, and compatibility.
+Total recommendations: 59 (46 from iteration 1 + 13 new).

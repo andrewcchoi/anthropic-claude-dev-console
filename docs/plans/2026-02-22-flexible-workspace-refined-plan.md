@@ -213,9 +213,205 @@ class WorkspaceManager {
 
 ---
 
+## Iteration 2 Critical Additions
+
+### 7. Migration Strategy (Operations)
+
+```typescript
+// Auto-migrate existing /workspace users on first load
+async function migrateExistingWorkspace(): Promise<void> {
+  const hasLegacyWorkspace = await fs.exists('/workspace');
+  const hasNewWorkspaces = useWorkspaceStore.getState().workspaces.size > 0;
+
+  if (hasLegacyWorkspace && !hasNewWorkspaces) {
+    // Auto-create local workspace for /workspace
+    await addWorkspace({
+      type: 'local',
+      path: '/workspace',
+      name: 'Current Workspace (Migrated)',
+      autoMigrated: true,
+    });
+
+    // Preserve existing session associations
+    const existingSessions = await discoverSessions('/workspace');
+    for (const session of existingSessions) {
+      await associateSessionWithWorkspace(session.id, workspaceId);
+    }
+
+    // Show migration notice
+    toast.info(
+      'Your workspace has been migrated to the new multi-workspace system. ' +
+      'You can now add additional workspaces using the + button.'
+    );
+  }
+}
+
+// Run on app startup
+useEffect(() => {
+  migrateExistingWorkspace();
+}, []);
+```
+
+### 8. CSRF Protection (Security)
+
+```typescript
+// middleware.ts - Generate CSRF token
+export function middleware(request: NextRequest) {
+  const response = NextResponse.next();
+
+  if (!request.cookies.has('csrf-secret')) {
+    const secret = crypto.randomUUID();
+    response.cookies.set('csrf-secret', secret, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+    });
+  }
+
+  return response;
+}
+
+// API route protection
+function validateCSRF(req: NextRequest): boolean {
+  const token = req.headers.get('X-CSRF-Token');
+  const secret = req.cookies.get('csrf-secret')?.value;
+
+  if (!token || !secret) return false;
+
+  // Token = HMAC(secret, timestamp)
+  const [timestamp, signature] = token.split('.');
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(timestamp)
+    .digest('hex');
+
+  return signature === expected && Date.now() - parseInt(timestamp) < 3600000;
+}
+
+// Protect all mutating workspace routes
+export async function POST(req: NextRequest) {
+  if (!validateCSRF(req)) {
+    return NextResponse.json({ error: 'Invalid CSRF token' }, { status: 403 });
+  }
+  // ... handle request
+}
+
+// Frontend: Include token in requests
+const csrfToken = generateCSRFToken(getCookie('csrf-secret'));
+fetch('/api/workspace/connect', {
+  method: 'POST',
+  headers: { 'X-CSRF-Token': csrfToken },
+  body: JSON.stringify(config),
+});
+```
+
+### 9. API Rate Limiting (Security)
+
+```typescript
+// Simple in-memory rate limiter (use Redis in production)
+class RateLimiter {
+  private requests: Map<string, number[]> = new Map();
+
+  check(key: string, limit: number, windowMs: number): boolean {
+    const now = Date.now();
+    const requests = this.requests.get(key) || [];
+
+    // Remove old requests
+    const recent = requests.filter(t => now - t < windowMs);
+
+    if (recent.length >= limit) {
+      return false;
+    }
+
+    recent.push(now);
+    this.requests.set(key, recent);
+    return true;
+  }
+}
+
+const rateLimiter = new RateLimiter();
+
+export async function POST(req: NextRequest) {
+  const ip = req.ip || req.headers.get('x-forwarded-for') || 'unknown';
+
+  // 10 requests per 10 seconds per IP
+  if (!rateLimiter.check(ip, 10, 10000)) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429 }
+    );
+  }
+
+  // ... handle request
+}
+```
+
+### 10. Accessibility (UX)
+
+```tsx
+// Accessible workspace tab
+function WorkspaceTab({ workspace, isActive, status }: WorkspaceTabProps) {
+  return (
+    <button
+      role="tab"
+      aria-selected={isActive}
+      aria-label={`${workspace.name}, ${status}`}
+      tabIndex={isActive ? 0 : -1}
+      className={cn(
+        "workspace-tab",
+        isActive && "workspace-tab--active"
+      )}
+    >
+      {/* Visual status indicator with accessible alternative */}
+      <span aria-hidden="true">
+        <StatusIcon status={status} />
+      </span>
+      <span className="sr-only">{status}</span>
+
+      <span className="workspace-tab__name">{workspace.name}</span>
+    </button>
+  );
+}
+
+// Keyboard navigation for tab bar
+function WorkspaceTabBar() {
+  const handleKeyDown = (e: KeyboardEvent) => {
+    const tabs = document.querySelectorAll('[role="tab"]');
+    const currentIndex = Array.from(tabs).findIndex(
+      t => t === document.activeElement
+    );
+
+    switch (e.key) {
+      case 'ArrowLeft':
+        const prevIndex = currentIndex > 0 ? currentIndex - 1 : tabs.length - 1;
+        (tabs[prevIndex] as HTMLElement).focus();
+        break;
+      case 'ArrowRight':
+        const nextIndex = currentIndex < tabs.length - 1 ? currentIndex + 1 : 0;
+        (tabs[nextIndex] as HTMLElement).focus();
+        break;
+      case 'Home':
+        (tabs[0] as HTMLElement).focus();
+        break;
+      case 'End':
+        (tabs[tabs.length - 1] as HTMLElement).focus();
+        break;
+    }
+  };
+
+  return (
+    <div role="tablist" aria-label="Workspaces" onKeyDown={handleKeyDown}>
+      {/* tabs */}
+    </div>
+  );
+}
+```
+
+---
+
 ## High Priority Additions
 
-### 7. Onboarding Empty State (UX)
+### 11. Onboarding Empty State (UX)
 
 ```tsx
 function WorkspaceEmptyState() {
@@ -257,7 +453,7 @@ function WorkspaceEmptyState() {
 }
 ```
 
-### 8. Recent Workspaces (UX)
+### 12. Recent Workspaces (UX)
 
 ```typescript
 interface WorkspaceHistory {
@@ -295,7 +491,7 @@ class WorkspaceHistoryManager {
 }
 ```
 
-### 9. Keyboard Navigation (UX)
+### 13. Keyboard Navigation (UX)
 
 ```typescript
 const WORKSPACE_SHORTCUTS = {
@@ -322,7 +518,7 @@ function useWorkspaceShortcuts() {
 }
 ```
 
-### 10. SSH Connection Pooling (Scalability)
+### 14. SSH Connection Pooling (Scalability)
 
 ```typescript
 class SSHConnectionPool {
@@ -386,7 +582,7 @@ class SSHConnectionPool {
 }
 ```
 
-### 11. Credential Key with Port (Security)
+### 15. Credential Key with Port (Security)
 
 ```typescript
 type CredentialKey =
@@ -404,7 +600,7 @@ function buildSSHCredentialKey(
 }
 ```
 
-### 12. Actionable Error Messages (UX)
+### 16. Actionable Error Messages (UX)
 
 ```typescript
 const ERROR_GUIDANCE: Record<string, ErrorGuidance> = {
