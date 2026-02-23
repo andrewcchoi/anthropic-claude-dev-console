@@ -21,6 +21,7 @@ export function useClaudeChat() {
     updateMessage,
     sessionId,
     setSessionId,
+    currentSession,
     isStreaming,
     setIsStreaming,
     setError,
@@ -34,13 +35,19 @@ export function useClaudeChat() {
 
   const sendMessage = useCallback(
     async (prompt: string, cwdOverride?: string, attachments?: FileAttachment[]) => {
-      // Use explicit cwd override, or workspace context, or default
-      const effectiveCwd = cwdOverride || activeWorkspace?.rootPath || '/workspace';
+      // Priority order for working directory:
+      // 1. Explicit override (highest)
+      // 2. Session's original cwd (for existing sessions - prevents resume errors)
+      // 3. Workspace's rootPath (for new sessions)
+      // 4. Default fallback (lowest)
+      const effectiveCwd = cwdOverride || currentSession?.cwd || activeWorkspace?.rootPath || '/workspace';
 
       log.debug('Sending message with workspace context', {
         sessionId: sessionId,
         workspaceId: activeWorkspace?.id,
         cwd: effectiveCwd,
+        sessionCwd: currentSession?.cwd,
+        workspaceRootPath: activeWorkspace?.rootPath,
         isWorkspaceContext: !!activeWorkspace,
         isOverride: !!cwdOverride,
       });
@@ -389,6 +396,7 @@ export function useClaudeChat() {
     },
     [
       activeWorkspace,
+      currentSession,
       sessionId,
       addMessage,
       updateMessage,
