@@ -21,6 +21,7 @@ export function useClaudeChat() {
     updateMessage,
     sessionId,
     setSessionId,
+    startNewSession,
     currentSession,
     isStreaming,
     setIsStreaming,
@@ -362,10 +363,15 @@ export function useClaudeChat() {
                     setError(serializeError(message.error));
                   }
                 } else if (message.type === 'session_locked') {
-                  // Session ID conflict - generate new session and retry
-                  const newSessionId = uuidv4();
-                  setSessionId(newSessionId);
-                  setError('Session conflict detected, regenerating session...');
+                  // Session ID conflict - generate new session with proper workspace linking
+                  log.warn('Session locked, creating new session with workspace context', {
+                    oldSessionId: sessionId,
+                    workspaceId: activeWorkspace?.id,
+                  });
+
+                  // Use startNewSession to properly link to workspace
+                  startNewSession(activeWorkspace?.id, activeWorkspace?.rootPath);
+                  setError('Session conflict detected, created new session...');
                 } else if (message.type === 'error') {
                   // Only show errors if we haven't received a successful result
                   if (!receivedSuccessResult) {
@@ -398,6 +404,7 @@ export function useClaudeChat() {
       activeWorkspace,
       currentSession,
       sessionId,
+      startNewSession,
       addMessage,
       updateMessage,
       setSessionId,
