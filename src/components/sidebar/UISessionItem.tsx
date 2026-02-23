@@ -2,19 +2,49 @@
 
 import { Session } from '@/types/claude';
 import { useChatStore } from '@/lib/store';
+import { useWorkspaceStore } from '@/lib/store/workspaces';
 import { formatSmartTime } from '@/lib/utils/time';
 import { cn } from '@/lib/utils';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('UISessionItem');
 
 interface UISessionItemProps {
   session: Session;
 }
 
 export function UISessionItem({ session }: UISessionItemProps) {
-  const { sessionId, switchSession, hideSession } = useChatStore();
+  const { sessionId, switchSession, hideSession, unlinkSessionFromWorkspace } = useChatStore();
+  const { activeWorkspaceId, workspaces, setActiveWorkspace } = useWorkspaceStore();
   const isActive = sessionId === session.id;
 
-  const handleClick = () => {
-    switchSession(session.id);
+  const handleClick = async () => {
+    // Auto-switch workspace if session belongs to different workspace
+    if (session.workspaceId && session.workspaceId !== activeWorkspaceId) {
+      // Validate workspace exists
+      const workspaceExists = workspaces.has(session.workspaceId);
+
+      if (workspaceExists) {
+        log.debug('Auto-switching workspace for session', {
+          sessionId: session.id,
+          sessionWorkspaceId: session.workspaceId,
+          currentActiveWorkspaceId: activeWorkspaceId,
+        });
+
+        setActiveWorkspace(session.workspaceId);
+      } else {
+        log.warn('Session references non-existent workspace', {
+          sessionId: session.id,
+          workspaceId: session.workspaceId,
+        });
+
+        // Unlink from non-existent workspace
+        unlinkSessionFromWorkspace(session.id);
+      }
+    }
+
+    // Switch to session
+    await switchSession(session.id);
   };
 
   const handleHide = (e: React.MouseEvent) => {
