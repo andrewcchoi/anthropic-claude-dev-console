@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : 'Unknown error',
-        details: error instanceof Error ? error.stack : undefined,
+        details: process.env.NODE_ENV === 'development' && error instanceof Error ? error.stack : undefined,
       },
       { status: 500 }
     );
@@ -100,6 +100,17 @@ export async function POST(request: NextRequest) {
       logger.warn('Missing required fields', { workspaceId, branch });
       return NextResponse.json(
         { error: 'workspaceId and branch are required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate branch name format (defense in depth)
+    const dangerous = /[;&|`$(){}[\]<>!\\'"]/;
+    const validPattern = /^[\w.\-/]+$/;
+    if (dangerous.test(branch) || !validPattern.test(branch)) {
+      logger.warn('Invalid branch name format', { workspaceId, branch });
+      return NextResponse.json(
+        { error: 'Invalid branch name format' },
         { status: 400 }
       );
     }
@@ -148,7 +159,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : 'Unknown error',
-        details: error instanceof Error ? error.stack : undefined,
+        details: process.env.NODE_ENV === 'development' && error instanceof Error ? error.stack : undefined,
       },
       { status: 500 }
     );

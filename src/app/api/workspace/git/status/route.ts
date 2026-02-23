@@ -8,8 +8,6 @@ import { createServerLogger } from '@/lib/logger/server';
 import { WorkspaceManager } from '@/lib/workspace/WorkspaceManager';
 import { GitProvider } from '@/lib/workspace/providers/GitProvider';
 
-const log = createServerLogger('GitStatusAPI');
-
 // Singleton workspace manager
 let workspaceManager: WorkspaceManager | null = null;
 
@@ -80,7 +78,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : 'Unknown error',
-        details: error instanceof Error ? error.stack : undefined,
+        details: process.env.NODE_ENV === 'development' && error instanceof Error ? error.stack : undefined,
       },
       { status: 500 }
     );

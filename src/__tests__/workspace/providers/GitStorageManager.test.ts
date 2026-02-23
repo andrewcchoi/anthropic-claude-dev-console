@@ -3,7 +3,7 @@
  * Phase 2 - LRU Eviction Management
  */
 
-import { GitStorageManager, getGitStorageManager } from '@/lib/workspace/providers/GitStorageManager';
+import { GitStorageManager, getGitStorageManager, resetGitStorageManager } from '@/lib/workspace/providers/GitStorageManager';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -13,6 +13,9 @@ describe('GitStorageManager', () => {
   let manager: GitStorageManager;
 
   beforeEach(async () => {
+    // Reset singleton before each test
+    resetGitStorageManager();
+
     // Create temp directory for tests
     testDir = join(tmpdir(), `git-storage-test-${Date.now()}`);
     await fs.mkdir(testDir, { recursive: true });

