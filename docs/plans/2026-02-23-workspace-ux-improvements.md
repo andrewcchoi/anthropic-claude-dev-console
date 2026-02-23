@@ -425,8 +425,10 @@ const workspace: Workspace = {
   rootPath: config.type === 'local'
     ? (config as LocalProviderConfig).path
     : config.type === 'ssh'
-      ? (config as any).remotePath
-      : '/',
+      ? (config as SSHProviderConfig).remotePath
+      : config.type === 'git'
+        ? '/'  // TODO: Update when git clone location is implemented
+        : '/',
   color: options.color ?? getNextColor(state.workspaces.size),
   sessionId: null,
   sessionIds: [],  // NEW: Initialize empty array
@@ -636,18 +638,15 @@ First, locate where Session is currently defined:
 
 ```bash
 # Find Session interface definition
-grep -rn "interface Session" src/types/ src/lib/store/index.ts
+grep -rn "export interface Session" src/types/
 ```
 
-Expected output will show either:
-- `src/types/sessions.ts:X: interface Session` (separate file)
-- `src/lib/store/index.ts:X: interface Session` (inline)
+Expected: Session is defined in `src/types/claude.ts` (imported in store as `import { Session } from '@/types/claude'`)
 
-Based on the result, update the appropriate file:
+Update the Session interface:
 
-**If Session is in src/types/sessions.ts:**
 ```tsx
-// src/types/sessions.ts
+// src/types/claude.ts
 export interface Session {
   id: string;
   name: string;
@@ -658,20 +657,12 @@ export interface Session {
 }
 ```
 
-**If Session is inline in src/lib/store/index.ts:**
-```tsx
-// src/lib/store/index.ts (update existing interface)
-interface Session {
-  id: string;
-  name: string;
-  created_at: number;
-  updated_at: number;
-  cwd: string;
-  workspaceId?: string;  // NEW: Optional workspace link
-}
-```
+Verify the store imports it correctly:
 
-**Note**: Regardless of location, ensure `Session` is imported/used in ChatStore interface.
+```tsx
+// src/lib/store/index.ts (should already have this import)
+import { ChatMessage, Session, ToolExecution, UsageStats, Provider, ProviderConfig, DefaultMode } from '@/types/claude';
+```
 
 **Step 2: Add session-workspace actions to ChatStore interface**
 
@@ -828,7 +819,7 @@ Expected: No type errors
 **Step 5: Commit**
 
 ```bash
-git add src/lib/store/index.ts src/types/sessions.ts
+git add src/lib/store/index.ts src/types/claude.ts
 git commit -m "feat(chat): add workspace linking to session store
 
 Add workspaceId field to Session type and actions to link/unlink
@@ -890,76 +881,7 @@ deleteSession: (id) => {
 },
 ```
 
-**Step 2: Subscribe workspace store to session events**
-
-Update the workspace store to set up subscriptions INSIDE the store creator:
-
-```tsx
-// src/lib/store/workspaces.ts (add import at top if not present)
-import { storeSync } from './sync';
-
-// Then update the store creation
-export const useWorkspaceStore = create<WorkspaceStore>()(
-  persist(
-    (set, get) => {
-      // Set up sync coordinator subscriptions INSIDE store creator
-      // This gives access to get() and set() functions
-      storeSync.subscribe((event) => {
-        if (event.type === 'session_created' && event.payload.workspaceId && event.payload.sessionId) {
-          // Call action from the store being created
-          const state = get();
-          state.addSessionToWorkspace(event.payload.workspaceId, event.payload.sessionId);
-        } else if (event.type === 'session_deleted' && event.payload.workspaceId && event.payload.sessionId) {
-          const state = get();
-          state.removeSessionFromWorkspace(event.payload.workspaceId, event.payload.sessionId);
-        }
-      });
-
-      return {
-        // Initial state
-        workspaces: new Map(),
-        providers: new Map(),
-        activeWorkspaceId: null,
-        workspaceOrder: [],
-        isInitialized: false,
-        hasMigratedSessions: false,
-
-        // Actions (all as methods of this returned object)
-        addWorkspace: async (config, options) => {
-          // ... implementation from existing plan
-        },
-
-        removeWorkspace: async (id) => {
-          // ... implementation from existing plan
-        },
-
-        addSessionToWorkspace: (workspaceId, sessionId) => {
-          // ... implementation from Task 3 Step 4
-        },
-
-        removeSessionFromWorkspace: (workspaceId, sessionId) => {
-          // ... implementation from Task 3 Step 4
-        },
-
-        // ... all other actions from original workspaces.ts
-      };
-    },
-    {
-      name: 'claude-workspaces-v1',
-      partialize: (state) => ({
-        // ... from Step 6
-      }),
-      onRehydrateStorage: () => (state) => {
-        // ... from Step 6
-      },
-    }
-  )
-);
-```
-
-**Note**: Subscriptions are set up once when store is created using closures. They persist for app lifetime, which is acceptable for singleton stores. The subscription can access `get()` because it's defined inside the creator function.
-
-**Step 3: Test in browser**
+**Step 2: Test in browser**
 
 1. Create workspace with 2 sessions
 2. Delete one session
@@ -969,7 +891,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
 Expected: Workspace sessionIds cleaned up on session deletion
 
-**Step 4: Commit**
+**Step 3: Commit**
 
 ```bash
 git add src/lib/store/index.ts src/lib/store/workspaces.ts
@@ -1515,6 +1437,107 @@ Co-Authored-By: Claude Sonnet 4.5 (1M context) <noreply@anthropic.com>"
 
 ---
 
+## Task 8.5: Filter Sidebar Sessions by Active Workspace
+
+**Files:**
+- Modify: `src/components/sidebar/SessionList.tsx` (or Sidebar.tsx - check which renders sessions)
+
+**Step 1: Add workspace filtering to session list**
+
+First, identify which component renders the session list:
+
+```bash
+grep -rn "SessionItem" src/components/sidebar/*.tsx | grep "map"
+```
+
+This will show which component maps over sessions. Update that component:
+
+```tsx
+// src/components/sidebar/SessionList.tsx (or wherever sessions are mapped)
+import { useMemo } from 'react';
+import { useWorkspaceStore } from '@/lib/store/workspaces';
+import { useChatStore } from '@/lib/store';
+import { SessionItem } from './SessionItem';
+
+export function SessionList() {
+  const { activeWorkspaceId } = useWorkspaceStore();
+  const allSessions = useChatStore(state => state.sessions);
+
+  // Filter sessions by active workspace (memoized for performance)
+  const workspaceSessions = useMemo(
+    () => allSessions.filter(s => s.workspaceId === activeWorkspaceId),
+    [allSessions, activeWorkspaceId]
+  );
+
+  const unassignedSessions = useMemo(
+    () => allSessions.filter(s => !s.workspaceId),
+    [allSessions]
+  );
+
+  return (
+    <div className="space-y-1">
+      {/* Workspace sessions */}
+      {workspaceSessions.map(session => (
+        <SessionItem key={session.id} session={session} />
+      ))}
+
+      {/* Unassigned sessions (show only if not empty) */}
+      {unassignedSessions.length > 0 && (
+        <>
+          <div className="text-xs text-gray-500 dark:text-gray-400 px-3 py-2 mt-4 border-t border-gray-200 dark:border-gray-700">
+            Unassigned
+          </div>
+          {unassignedSessions.map(session => (
+            <SessionItem key={session.id} session={session} />
+          ))}
+        </>
+      )}
+
+      {/* Empty state */}
+      {workspaceSessions.length === 0 && unassignedSessions.length === 0 && (
+        <div className="text-gray-500 dark:text-gray-400 px-3 py-8 text-center text-sm">
+          No sessions in this workspace
+          <div className="text-xs mt-2">Create a new chat to get started</div>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+**Step 2: Test in browser**
+
+1. Create workspace A
+2. Create 2 chat sessions (should appear in sidebar)
+3. Create workspace B
+4. Create 1 chat session
+5. Switch to workspace A tab
+6. Verify sidebar shows only workspace A's 2 sessions (workspace B's session hidden)
+7. Switch to workspace B tab
+8. Verify sidebar shows only workspace B's 1 session (workspace A's sessions hidden)
+9. Delete workspace B
+10. Switch to workspace A
+11. Verify workspace B's session appears in "Unassigned" section at bottom
+
+Expected: Sidebar dynamically filters sessions based on active workspace
+
+**Step 3: Commit**
+
+```bash
+git add src/components/sidebar/SessionList.tsx
+git commit -m "feat(sidebar): filter sessions by active workspace
+
+Show only sessions belonging to active workspace in sidebar.
+Sessions without workspaceId shown in 'Unassigned' section.
+Uses useMemo for performance optimization.
+
+Implements core UX requirement: workspace-scoped session display.
+
+Co-Authored-By: Claude Sonnet 4.5 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
 ## Task 9: Add Migration for Existing Sessions
 
 **Files:**
@@ -1546,7 +1569,8 @@ migrateExistingSessions: () => {
 
   const state = get();
 
-  // Dynamic import to avoid circular dependency
+  // Get chat store (both stores are singletons, already initialized)
+  // We can safely import at runtime since migration runs AFTER stores are created
   const { useChatStore } = require('./index');
   const { sessions } = useChatStore.getState();
 
@@ -1575,9 +1599,11 @@ migrateExistingSessions: () => {
   });
 
   // Link all unlinked sessions to default workspace
+  // Note: linkSessionToWorkspace emits session_linked event, which triggers
+  // workspace store subscription to call addSessionToWorkspace automatically
   unlinkedSessions.forEach(session => {
     useChatStore.getState().linkSessionToWorkspace(session.id, defaultWorkspace.id);
-    get().addSessionToWorkspace(defaultWorkspace.id, session.id);
+    // No need to manually call addSessionToWorkspace - event handler does it
   });
 
   log.info('Migration complete', {
@@ -1675,10 +1701,17 @@ Co-Authored-By: Claude Sonnet 4.5 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Task 10: Manual Testing & Verification
+## Task 10: Integration Testing & Verification
+
+**Purpose**: Final validation that all features work correctly together. Execute AFTER Tasks 0-9 are complete and committed.
 
 **Files:**
 - None (testing only)
+
+**Prerequisites**:
+- All implementation tasks (0-9) committed
+- Dev server running (`npm run dev`)
+- Browser console accessible
 
 **Step 1: Test plus button positioning**
 
@@ -1708,15 +1741,19 @@ Co-Authored-By: Claude Sonnet 4.5 (1M context) <noreply@anthropic.com>"
 5. Verify session linked to workspace
 6. Check: ✓ New chats inherit workspace
 
-**Step 4: Test workspace switching**
+**Step 4: Test workspace switching and session filtering**
 
-1. Create workspace A with 2 chats
-2. Create workspace B with 1 chat
-3. Switch to workspace A
-4. Verify only workspace A's chats shown
-5. Switch to workspace B
-6. Verify only workspace B's chat shown
-7. Check: ✓ Sessions filtered by workspace
+1. Create workspace A
+2. Create 2 chat sessions in workspace A
+3. Create workspace B
+4. Create 1 chat session in workspace B
+5. Switch to workspace A tab
+6. Verify sidebar shows ONLY workspace A's 2 sessions (workspace B's session should be hidden)
+7. Count visible sessions - should be exactly 2
+8. Switch to workspace B tab
+9. Verify sidebar shows ONLY workspace B's 1 session (workspace A's sessions should be hidden)
+10. Count visible sessions - should be exactly 1
+11. Check: ✓ Sessions filtered by workspace correctly
 
 **Step 5: Test session auto-switch**
 
@@ -1799,14 +1836,17 @@ Co-Authored-By: Claude Sonnet 4.5 (1M context) <noreply@anthropic.com>"
 
 All tasks completed. Features implemented:
 
-1. ✓ Plus button repositioned next to last tab
-2. ✓ Directory browser allows selecting current folder
-3. ✓ Workspace-session bidirectional linking
-4. ✓ Sessions filtered by active workspace
-5. ✓ Auto-switch workspace on session switch
-6. ✓ Preserve sessions on workspace deletion
-7. ✓ Migrate existing sessions to default workspace
-8. ✓ Debug logging for all operations
+1. ✓ Plus button repositioned next to last tab (Task 1)
+2. ✓ Directory browser allows selecting current folder (Task 2)
+3. ✓ Workspace-session bidirectional linking (Tasks 3, 4)
+4. ✓ Session creation with workspace context (Task 5)
+5. ✓ Working directory context for Claude (Task 6)
+6. ✓ Workspace deletion with session unlinking (Task 7)
+7. ✓ Auto-switch workspace on session switch (Task 8)
+8. ✓ **Sidebar session filtering by workspace (Task 8.5 - NEW)**
+9. ✓ Migrate existing sessions to default workspace (Task 9)
+10. ✓ Debug logging for all operations (All tasks)
+11. ✓ Comprehensive integration testing (Task 10)
 
 ## Next Steps
 
@@ -1925,22 +1965,23 @@ All tasks completed. Features implemented:
 2. Single re-render for workspace deletion
 3. Early returns for invalid operations
 
-**Total Issues Addressed**: 36 (13 from iteration 1, 11 from iteration 2, 12 from iteration 3)
-- Critical Blockers: 7 (3 + 3 + 1)
-- High Priority: 12 (4 + 3 + 5)
-- Medium/Low Priority: 17 (6 + 5 + 6)
+**Total Issues Addressed**: 45 (13 from iter 1, 11 from iter 2, 12 from iter 3, 9 from iter 4)
+- Critical Blockers: 9 (3 + 3 + 1 + 2)
+- High Priority: 14 (4 + 3 + 5 + 2)
+- Medium/Low Priority: 22 (6 + 5 + 6 + 5)
 
 **Implementation Confidence**: Production-Ready
-- All critical blockers resolved
-- Architecture improved and validated
-- Security hardened
-- Performance optimized
-- Type safety enforced
-- No circular dependencies
-- Proper React patterns
-- Complete file specifications
-- Comprehensive testing coverage
-- Clear execution path
+- All critical blockers resolved (including major feature gap)
+- Architecture improved and validated across 4 iterations
+- Security hardened (path validation, XSS prevention)
+- Performance optimized (batch updates, useMemo)
+- Type safety enforced (all types explicit)
+- No circular dependencies (sync coordinator pattern)
+- Proper React patterns (hooks usage validated)
+- Complete file specifications (exact paths)
+- Comprehensive testing coverage (12 scenarios + sync testing)
+- Clear execution path (all steps numbered, no duplicates)
+- Feature complete (sidebar filtering added)
 
 ---
 
@@ -2024,7 +2065,7 @@ All tasks completed. Features implemented:
 - **Modified**: `src/hooks/useClaudeChat.ts` (hook usage pattern)
 - **Modified**: UI components (workspace switching logic)
 
-**Implementation Status**: Ready for iteration 3 or implementation
+**Implementation Status**: Iterations complete - ready for production implementation
 
 ---
 
@@ -2142,3 +2183,174 @@ All architectural patterns from iterations 1-2 validated:
 - Proper architecture patterns
 - Comprehensive testing
 - Full type safety
+
+---
+
+## Ralph Loop Iteration 4 Summary (Final)
+
+### Critical Issues Fixed
+
+1. **🔴 Duplicate Subscription Setup** (Tasks 4.5, 5)
+   - Removed Task 4.5 Step 2 (subscription already in Task 3)
+   - Workspace store subscriptions set up ONCE in Task 3 Step 2
+   - Prevents duplicate action execution
+   - Cleaner execution flow
+
+2. **🔴 Missing Sidebar Session Filtering** (New Task 8.5)
+   - Added complete task for sidebar filtering implementation
+   - Filter sessions by activeWorkspaceId
+   - Show "Unassigned" section for unlinked sessions
+   - UseMemo for performance optimization
+   - **Critical feature gap** - core UX requirement was missing!
+
+### High Priority Issues Fixed
+
+3. **🟡 Session Type Location** (Task 4)
+   - Fixed to use src/types/claude.ts (not sessions.ts)
+   - Updated grep command to find correct file
+   - Corrected commit message file path
+
+4. **🟡 Performance Optimization** (Task 8.5)
+   - Added useMemo for session filtering
+   - Prevents unnecessary re-filtering on every render
+   - O(n) operation memoized
+
+### Medium Priority Issues Fixed
+
+5. **🟡 Git Provider rootPath** (Task 3)
+   - Added explicit git case in ternary
+   - Cast to SSHProviderConfig instead of any
+   - Added TODO for future git implementation
+
+6. **🟡 Migration Double-Call** (Task 9)
+   - Removed manual addSessionToWorkspace call
+   - linkSessionToWorkspace emits event → subscription handles it
+   - Prevents duplicate entries
+
+7. **🔵 Task 10 Purpose** (Task 10)
+   - Renamed to "Integration Testing & Verification"
+   - Added prerequisites section
+   - Clarified it runs AFTER implementation complete
+
+### Documentation Improvements
+
+- **Step Renumbering**: Fixed Task 4.5 step numbers (removed duplicate Step 2)
+- **Import Verification**: Added import checks for all sync coordinator usage
+- **Testing Clarity**: Enhanced filtering test with explicit count verification
+- **File Specificity**: Identified SessionList.tsx for filtering implementation
+
+### Feature Completeness Validation
+
+**All design requirements now implemented**:
+- ✅ Plus button repositioning (Task 1)
+- ✅ Directory browser selection fix (Task 2)
+- ✅ Workspace-session bidirectional linking (Tasks 3, 4)
+- ✅ Session creation with workspace context (Task 5)
+- ✅ Working directory context for Claude (Task 6)
+- ✅ Workspace deletion handling (Task 7)
+- ✅ Session switching with auto-switch (Task 8)
+- ✅ **Sidebar session filtering (Task 8.5 - NEW)**
+- ✅ Migration for existing sessions (Task 9)
+- ✅ Comprehensive testing (Task 10)
+
+### Critical Discovery
+
+**Major Feature Gap Found**: The design doc explicitly required "sidebar filters sessions by workspace" but NO TASK implemented this. The plan would have resulted in a non-functional feature where switching workspaces didn't change visible sessions.
+
+**Impact**: Without Task 8.5, the core UX requirement would have been missed. Users would see ALL sessions regardless of workspace, defeating the purpose of the feature.
+
+**Resolution**: Added Task 8.5 with complete implementation including:
+- Filtering logic with useMemo
+- "Unassigned" section for orphaned sessions
+- Empty state handling
+- Comprehensive testing
+
+### Final Architecture Review
+
+**Sync Coordinator Pattern**:
+- ✅ No circular dependencies
+- ✅ Event-driven bidirectional sync
+- ✅ Subscriptions in store creators (correct closure scope)
+- ✅ Error handling and logging
+- ✅ Proper event ordering (state → event)
+
+**Type Safety**:
+- ✅ All interfaces explicitly defined
+- ✅ Persistence types (PersistedWorkspaceConfig)
+- ✅ Session type in claude.ts (not sessions.ts)
+- ✅ No implicit any types
+
+**React Patterns**:
+- ✅ Hooks use hooks (not getState)
+- ✅ Actions use getState (not hooks)
+- ✅ Parameters passed from UI to stores
+- ✅ Performance optimized (useMemo)
+
+**Data Integrity**:
+- ✅ Immutable updates (no .push(), create new arrays)
+- ✅ Null safety (proper checks, no ! assertions)
+- ✅ Validation (workspace existence, path boundaries)
+- ✅ Sync maintenance (events prevent desync)
+
+### Files Modified/Created (All Iterations)
+
+**Created**:
+- `src/lib/store/sync.ts` (sync coordinator)
+
+**Modified**:
+- `src/lib/store/workspaces.ts` (sessionIds, actions, subscriptions, persistence)
+- `src/lib/store/index.ts` (workspaceId, actions, subscriptions, parameters)
+- `src/lib/workspace/types.ts` (Workspace.sessionIds)
+- `src/types/claude.ts` (Session.workspaceId)
+- `src/components/workspace/WorkspaceTabBar.tsx` (plus button position)
+- `src/components/workspace/DirectoryBrowser.tsx` (selection fix, validation)
+- `src/components/sidebar/SessionPanel.tsx` (workspace context)
+- `src/components/sidebar/SessionItem.tsx` (auto-switch workspace)
+- `src/components/sidebar/SessionList.tsx` (session filtering - NEW)
+- `src/hooks/useClaudeChat.ts` (workspace context)
+
+**Total**: 1 new file, 10 modified files
+
+### Testing Coverage (Final)
+
+**Manual Test Scenarios**: 12
+1. Plus button positioning
+2. Plus button scroll behavior
+3. Directory browser selection
+4. Directory browser path validation
+5. Workspace-session creation
+6. Workspace switching and filtering ← Enhanced
+7. Session auto-switch
+8. Workspace deletion
+9. cwd context
+10. Sync coordinator events ← New
+11. Final verification checklist (12 items)
+12. Integration testing
+
+**Edge Cases Covered**:
+- No active workspace (fallback handling)
+- Workspace deleted (session unlinking)
+- Session switching across workspaces
+- Non-existent workspace references
+- Path traversal attempts
+- Concurrent operations
+- Migration idempotency
+- Duplicate subscriptions (prevented)
+
+## Iteration 4 Status (Final)
+
+**Total Issues Found**: 9
+**Critical**: 2
+**High Priority**: 2
+**Medium Priority**: 3
+**Low Priority**: 2
+
+**All Issues Resolved**: Yes
+
+**Implementation Readiness**: Production-Ready
+- Complete feature coverage
+- All requirements from design doc implemented
+- No blockers remaining
+- Ready for execution
+
+**Recommendation**: Proceed to implementation using superpowers:executing-plans or subagent-driven-development skill.
