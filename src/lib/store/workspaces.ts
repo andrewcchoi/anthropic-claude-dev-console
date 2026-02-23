@@ -16,6 +16,7 @@ import {
   SSHProviderConfig,
 } from '../workspace/types';
 import { createLogger } from '../logger';
+import { storeSync } from './sync';
 
 const log = createLogger('WorkspaceStore');
 
@@ -92,13 +93,22 @@ const getNextColor = (existingCount: number): string => {
 
 export const useWorkspaceStore = create<WorkspaceStore>()(
   persist(
-    (set, get) => ({
-      // Initial state
-      workspaces: new Map(),
-      providers: new Map(),
-      activeWorkspaceId: null,
-      workspaceOrder: [],
-      isInitialized: false,
+    (set, get) => {
+      // Set up sync coordinator subscriptions INSIDE store creator
+      storeSync.subscribe((event) => {
+        if (event.type === 'session_deleted' && event.payload.sessionId && event.payload.workspaceId) {
+          const state = get();
+          state.removeSessionFromWorkspace(event.payload.workspaceId, event.payload.sessionId);
+        }
+      });
+
+      return {
+        // Initial state
+        workspaces: new Map(),
+        providers: new Map(),
+        activeWorkspaceId: null,
+        workspaceOrder: [],
+        isInitialized: false,
 
       // ========================================================================
       // Workspace Actions
@@ -511,7 +521,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       migrateExistingSessions: () => {
         // TODO: Implemented in Task 9
       },
-    }),
+      };
+    },
     {
       name: 'claude-workspaces-v1',
 

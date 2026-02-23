@@ -382,19 +382,37 @@ export const useChatStore = create<ChatStore>()(
         }
       },
 
-      deleteSession: (id) =>
-        set((state) => ({
-          sessions: state.sessions.filter((s) => s.id !== id),
-          ...(state.sessionId === id
-            ? {
+      deleteSession: (id) => {
+        try {
+          set((state) => {
+            const session = state.sessions.find(s => s.id === id);
+
+            // Remove from workspace's sessionIds before deleting
+            if (session?.workspaceId) {
+              log.debug('Removing session from workspace before deletion', {
+                sessionId: id,
+                workspaceId: session.workspaceId,
+              });
+
+              // Emit sync event so workspace store can clean up
+              storeSync.sessionDeleted(id, session.workspaceId);
+            }
+
+            return {
+              sessions: state.sessions.filter((s) => s.id !== id),
+              ...(state.sessionId === id ? {
                 sessionId: null,
                 currentSession: null,
                 messages: [],
                 toolExecutions: [],
                 sessionUsage: null,
-              }
-            : {}),
-        })),
+              } : {}),
+            };
+          });
+        } catch (error) {
+          log.error('Failed to delete session', { error, sessionId: id });
+        }
+      },
 
       hideSession: (id) =>
         set((state) => ({
