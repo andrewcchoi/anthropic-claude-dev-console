@@ -17,8 +17,10 @@ export function useCliPrewarm() {
     preferredModel,
   } = useChatStore();
 
-  const prewarmCli = async (sessionId: string) => {
-    log.debug('Starting CLI pre-warm', { sessionId });
+  const prewarmCli = async (sessionId: string, cwd?: string) => {
+    const effectiveCwd = cwd || '/workspace';
+
+    log.debug('Starting CLI pre-warm', { sessionId, cwd: effectiveCwd });
     setIsPrewarming(true);
     setPrewarmError(null);
 
@@ -28,7 +30,7 @@ export function useCliPrewarm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId,
-          cwd: '/workspace',
+          cwd: effectiveCwd,
           model: preferredModel,
           provider,
           providerConfig,

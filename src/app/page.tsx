@@ -81,14 +81,20 @@ export default function Home() {
     // Use current session if available, otherwise create a temporary session with valid UUID
     const initSessionId = sessionId || uuidv4();
 
+    // Get workspace context for CLI initialization
+    const activeWorkspace = activeWorkspaceId ? workspaces.get(activeWorkspaceId) : null;
+    const cwd = activeWorkspace?.rootPath || '/workspace';
+
     log.debug('Initializing CLI to load skills and commands', {
       sessionId: initSessionId,
       isTemporary: !sessionId,
+      cwd,
+      hasWorkspace: !!activeWorkspace,
     });
 
     hasInitialized.current = true;
-    prewarmCli(initSessionId);
-  }, [sessionId, availableSkills, availableCommands, prewarmCli]);
+    prewarmCli(initSessionId, cwd);
+  }, [sessionId, availableSkills, availableCommands, prewarmCli, activeWorkspaceId, workspaces]);
 
   // Keyboard shortcuts
   useWorkspaceShortcuts({
