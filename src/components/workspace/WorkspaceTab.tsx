@@ -19,7 +19,8 @@ export function WorkspaceTab({ workspace, isActive, onClick, onClose }: Workspac
   const [isHovered, setIsHovered] = useState(false);
 
   const getStatusColor = () => {
-    switch (workspace.status) {
+    const status = (workspace as any).status || 'disconnected';
+    switch (status) {
       case 'connected':
         return 'bg-green-500';
       case 'connecting':
@@ -32,7 +33,8 @@ export function WorkspaceTab({ workspace, isActive, onClick, onClose }: Workspac
   };
 
   const getProviderIcon = () => {
-    switch (workspace.type) {
+    const providerType = (workspace as any).providerType || workspace.providerId?.split('-')[0] || 'local';
+    switch (providerType) {
       case 'local':
         return '📁';
       case 'git':
