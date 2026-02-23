@@ -25,7 +25,7 @@ export function WorkspaceTabBar({
 }: WorkspaceTabBarProps) {
   return (
     <div className="relative z-40 flex items-center bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-      {/* Workspace tabs */}
+      {/* Workspace tabs with plus button inside scrollable area */}
       <div className="flex items-center flex-1 overflow-x-auto">
         {workspaces.map((workspace) => (
           <WorkspaceTab
@@ -36,24 +36,23 @@ export function WorkspaceTabBar({
             onClose={() => onWorkspaceClose(workspace.id)}
           />
         ))}
-      </div>
 
-      {/* Add workspace button */}
-      <button
-        onClick={onAddWorkspace}
-        className="
-          w-10 h-10 flex items-center justify-center
-          text-gray-600 dark:text-gray-400
-          hover:text-gray-900 dark:hover:text-gray-100
-          hover:bg-gray-100 dark:hover:bg-gray-800
-          border-l border-gray-200 dark:border-gray-700
-          transition-colors
-        "
-        aria-label="Add workspace"
-        title="Add workspace"
-      >
-        <span className="text-xl">+</span>
-      </button>
+        {/* Add workspace button - now inside scrollable container */}
+        <button
+          onClick={onAddWorkspace}
+          className="
+            shrink-0 w-10 h-10 flex items-center justify-center
+            text-gray-600 dark:text-gray-400
+            hover:text-gray-900 dark:hover:text-gray-100
+            hover:bg-gray-100 dark:hover:bg-gray-800
+            transition-colors
+          "
+          aria-label="Add workspace"
+          title="Add workspace"
+        >
+          <span className="text-xl">+</span>
+        </button>
+      </div>
     </div>
   );
 }
