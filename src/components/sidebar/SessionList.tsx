@@ -2,14 +2,45 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useChatStore } from '@/lib/store';
+import { useSessionDiscoveryStore } from '@/lib/store/sessions';
 import { useWorkspaceStore } from '@/lib/store/workspaces';
 import { formatRelativeTime } from '@/lib/utils/time';
 import { Session } from '@/types/claude';
+import { CLISession } from '@/types/sessions';
 
 export function SessionList() {
   const [isClient, setIsClient] = useState(false);
-  const { sessions, sessionId, switchSession, deleteSession } = useChatStore();
+  const { sessions: uiSessions, sessionId, switchSession, deleteSession, hiddenSessionIds } = useChatStore();
+  const { sessions: cliSessions } = useSessionDiscoveryStore();
   const { activeWorkspaceId, workspaces, setActiveWorkspace } = useWorkspaceStore();
+
+  // Combine UI sessions and CLI discovered sessions
+  // Convert CLI sessions to Session format
+  const allSessions = useMemo(() => {
+    const combined: Session[] = [
+      // UI sessions (excluding hidden)
+      ...uiSessions.filter(s => !hiddenSessionIds.has(s.id)),
+      // CLI sessions (excluding system sessions)
+      ...cliSessions
+        .filter(s => !s.isSystem)
+        .map((cli: CLISession): Session => ({
+          id: cli.id,
+          name: cli.name || 'Untitled Session',
+          created_at: cli.createdAt,
+          updated_at: cli.modifiedAt,
+          cwd: cli.cwd || '',
+          workspaceId: undefined, // CLI sessions don't have workspace link yet
+        })),
+    ];
+
+    // Deduplicate by ID (prefer UI sessions over CLI sessions)
+    const seen = new Set<string>();
+    return combined.filter(s => {
+      if (seen.has(s.id)) return false;
+      seen.add(s.id);
+      return true;
+    });
+  }, [uiSessions, cliSessions, hiddenSessionIds]);
 
   useEffect(() => {
     setIsClient(true);
@@ -23,7 +54,7 @@ export function SessionList() {
     const workspace = workspaces.get(workspaceId);
     if (!workspace) return [];
 
-    return sessions.filter(s => {
+    return allSessions.filter(s => {
       // Explicit workspace link (preferred)
       if (s.workspaceId === workspaceId) return true;
 
@@ -50,7 +81,7 @@ export function SessionList() {
   const workspaceSessions = useMemo(() => {
     if (!activeWorkspace) return [];
 
-    return sessions.filter(s => {
+    return allSessions.filter(s => {
       // Explicit workspace link (preferred)
       if (s.workspaceId === activeWorkspaceId) return true;
 
@@ -68,13 +99,13 @@ export function SessionList() {
 
       return false;
     });
-  }, [sessions, activeWorkspaceId, activeWorkspace]);
+  }, [allSessions, activeWorkspaceId, activeWorkspace]);
 
   // Unassigned sessions: no workspaceId AND don't match any workspace's path
   const unassignedSessions = useMemo(() => {
     const allWorkspaces = Array.from(workspaces.values());
 
-    return sessions.filter(s => {
+    return allSessions.filter(s => {
       // Already has a workspace link
       if (s.workspaceId) return false;
 
@@ -94,7 +125,7 @@ export function SessionList() {
 
       return true; // Doesn't match any workspace
     });
-  }, [sessions, workspaces]);
+  }, [allSessions, workspaces]);
 
   if (!isClient) {
     return <div className="text-sm text-gray-400 dark:text-gray-500">Loading...</div>;
