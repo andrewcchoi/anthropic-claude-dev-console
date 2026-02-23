@@ -13,7 +13,11 @@ import {
   ProviderState,
   ConnectionStatus,
   LocalProviderConfig,
+  SSHProviderConfig,
 } from '../workspace/types';
+import { createLogger } from '../logger';
+
+const log = createLogger('WorkspaceStore');
 
 // ============================================================================
 // Store Types
@@ -24,6 +28,7 @@ interface PersistedWorkspaceConfig {
   name: string;
   config: ProviderConfig;
   color: string;
+  sessionIds: string[];  // Include session links
 }
 
 interface WorkspaceStore {
@@ -52,9 +57,14 @@ interface WorkspaceStore {
   selectFile: (workspaceId: string, path: string | null) => void;
   trackFileActivity: (workspaceId: string, path: string, type: 'read' | 'modified') => void;
 
+  // Session management
+  addSessionToWorkspace: (workspaceId: string, sessionId: string) => void;
+  removeSessionFromWorkspace: (workspaceId: string, sessionId: string) => void;
+
   // Initialization
   initialize: () => Promise<void>;
   migrateFromLegacy: () => Promise<void>;
+  migrateExistingSessions: () => void;
 }
 
 // ============================================================================
@@ -141,10 +151,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           rootPath: config.type === 'local'
             ? (config as LocalProviderConfig).path
             : config.type === 'ssh'
-              ? (config as any).remotePath
-              : '/',
+              ? (config as SSHProviderConfig).remotePath
+              : config.type === 'git'
+                ? '/'  // TODO: Update when git clone location is implemented
+                : '/',
           color: options.color ?? getNextColor(state.workspaces.size),
           sessionId: null,
+          sessionIds: [],  // Initialize empty array
           expandedFolders: new Set(),
           selectedFile: null,
           fileActivity: new Map(),
@@ -232,6 +245,85 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           newOrder.splice(toIndex, 0, moved);
           return { workspaceOrder: newOrder };
         });
+      },
+
+      // ========================================================================
+      // Session Management
+      // ========================================================================
+
+      addSessionToWorkspace: (workspaceId, sessionId) => {
+        try {
+          set((state) => {
+            const newWorkspaces = new Map(state.workspaces);
+            const workspace = newWorkspaces.get(workspaceId);
+
+            if (!workspace) {
+              log.warn('Workspace not found', { workspaceId });
+              return state;
+            }
+
+            if (workspace.sessionIds.includes(sessionId)) {
+              return state; // Already added
+            }
+
+            // Create new workspace object with new sessionIds array (immutable)
+            const updatedWorkspace = {
+              ...workspace,
+              sessionIds: [...workspace.sessionIds, sessionId], // ✅ NEW ARRAY
+            };
+
+            newWorkspaces.set(workspaceId, updatedWorkspace);
+
+            log.debug('Added session to workspace', {
+              workspaceId,
+              sessionId,
+              sessionCount: updatedWorkspace.sessionIds.length,
+            });
+
+            return { workspaces: newWorkspaces };
+          });
+        } catch (error) {
+          log.error('Failed to add session to workspace', {
+            error,
+            workspaceId,
+            sessionId,
+          });
+        }
+      },
+
+      removeSessionFromWorkspace: (workspaceId, sessionId) => {
+        try {
+          set((state) => {
+            const newWorkspaces = new Map(state.workspaces);
+            const workspace = newWorkspaces.get(workspaceId);
+
+            if (!workspace) {
+              return state;
+            }
+
+            // Create new workspace object with filtered sessionIds array (immutable)
+            const updatedWorkspace = {
+              ...workspace,
+              sessionIds: workspace.sessionIds.filter(id => id !== sessionId), // ✅ NEW ARRAY
+            };
+
+            newWorkspaces.set(workspaceId, updatedWorkspace);
+
+            log.debug('Removed session from workspace', {
+              workspaceId,
+              sessionId,
+              remainingCount: updatedWorkspace.sessionIds.length,
+            });
+
+            return { workspaces: newWorkspaces };
+          });
+        } catch (error) {
+          log.error('Failed to remove session from workspace', {
+            error,
+            workspaceId,
+            sessionId,
+          });
+        }
       },
 
       // ========================================================================
@@ -415,6 +507,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           // Ignore errors during migration check
         }
       },
+
+      migrateExistingSessions: () => {
+        // TODO: Implemented in Task 9
+      },
     }),
     {
       name: 'claude-workspaces-v1',
@@ -426,7 +522,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           name: ws.name,
           config: state.providers.get(ws.providerId)?.config,
           color: ws.color,
-        })),
+          sessionIds: ws.sessionIds,  // Persist session links
+        })) as PersistedWorkspaceConfig[],
         workspaceOrder: state.workspaceOrder,
         activeWorkspaceId: state.activeWorkspaceId,
       }),
@@ -463,9 +560,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               providerType: wc.config.type,
               rootPath: wc.config.type === 'local'
                 ? (wc.config as LocalProviderConfig).path
-                : '/',
+                : wc.config.type === 'ssh'
+                  ? (wc.config as SSHProviderConfig).remotePath
+                  : wc.config.type === 'git'
+                    ? '/'  // TODO: Update when git clone location is implemented
+                    : '/',
               color: wc.color,
               sessionId: null,
+              sessionIds: wc.sessionIds || [],  // Restore session links (type-safe)
               expandedFolders: new Set(),
               selectedFile: null,
               fileActivity: new Map(),

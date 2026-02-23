@@ -271,6 +271,7 @@ export class WorkspaceManager {
       rootPath: provider.rootPath,
       color: config.color ?? WORKSPACE_COLORS[colorIndex],
       sessionId: null,
+      sessionIds: [],
       expandedFolders: new Set(),
       selectedFile: null,
       fileActivity: new Map(),

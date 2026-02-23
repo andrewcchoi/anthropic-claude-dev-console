@@ -117,6 +117,7 @@ export interface Workspace {
 
   // Session association
   sessionId: string | null;
+  sessionIds: string[];  // Track all sessions for this workspace
 
   // Per-workspace UI state
   expandedFolders: Set<string>;
