@@ -7,7 +7,7 @@ import { useWorkspaceStore } from '@/lib/store/workspaces';
 import { useCliPrewarm } from '@/hooks/useCliPrewarm';
 import { SessionSearch } from './SessionSearch';
 import { RefreshButton } from './RefreshButton';
-import { ProjectList } from './ProjectList';
+import { SessionList } from './SessionList';
 import { Loader2 } from 'lucide-react';
 
 const STALE_THRESHOLD = 60000; // 60 seconds
@@ -50,9 +50,10 @@ export function SessionPanel() {
     const activeWorkspace = activeWorkspaceId ? workspaces.get(activeWorkspaceId) : null;
 
     // Pass workspace context to session creation
-    const newSessionId = startNewSession(activeWorkspace?.id, activeWorkspace?.rootPath);
+    startNewSession(activeWorkspace?.id, activeWorkspace?.rootPath);
 
-    prewarmCli(newSessionId);
+    // NOTE: Don't pre-warm new sessions - it causes "Session ID already in use" conflicts
+    // Pre-warm only happens on app startup in page.tsx for global CLI initialization
   };
 
   const handleRefresh = () => {
@@ -96,13 +97,13 @@ export function SessionPanel() {
           </div>
         )}
 
-        {/* Projects with sessions - no collapsible wrapper */}
+        {/* Sessions filtered by active workspace */}
         {isDiscovering && !lastDiscoveryTime ? (
           <div className="text-sm text-gray-400 dark:text-gray-500 py-4 text-center">
             Discovering sessions...
           </div>
         ) : (
-          <ProjectList />
+          <SessionList />
         )}
       </div>
     </>

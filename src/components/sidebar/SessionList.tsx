@@ -8,22 +8,65 @@ import { formatRelativeTime } from '@/lib/utils/time';
 export function SessionList() {
   const [isClient, setIsClient] = useState(false);
   const { sessions, sessionId, switchSession, deleteSession } = useChatStore();
-  const { activeWorkspaceId } = useWorkspaceStore();
+  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // Filter sessions by active workspace (memoized for performance)
-  const workspaceSessions = useMemo(
-    () => sessions.filter(s => s.workspaceId === activeWorkspaceId),
-    [sessions, activeWorkspaceId]
-  );
+  // Get active workspace to check path matching
+  const activeWorkspace = activeWorkspaceId ? workspaces.get(activeWorkspaceId) : null;
 
-  const unassignedSessions = useMemo(
-    () => sessions.filter(s => !s.workspaceId),
-    [sessions]
-  );
+  // Filter sessions by active workspace (memoized for performance)
+  // Include sessions with matching workspaceId OR matching cwd path (for old sessions without workspaceId)
+  const workspaceSessions = useMemo(() => {
+    if (!activeWorkspace) return [];
+
+    return sessions.filter(s => {
+      // Explicit workspace link (preferred)
+      if (s.workspaceId === activeWorkspaceId) return true;
+
+      // Path-based matching for old sessions without workspaceId
+      // Match if session's cwd is within workspace's rootPath
+      if (!s.workspaceId && s.cwd && activeWorkspace.rootPath) {
+        // Normalize paths for comparison (remove trailing slashes)
+        const normalizedCwd = s.cwd.replace(/\/$/, '');
+        const normalizedRoot = activeWorkspace.rootPath.replace(/\/$/, '');
+
+        // Exact match or subdirectory
+        return normalizedCwd === normalizedRoot ||
+               normalizedCwd.startsWith(normalizedRoot + '/');
+      }
+
+      return false;
+    });
+  }, [sessions, activeWorkspaceId, activeWorkspace]);
+
+  // Unassigned sessions: no workspaceId AND don't match any workspace's path
+  const unassignedSessions = useMemo(() => {
+    const allWorkspaces = Array.from(workspaces.values());
+
+    return sessions.filter(s => {
+      // Already has a workspace link
+      if (s.workspaceId) return false;
+
+      // Check if it matches any workspace's path
+      if (s.cwd) {
+        const normalizedCwd = s.cwd.replace(/\/$/, '');
+
+        for (const workspace of allWorkspaces) {
+          if (!workspace.rootPath) continue;
+
+          const normalizedRoot = workspace.rootPath.replace(/\/$/, '');
+          if (normalizedCwd === normalizedRoot || normalizedCwd.startsWith(normalizedRoot + '/')) {
+            return false; // Matches a workspace, not unassigned
+          }
+        }
+      }
+
+      return true; // Doesn't match any workspace
+    });
+  }, [sessions, workspaces]);
 
   if (!isClient) {
     return <div className="text-sm text-gray-400 dark:text-gray-500">Loading...</div>;

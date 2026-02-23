@@ -9,6 +9,8 @@ import { serializeError } from '@/lib/utils/errorUtils';
 
 const log = createLogger('ClaudeChat');
 
+const MAX_SESSION_RETRIES = 1;
+
 export function useClaudeChat() {
   // Get workspace info from hook (not getState())
   const activeWorkspaceId = useWorkspaceStore(state => state.activeWorkspaceId);
@@ -33,6 +35,7 @@ export function useClaudeChat() {
   } = useChatStore();
 
   const [currentMessageId, setCurrentMessageId] = useState<string | null>(null);
+  const [sessionConflictRetries, setSessionConflictRetries] = useState(0);
 
   const sendMessage = useCallback(
     async (prompt: string, cwdOverride?: string, attachments?: FileAttachment[]) => {
@@ -349,6 +352,8 @@ export function useClaudeChat() {
                   // Final result
                   if (message.subtype === 'success') {
                     receivedSuccessResult = true;
+                    // Reset retry counter on successful completion
+                    setSessionConflictRetries(0);
                     // Extract and update usage stats
                     if (message.total_cost_usd !== undefined || message.usage) {
                       updateUsage({
@@ -363,12 +368,31 @@ export function useClaudeChat() {
                     setError(serializeError(message.error));
                   }
                 } else if (message.type === 'session_locked') {
+                  // Check retry limit
+                  if (sessionConflictRetries >= MAX_SESSION_RETRIES) {
+                    log.error('Session conflict retry limit reached', {
+                      retries: sessionConflictRetries,
+                      sessionId,
+                      workspaceId: activeWorkspace?.id,
+                    });
+
+                    setError(
+                      'Unable to create session after retry. This may be due to provider configuration issues. ' +
+                      'Please check Settings → Provider or try switching to Anthropic provider.'
+                    );
+                    setIsStreaming(false);
+                    setSessionConflictRetries(0); // Reset for next attempt
+                    return;
+                  }
+
                   // Session ID conflict - generate new session with proper workspace linking
-                  log.warn('Session locked, creating new session with workspace context', {
+                  log.warn('Session locked, creating new session', {
                     oldSessionId: sessionId,
                     workspaceId: activeWorkspace?.id,
+                    retryCount: sessionConflictRetries + 1,
                   });
 
+                  setSessionConflictRetries(prev => prev + 1);
                   // Use startNewSession to properly link to workspace
                   startNewSession(activeWorkspace?.id, activeWorkspace?.rootPath);
                   setError('Session conflict detected, created new session...');

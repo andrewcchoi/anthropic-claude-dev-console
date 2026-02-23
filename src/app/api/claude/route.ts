@@ -14,6 +14,18 @@ export const dynamic = 'force-dynamic';
 
 const TELEMETRY_LOG = '/workspace/logs/telemetry.jsonl';
 
+// Sanitize stderr to prevent secret exposure in logs
+const sanitizeStderr = (stderr: string): string => {
+  // Remove API keys (sk- prefix + 32+ chars)
+  let sanitized = stderr.replace(/sk-[a-zA-Z0-9_-]{32,}/g, '[API_KEY_REDACTED]');
+  // Remove long tokens (48+ chars)
+  sanitized = sanitized.replace(/[a-zA-Z0-9_-]{48,}/g, '[TOKEN_REDACTED]');
+  // Remove file paths with usernames
+  sanitized = sanitized.replace(/\/home\/[^\/\s]+/g, '/home/[USER]');
+  sanitized = sanitized.replace(/\/Users\/[^\/\s]+/g, '/Users/[USER]');
+  return sanitized;
+};
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -33,6 +45,46 @@ export async function POST(req: NextRequest) {
         JSON.stringify({ error: 'Prompt is required' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Validate provider configuration BEFORE spawning CLI
+    if (provider === 'foundry') {
+      const config = providerConfig as any;
+
+      if (!config?.foundryApiKey) {
+        const errorMsg = 'Foundry provider requires API key. Please configure in Settings.';
+        log.error('Missing foundry API key', {
+          provider,
+          hasConfig: !!providerConfig,
+          configKeys: providerConfig ? Object.keys(providerConfig) : [],
+        });
+
+        return new Response(
+          JSON.stringify({ error: errorMsg }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      if (!config?.foundryResource) {
+        const errorMsg = 'Foundry provider requires resource configuration.';
+        log.error('Missing foundry resource', { provider });
+
+        return new Response(
+          JSON.stringify({ error: errorMsg }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      log.debug('Foundry provider config validated', {
+        hasApiKey: !!config.foundryApiKey,
+        hasResource: !!config.foundryResource,
+      });
     }
 
     // Validate defaultMode
@@ -209,7 +261,13 @@ export async function POST(req: NextRequest) {
 
           // Capture stderr for error reporting
           claude.stderr.on('data', (chunk: Buffer) => {
-            stderrBuffer += chunk.toString();
+            const stderrChunk = chunk.toString();
+            stderrBuffer += stderrChunk;
+
+            // Log sanitized stderr for debugging (only in debug mode)
+            if (process.env.LOG_LEVEL === 'debug' || process.env.NODE_ENV === 'development') {
+              log.debug('CLI stderr output', { stderr: sanitizeStderr(stderrChunk) });
+            }
           });
 
           // Handle process completion
@@ -239,25 +297,44 @@ export async function POST(req: NextRequest) {
               }
             }
 
-            // Only report errors if we didn't receive a success result and exit code is non-zero
-            if (code !== 0 && !receivedSuccessResult && stderrBuffer) {
+            // Report errors if we didn't receive a success result and exit code is non-zero
+            if (code !== 0 && !receivedSuccessResult) {
+              const errorMessage = stderrBuffer || `CLI exited with code ${code} (no error output)`;
+
+              log.error('CLI process failed', {
+                exitCode: code,
+                hadStderr: !!stderrBuffer,
+                stderrLength: stderrBuffer.length,
+                provider,
+                model,
+              });
+
               // Check for session lock error
               if (stderrBuffer.includes('already in use')) {
-                const errorMessage = {
+                const errorEvent = {
                   type: 'session_locked',
                   error: 'Session ID conflict - regenerating',
                 };
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify(errorMessage)}\n\n`)
-                );
+                try {
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify(errorEvent)}\n\n`)
+                  );
+                } catch (e) {
+                  log.error('Failed to send session_locked event', { error: e });
+                }
               } else {
-                const errorMessage = {
+                const errorEvent = {
                   type: 'error',
-                  error: `Claude CLI exited with code ${code}: ${stderrBuffer}`,
+                  error: errorMessage,
+                  code: code,
                 };
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify(errorMessage)}\n\n`)
-                );
+                try {
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify(errorEvent)}\n\n`)
+                  );
+                } catch (e) {
+                  log.error('Failed to send error event', { error: e });
+                }
               }
             }
             controller.enqueue(encoder.encode('data: [DONE]\n\n'));
