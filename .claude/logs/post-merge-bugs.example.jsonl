@@ -1,0 +1,20 @@
+# Post-Merge Bugs Log
+# Format: JSONL (one JSON object per line)
+# Purpose: Track bugs discovered after code was merged to correlate with reviewer decisions
+#
+# Fields:
+#   - timestamp: ISO 8601 timestamp of bug discovery
+#   - task: Original task identifier (links to reviewer-decisions.jsonl)
+#   - bug_id: Bug identifier (e.g., "BUG-001", GitHub issue number)
+#   - severity: Bug severity (critical, high, medium, low)
+#   - category: Bug category (logic, security, performance, ux, data, integration)
+#   - description: Brief description of the bug
+#   - reviewers_involved: Array of reviewers who approved the original task
+#   - should_have_caught: Which reviewer type should have caught this
+#   - root_cause: What was the underlying issue
+#   - time_to_discovery: How long after merge was bug found (e.g., "2h", "3d")
+#
+# Example entries below (delete these in production):
+{"timestamp":"2026-02-24T14:00:00Z","task":"task-1","bug_id":"BUG-001","severity":"medium","category":"integration","description":"API returns 404 for non-default workspace sessions","reviewers_involved":["spec","quality","adversarial"],"should_have_caught":"integration","root_cause":"UUID vs encoded path type mismatch","time_to_discovery":"4h"}
+{"timestamp":"2026-02-25T09:00:00Z","task":"task-3","bug_id":"BUG-002","severity":"high","category":"logic","description":"Race condition in concurrent session switches","reviewers_involved":["spec","quality"],"should_have_caught":"adversarial","root_cause":"Missing lock mechanism for state updates","time_to_discovery":"1d"}
+{"timestamp":"2026-02-26T11:00:00Z","task":"task-5","bug_id":"BUG-003","severity":"low","category":"ux","description":"Toast notification appears twice on error","reviewers_involved":["spec","quality"],"should_have_caught":"quality","root_cause":"Duplicate error handler registration","time_to_discovery":"2d"}

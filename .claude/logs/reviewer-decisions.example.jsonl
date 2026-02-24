@@ -1,0 +1,21 @@
+# Reviewer Decisions Log
+# Format: JSONL (one JSON object per line)
+# Purpose: Track all reviewer decisions for accuracy analysis
+#
+# Fields:
+#   - timestamp: ISO 8601 timestamp of decision
+#   - task: Task identifier (e.g., "task-1", "feature-auth")
+#   - reviewer: Reviewer type (spec, quality, adversarial, security, etc.)
+#   - decision: Outcome (approved, fixes_needed, rejected)
+#   - issues_found: Number of issues identified
+#   - severity: Optional - highest severity found (critical, medium, low, none)
+#   - confidence: Optional - reviewer's confidence score (0-100)
+#   - notes: Optional - additional context
+#
+# Example entries below (delete these in production):
+{"timestamp":"2026-02-24T10:00:00Z","task":"task-1","reviewer":"spec","decision":"approved","issues_found":0,"severity":"none","confidence":85}
+{"timestamp":"2026-02-24T10:05:00Z","task":"task-1","reviewer":"quality","decision":"fixes_needed","issues_found":2,"severity":"medium","confidence":75,"notes":"Missing error handling in edge cases"}
+{"timestamp":"2026-02-24T10:10:00Z","task":"task-1","reviewer":"adversarial","decision":"approved","issues_found":1,"severity":"low","confidence":70,"notes":"Minor optimization opportunity, not blocking"}
+{"timestamp":"2026-02-24T11:00:00Z","task":"task-2","reviewer":"spec","decision":"rejected","issues_found":3,"severity":"critical","confidence":90,"notes":"Missing required functionality per spec"}
+{"timestamp":"2026-02-24T11:30:00Z","task":"task-2","reviewer":"spec","decision":"approved","issues_found":0,"severity":"none","confidence":88,"notes":"After fixes applied"}
+{"timestamp":"2026-02-24T12:00:00Z","task":"task-3","reviewer":"security","decision":"fixes_needed","issues_found":1,"severity":"critical","confidence":95,"notes":"Input validation vulnerability"}
