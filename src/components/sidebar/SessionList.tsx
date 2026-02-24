@@ -29,7 +29,7 @@ export function SessionList() {
           created_at: cli.createdAt,
           updated_at: cli.modifiedAt,
           cwd: cli.cwd || '',
-          workspaceId: undefined, // CLI sessions don't have workspace link yet
+          workspaceId: cli.projectId, // Map projectId to workspaceId
         })),
     ];
 
@@ -73,7 +73,7 @@ export function SessionList() {
   // Handle session click in overview mode (opens workspace tab)
   const handleSessionClickInOverview = (session: Session, workspaceId: string) => {
     setActiveWorkspace(workspaceId); // Open the workspace tab
-    switchSession(session.id); // Switch to the session
+    switchSession(session.id, session.workspaceId); // Switch to the session
   };
 
   // Filter sessions by active workspace (memoized for performance)
@@ -206,7 +206,7 @@ export function SessionList() {
               {sortedUnassigned.map((session) => (
                 <div
                   key={session.id}
-                  onClick={() => switchSession(session.id)}
+                  onClick={() => switchSession(session.id, session.workspaceId)}
                   className={`p-2 rounded cursor-pointer text-sm truncate ${
                     session.id === sessionId
                       ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100'
@@ -256,7 +256,7 @@ export function SessionList() {
       {sortedWorkspace.map((session) => (
         <div
           key={session.id}
-          onClick={() => switchSession(session.id)}
+          onClick={() => switchSession(session.id, session.workspaceId)}
           className={`p-2 rounded cursor-pointer text-sm truncate ${
             session.id === sessionId
               ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100'
@@ -288,7 +288,7 @@ export function SessionList() {
           {sortedUnassigned.map((session) => (
             <div
               key={session.id}
-              onClick={() => switchSession(session.id)}
+              onClick={() => switchSession(session.id, session.workspaceId)}
               className={`p-2 rounded cursor-pointer text-sm truncate ${
                 session.id === sessionId
                   ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100'

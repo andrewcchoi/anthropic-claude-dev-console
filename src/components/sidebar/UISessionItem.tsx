@@ -44,7 +44,7 @@ export function UISessionItem({ session }: UISessionItemProps) {
     }
 
     // Switch to session
-    await switchSession(session.id);
+    await switchSession(session.id, session.workspaceId);
   };
 
   const handleHide = (e: React.MouseEvent) => {

@@ -15,7 +15,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
-    "test:connectivity": "tsx scripts/test-connectivity.ts"
+    "test:connectivity": "tsx scripts/test-connectivity.ts",
+    "test:audits": "vitest run __tests__/audits",
+    "test:integration": "vitest run __tests__/integration",
+    "test:report": "tsx scripts/test-automation/generate-report.ts",
+    "test:heal": "tsx scripts/test-automation/test-healer.ts",
+    "generate-checklist": "tsx scripts/test-automation/generate-checklist.ts",
+    "generate-tests": "tsx scripts/test-automation/ai-test-generator.ts",
+    "verify-tests": "tsx scripts/test-automation/verify-tests.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

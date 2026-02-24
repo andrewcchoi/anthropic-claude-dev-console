@@ -41,9 +41,12 @@ Every feature must test all five layers:
 - [**Comprehensive Testing Skill**](../../.claude/skills/comprehensive-testing.md) - Skill for Claude Code
 - [**Test Templates**](../../__tests__/templates/) - Copy-paste templates
 
-## Innovation: AI-Powered Test Generation
+## Innovation: AI-Powered Test Generation & Healing
 
-This strategy includes an **AI-powered test generator** that analyzes your code and creates draft tests automatically:
+This strategy includes TWO AI-powered features:
+
+### 1. AI Test Generator
+Analyzes your code and creates draft tests automatically:
 
 ```bash
 # Generate tests with Claude API
@@ -56,6 +59,44 @@ The AI will:
 - Identify edge cases
 - Generate comprehensive test coverage
 - Create call-site audits
+
+### 2. AI Test Healer 🔮 (THE SURPRISE!)
+When tests fail, automatically analyzes failures and suggests fixes:
+
+```bash
+# Heal failing tests
+export ANTHROPIC_API_KEY=your-key
+npm run test:heal
+```
+
+The AI will:
+- Analyze test failures and stack traces
+- Review recent code changes (git diff)
+- Determine if code changed or test is outdated
+- Suggest specific code changes to fix the test
+- Provide confidence rating (high/medium/low)
+
+**Example output:**
+```
+🔍 Analyzing Failure 1/3
+   Test: should pass workspaceId to switchSession
+   File: src/components/sidebar/SessionList.tsx
+
+   🤖 Consulting AI...
+
+   📋 Healing Suggestion:
+   Confidence: HIGH
+
+   Problem: Test expects 2 parameters but function called with 1
+
+   Likely Cause: Code was refactored to require projectId parameter
+   but test wasn't updated to pass it
+
+   Suggested Fix:
+   1. Update line 259: switchSession(session.id, session.workspaceId)
+   2. Ensure session.workspaceId is available in component state
+   3. Add null check if workspaceId can be undefined
+```
 
 ## Why This Exists
 
@@ -79,6 +120,8 @@ The strategy is enforced via:
 |---------|---------|
 | `npm run generate-checklist` | Generate test checklist for files |
 | `npm run generate-tests` | AI-powered test generation |
+| `npm run test:heal` | 🔮 AI-powered test healing (analyzes failures & suggests fixes) |
+| `npm run test:report` | Generate comprehensive test strategy report |
 | `npm run verify-tests` | Verify all checklist items complete |
 | `npm run test:audits` | Run call-site audit tests |
 | `npm test -- --coverage` | Run tests with coverage |

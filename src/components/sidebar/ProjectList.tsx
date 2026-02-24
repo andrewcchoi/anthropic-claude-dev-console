@@ -15,7 +15,7 @@ const log = createLogger('ProjectList');
 export function ProjectList() {
   const { projects, sessions, sessionSearchQuery } = useSessionDiscoveryStore();
   const { sessions: uiSessions, sessionId, hiddenSessionIds, collapsedProjects, toggleProjectCollapse, switchSession, setCurrentSession, isStreaming } = useChatStore();
-  const { validateLastActiveSession, getMostRecentSessionForWorkspace, updateWorkspaceLastActiveSession, setCurrentWorkspace, workspaces } = useWorkspaceStore();
+  const { validateLastActiveSession, getMostRecentSessionForWorkspace, updateWorkspaceLastActiveSession, setActiveWorkspace, workspaces } = useWorkspaceStore();
   const { cleanupStream } = useClaudeChat();
   const [announcement, setAnnouncement] = useState('');
 
@@ -42,7 +42,7 @@ export function ProjectList() {
     // Step 2: Update current workspace (sync)
     // For now, we'll treat project.id as workspaceId
     // In future, we may need explicit workspace mapping
-    setCurrentWorkspace(project.id);
+    setActiveWorkspace(project.id);
 
     // Step 3: Find workspace from store (if it exists)
     const workspace = workspaces.get(project.id);
@@ -89,7 +89,7 @@ export function ProjectList() {
 
     // Step 6: Activate session (sync state, async messages)
     if (sessionToActivate) {
-      await switchSession(sessionToActivate);
+      await switchSession(sessionToActivate, project.id);
       updateWorkspaceLastActiveSession(project.id, sessionToActivate);
 
       // Announce to screen readers
@@ -104,7 +104,7 @@ export function ProjectList() {
   }, [
     isStreaming,
     cleanupStream,
-    setCurrentWorkspace,
+    setActiveWorkspace,
     validateLastActiveSession,
     getMostRecentSessionForWorkspace,
     updateWorkspaceLastActiveSession,
