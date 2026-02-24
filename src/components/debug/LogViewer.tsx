@@ -9,6 +9,16 @@ import { useState, useEffect, useRef } from 'react';
 import { useDebug } from '../providers/DebugProvider';
 import { type LogEntry } from '@/types/logger';
 import { DebugToggle } from '@/components/ui/DebugToggle';
+import { exportLogs, getLogStats, clearLogs as clearClientLogs } from '@/lib/logger/file-logger';
+
+type LogTab = 'server' | 'client';
+
+interface LogStats {
+  entryCount: number;
+  sizeBytes: number;
+  oldestEntry?: string;
+  newestEntry?: string;
+}
 
 const LOG_COLORS = {
   debug: 'text-gray-400 dark:text-gray-500',
@@ -33,6 +43,10 @@ export function LogViewer() {
   const [levelFilter, setLevelFilter] = useState<string>('all');
   const logsEndRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const [activeTab, setActiveTab] = useState<LogTab>('server');
+  const [clientLogs, setClientLogs] = useState<LogEntry[]>([]);
+  const [stats, setStats] = useState<LogStats | null>(null);
+  const [totalReceived, setTotalReceived] = useState(0);
 
   // Connect to log stream
   useEffect(() => {
@@ -56,6 +70,7 @@ export function LogViewer() {
 
         if (message.type === 'log') {
           setLogs((prev) => [...prev.slice(-999), message.log]);
+          setTotalReceived((prev) => prev + 1);
         }
       } catch (error) {
         console.error('Failed to parse log message:', error);
@@ -75,8 +90,53 @@ export function LogViewer() {
     }
   }, [logs, autoScroll]);
 
-  // Filter logs
-  const filteredLogs = logs.filter((log) => {
+  // Load client logs when tab switches to client
+  useEffect(() => {
+    if (activeTab !== 'client') return;
+
+    const loadClientLogs = async () => {
+      try {
+        // Load client logs from IndexedDB via exportLogs
+        const jsonl = await exportLogs();
+        if (jsonl) {
+          const entries = jsonl
+            .split('\n')
+            .filter((line) => line.trim())
+            .map((line) => JSON.parse(line) as LogEntry);
+          setClientLogs(entries);
+        } else {
+          setClientLogs([]);
+        }
+
+        // Load stats
+        const logStats = await getLogStats();
+        setStats(logStats);
+      } catch (error) {
+        console.error('Failed to load client logs:', error);
+        setClientLogs([]);
+        setStats(null);
+      }
+    };
+
+    loadClientLogs();
+  }, [activeTab]);
+
+  // Update stats for server tab
+  useEffect(() => {
+    if (activeTab !== 'server') return;
+
+    setStats({
+      entryCount: logs.length,
+      sizeBytes: logs.length * 200, // Estimate
+      oldestEntry: logs[0]?.timestamp,
+      newestEntry: logs[logs.length - 1]?.timestamp,
+    });
+  }, [activeTab, logs]);
+
+  // Use appropriate log source based on active tab
+  const currentLogs = activeTab === 'server' ? logs : clientLogs;
+
+  const filteredLogs = currentLogs.filter((log) => {
     // Level filter
     if (levelFilter !== 'all' && log.level !== levelFilter) {
       return false;
