@@ -313,6 +313,41 @@ export function LogViewer() {
         </div>
       </div>
 
+      {/* Stats Panel */}
+      {stats && activeTab === 'client' && (
+        <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900/30 border-b border-gray-200 dark:border-gray-800 text-xs text-gray-600 dark:text-gray-400">
+          <span className="mr-4">
+            📊 {stats.entryCount.toLocaleString()} entries
+          </span>
+          <span className="mr-4">
+            ~{Math.round(stats.sizeBytes / 1024)} KB
+          </span>
+          {stats.oldestEntry && (
+            <span className="mr-4">
+              Oldest: {new Date(stats.oldestEntry).toLocaleTimeString()}
+            </span>
+          )}
+          {stats.newestEntry && (
+            <span>
+              Newest: {new Date(stats.newestEntry).toLocaleTimeString()}
+            </span>
+          )}
+        </div>
+      )}
+      {activeTab === 'server' && (
+        <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900/30 border-b border-gray-200 dark:border-gray-800 text-xs text-gray-600 dark:text-gray-400">
+          <span className="mr-4">
+            📊 {logs.length.toLocaleString()} in memory
+            {totalReceived > logs.length && ` (${totalReceived.toLocaleString()} total received)`}
+          </span>
+          {logs.length >= 999 && (
+            <span className="text-yellow-600 dark:text-yellow-500">
+              999 max displayed
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Logs */}
       <div className="flex-1 overflow-auto p-2 space-y-1 font-mono text-xs">
         {displayLogs.length === 0 ? (
