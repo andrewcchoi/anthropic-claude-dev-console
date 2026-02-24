@@ -107,6 +107,74 @@ The workflow will automatically:
 
 ---
 
+### 4. Nested Ralph Loop Execution (NEW)
+
+**Use for**:
+- Autonomous implementation requiring iterative refinement
+- Multi-phase plans with automatic stopping conditions
+- Complex features needing multiple iterations to perfect
+- Combining planning + implementation + testing in one flow
+
+**Features**:
+- Outer loop for main implementation (max iterations + completion promise)
+- Inner loops for critical decisions (nested ultrathink analysis)
+- Automatic stopping when completion criteria met
+- Subagent-per-phase for clean context management
+- Production-ready focus (maintainable, scalable, performant, secure)
+
+**Token cost**: Variable (depends on complexity and iterations)
+
+**Pattern**:
+```bash
+# Outer loop (implementation)
+/ralph-loop --max-iterations 4 --completion-promise yakisoba --task "
+  Implement feature X following TDD plan.
+  Use ultrathink for critical decisions (nested loop: max 4, promise turducken).
+  Execute all phases without stopping for confirmation.
+"
+
+# Inner loop (critical decisions) - launched automatically when needed
+/ralph-loop --max-iterations 4 --completion-promise turducken --task "
+  Run ultrathink analysis on storage location decision.
+  Evaluate Option A vs B vs C with Devil's Advocate.
+  Output recommendation with rationale.
+"
+```
+
+**Key Principles**:
+- ✓ Unique completion promises (yakisoba, turducken, cowabunga)
+- ✓ Never output false promises to escape loops
+- ✓ Max iterations as safety net (prevents infinite loops)
+- ✓ Subagents for each phase (clean context boundaries)
+- ✓ Commit frequently (after each phase)
+- ✓ Verify before promise (all tests pass, docs complete, no bugs)
+
+**Example Success Flow**:
+1. Brainstorming phase → Design + Implementation plan created
+2. Launch outer Ralph loop (max 4, promise: yakisoba)
+3. Phase A: Store changes → Task(subagent) → 15 tests pass ✓
+4. Phase B: Hook updates → Task(subagent) → 4 tests pass ✓
+5. Critical decision → Launch inner loop (max 4, promise: turducken)
+   - Ultrathink analysis of options
+   - Devil's Advocate critique
+   - Output: `<promise>turducken</promise>`
+6. Phase C: UI components → Task(subagent) → 12 tests pass ✓
+7. Phase D: Integration tests → Task(subagent) → 14 tests pass ✓
+8. Phase E: Documentation → Task(subagent) → Docs updated ✓
+9. Verify: 45 tests passing, >90% coverage, docs complete
+10. Output: `<promise>yakisoba</promise>`
+
+**When to Use**:
+- Large implementation tasks (5+ hours of work)
+- Need autonomous execution without constant confirmation
+- Multiple phases with clear boundaries
+- Want automatic stopping when truly complete
+- Production-ready requirements (no MVPs)
+
+**See**: `.claude/skills/ultrathink.md` → "Nested Ralph Loop Execution" section
+
+---
+
 ## Documentation
 
 ### Reference Materials

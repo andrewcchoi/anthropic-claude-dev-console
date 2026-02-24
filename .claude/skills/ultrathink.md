@@ -283,6 +283,242 @@ Use `@restore("checkpoint-name")` to return to a checkpoint.
 
 ---
 
+## Nested Ralph Loop Execution
+
+For autonomous implementation that requires iterative refinement with automatic stopping conditions, use nested Ralph loops with completion promises.
+
+### When to Use Nested Ralph Loops
+
+**Use when**:
+- Implementing complex features that need multiple iterations to perfect
+- Executing multi-phase plans with review gates between phases
+- Need autonomous execution without constant user confirmation
+- Want automatic stopping when completion criteria met
+- Combining planning + implementation + testing in one flow
+
+**Pattern**: Outer Ralph loop for main task, inner Ralph loops for critical decisions
+
+### Structure
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ NESTED RALPH LOOP PATTERN                                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ OUTER LOOP (Implementation):                                   │
+│   --max-iterations 4                                            │
+│   --completion-promise yakisoba                                 │
+│                                                                 │
+│   Task: Execute plan with TDD, tests, docs                     │
+│                                                                 │
+│   ├─ Phase A: Store changes (subagent)                         │
+│   ├─ Phase B: Hook updates (subagent)                          │
+│   ├─ Phase C: UI components (subagent)                         │
+│   │                                                             │
+│   │   ┌─ INNER LOOP (Critical Decision):                       │
+│   │   │   --max-iterations 4                                   │
+│   │   │   --completion-promise turducken                       │
+│   │   │                                                         │
+│   │   │   Task: Ultrathink analysis of options                 │
+│   │   │   Output: <promise>turducken</promise>                 │
+│   │   └─                                                        │
+│   │                                                             │
+│   ├─ Phase D: Integration testing (subagent)                   │
+│   └─ Phase E: Documentation (subagent)                         │
+│                                                                 │
+│   Output: <promise>yakisoba</promise>                          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Completion Promise Rules
+
+**CRITICAL**: Never output false promises to escape the loop.
+
+1. **Choose unique promises**: Use food names that are easy to spell exactly
+   - Good: `yakisoba`, `turducken`, `cowabunga`, `marshmallow`
+   - Bad: `complete`, `done`, `finished` (too generic)
+
+2. **Promise hierarchy**: Nested loops use different promises
+   - Outer loop: `yakisoba` (implementation complete)
+   - Inner loop: `turducken` (decision made)
+   - Another inner: `cowabunga` (analysis done)
+
+3. **Output only when TRUE**: The promise statement must be completely unequivocal
+   ```xml
+   <promise>yakisoba</promise>
+   ```
+   - Do NOT output if: tasks incomplete, tests failing, bugs present
+   - DO output when: all criteria genuinely met
+
+4. **Max iterations as safety**: Prevents infinite loops
+   - Typical: 3-4 iterations for implementation
+   - Nested: 2-4 iterations for decisions
+   - If max reached without promise: manual intervention needed
+
+### Usage Example
+
+```bash
+# User command:
+"Use ultrathink brainstorm protocol with nested ralph loops.
+max iterations 4, completion promise yakisoba.
+For any critical decision, use nested loop: max 4, promise turducken.
+Production-ready: maintainable, scalable, performant, secure."
+
+# Implementation:
+/ralph-loop --max-iterations 4 --completion-promise yakisoba --task "
+  Implement feature X following plan at docs/plans/YYYY-MM-DD-X.md.
+  Use ultrathink for critical decisions (nested loop: max 4, promise turducken).
+  Execute all tasks without stopping for confirmation.
+"
+```
+
+### Subagent Management
+
+Use fresh subagents for each phase to manage context:
+
+```
+Phase A → Task(subagent_type: general-purpose, description: "Phase A")
+Phase B → Task(subagent_type: general-purpose, description: "Phase B")
+Phase C → Task(subagent_type: general-purpose, description: "Phase C")
+```
+
+**Benefits**:
+- Fresh context per phase (no bloat)
+- Parallel execution possible
+- Isolated failures (one phase fails → others unaffected)
+- Clear boundaries between phases
+
+### Critical Decision Points
+
+When encountering critical decisions during implementation, launch nested ultrathink loop:
+
+```
+CRITICAL DECISION: Which store should hold lastActiveSessionId?
+
+├─ Launch nested Ralph loop
+│  --max-iterations 4
+│  --completion-promise turducken
+│
+├─ Run ultrathink analysis:
+│  ├─ Option A: Workspace store (data locality)
+│  ├─ Option B: Chat store (session ownership)
+│  └─ Option C: Both stores (redundancy)
+│
+├─ Devil's Advocate critique
+├─ Trade-off analysis
+├─ Recommendation with rationale
+│
+└─ Output: <promise>turducken</promise>
+```
+
+### Integration with Ultrathink Workflow
+
+Nested Ralph loops enhance ultrathink by:
+
+1. **Stage A (PLAN)**: Outer loop starts, runs planning agents
+2. **Stage B (CRITIQUE)**: Nested loop for complex trade-off decisions
+3. **Stage C (FINALIZE)**: Return to outer loop, proceed with decision
+4. **Stage D (TEST)**: Outer loop continues autonomously
+5. **Stage E (IMPLEMENT)**: Outer loop executes with subagents per phase
+
+### Exit Conditions
+
+**Outer loop exits when**:
+- Completion promise output (primary)
+- Max iterations reached (safety)
+- All phases complete + tests pass + docs written
+
+**Inner loop exits when**:
+- Decision completion promise output
+- Max iterations reached (escalate to user)
+- Ultrathink analysis complete with recommendation
+
+### Best Practices
+
+✓ **Clear task descriptions**: Each loop needs precise mission
+✓ **Unique promises**: Never reuse promise names
+✓ **Context management**: Use subagents + /clear between phases
+✓ **Verification before promise**: Run tests, check status, confirm complete
+✓ **Max iterations safety net**: Always set reasonable limits (3-5)
+✓ **Documentation of decisions**: Record why decisions were made
+✓ **Commit frequently**: Each phase commits its work
+
+### Anti-Patterns
+
+✗ **Outputting false promises**: Never lie to escape the loop
+✗ **Reusing promise names**: Causes confusion, hard to debug
+✗ **No max iterations**: Loop can run forever
+✗ **Stopping for confirmation**: Defeats autonomous execution
+✗ **Single monolithic phase**: Use subagents to break up work
+✗ **Context bloat**: Clear between phases, use Memory section
+
+### Example: Full Implementation Flow
+
+```
+User: "Create plan to select most recent session when switching workspaces.
+       Use ultrathink with ralph loop, max 4 iterations, promise yakisoba.
+       For decisions use nested loop max 4, promise turducken.
+       Production-ready, no MVPs."
+
+Claude:
+1. Launch brainstorming (tasks 1-6)
+   → Creates design doc, implementation plan
+
+2. Launch outer Ralph loop:
+   /ralph-loop --max-iterations 4 --completion-promise yakisoba
+
+3. Execute Group A (Store changes):
+   → Task(subagent, "implement store, TDD")
+   → 15 tests pass ✓
+
+4. Execute Group B (Hook updates):
+   → Task(subagent, "implement hook, TDD")
+   → 4 tests pass ✓
+
+5. CRITICAL DECISION: Storage location
+   → Launch nested loop:
+     /ralph-loop --max-iterations 4 --completion-promise turducken
+   → Run ultrathink analysis
+   → Devil's Advocate critique
+   → Output: <promise>turducken</promise>
+
+6. Execute Group C (UI components):
+   → Task(subagent, "implement UI, TDD")
+   → 12 tests pass ✓
+
+7. Execute Group D (Integration tests):
+   → Task(subagent, "integration tests")
+   → 14 tests pass ✓
+
+8. Execute Group E (Documentation):
+   → Task(subagent, "update docs")
+   → All docs updated ✓
+
+9. Verify completion:
+   → All 45 tests passing ✓
+   → Documentation complete ✓
+   → No bugs ✓
+
+10. Output: <promise>yakisoba</promise>
+```
+
+### Success Metrics
+
+Track these to know when to output completion promise:
+
+- [ ] All implementation phases complete
+- [ ] All tests passing (100% of feature tests)
+- [ ] Test coverage >90%
+- [ ] Documentation updated (FEATURES, CLAUDE.md, ADR)
+- [ ] All git commits made
+- [ ] No known bugs or regressions
+- [ ] Production-ready (error handling, logging, accessibility)
+
+Only when ALL are true → output completion promise.
+
+---
+
 ## Integration with CLAUDE.md
 
 This workflow integrates with the Ultrathink Brainstorm Workflow section in CLAUDE.md.
