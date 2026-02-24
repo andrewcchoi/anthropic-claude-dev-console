@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useSessionDiscoveryStore } from '@/lib/store/sessions';
 import { useChatStore } from '@/lib/store';
 import { useWorkspaceStore } from '@/lib/store/workspaces';
@@ -17,6 +17,7 @@ export function ProjectList() {
   const { sessions: uiSessions, sessionId, hiddenSessionIds, collapsedProjects, toggleProjectCollapse, switchSession, setCurrentSession, isStreaming } = useChatStore();
   const { validateLastActiveSession, getMostRecentSessionForWorkspace, updateWorkspaceLastActiveSession, setCurrentWorkspace, workspaces } = useWorkspaceStore();
   const { cleanupStream } = useClaudeChat();
+  const [announcement, setAnnouncement] = useState('');
 
   // Split sessions into user and system sessions
   const userSessions = sessions.filter(s => !s.isSystem);
@@ -90,6 +91,15 @@ export function ProjectList() {
     if (sessionToActivate) {
       await switchSession(sessionToActivate);
       updateWorkspaceLastActiveSession(project.id, sessionToActivate);
+
+      // Announce to screen readers
+      const session = projectSessions.find(s => s.id === sessionToActivate);
+      const workspaceName = project.path === '/workspace' ? 'Current Workspace' : project.path;
+      setAnnouncement(`Switched to ${workspaceName}, ${session?.name || 'session'} active`);
+    } else {
+      // No sessions to activate
+      const workspaceName = project.path === '/workspace' ? 'Current Workspace' : project.path;
+      setAnnouncement(`Switched to ${workspaceName}, no sessions`);
     }
   }, [
     isStreaming,
@@ -133,8 +143,19 @@ export function ProjectList() {
   }
 
   return (
-    <div className="space-y-2">
-      {displayProjects.map((project) => {
+    <>
+      {/* Live region for announcements */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {announcement}
+      </div>
+
+      <div className="space-y-2">
+        {displayProjects.map((project) => {
         const isWorkspace = project.path === '/workspace';
 
         // Get CLI sessions for this project (excluding system sessions)
@@ -189,7 +210,8 @@ export function ProjectList() {
                 handleWorkspaceClick(project);
                 toggleProjectCollapse(project.id);
               }}
-              className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-left"
+              aria-label={`Switch to ${project.path === '/workspace' ? 'Current Workspace' : project.path}, ${allProjectSessions.length} session${allProjectSessions.length !== 1 ? 's' : ''}`}
+              className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-left focus:ring-2 focus:ring-blue-500/50 focus:outline-none"
             >
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <svg
@@ -281,6 +303,7 @@ export function ProjectList() {
           )}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
