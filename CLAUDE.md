@@ -875,7 +875,66 @@ Two distinct terminal components serve different purposes:
 ### Blockers
 - None
 
+#### Zero-Gap Testing System (2026-02-24)
+- **Problem**: Workspace session feature had 45 passing tests (>90% coverage) but shipped with bug where `switchSession()` was called without `projectId` parameter in 5 locations, causing 404 errors
+- **Root Cause**: Tests focused on new code but didn't audit existing call sites or verify integration points
+- **Solution**: Created comprehensive 5-layer test strategy with call-site audits and AI-powered automation
+- **Innovation**: Layer 5 (Call-Site Audits) uses grep-based automated verification that all callers of modified functions are updated correctly
+- **Surprise**: AI Test Healer analyzes test failures, reviews git diff, and suggests specific code changes to fix broken tests
+- **Integration**: Fully integrated with ultrathink planning workflow via `/ultrathink-with-tests` skill
+- **Files Created**:
+  * `docs/testing/` - 6 comprehensive guides (4,500+ lines)
+  * `.claude/skills/comprehensive-testing.md` - Main skill
+  * `.claude/skills/ultrathink-with-tests.md` - Integrated workflow skill
+  * `__tests__/templates/` - 5 test templates (one per layer)
+  * `__tests__/audits/switchSession-call-sites.test.ts` - Real working example (5 passing tests)
+  * `scripts/test-automation/` - 5 automation tools
+  * `.git/hooks/pre-commit` - Automatic call-site audit enforcement
+  * `.github/workflows/test-verification.yml` - CI/CD verification
+- **Automation Tools**:
+  1. Test Checklist Generator (`npm run generate-checklist`)
+  2. AI Test Generator (`npm run generate-tests`)
+  3. AI Test Healer (`npm run test:heal`) 🔮
+  4. Test Report Generator (`npm run test:report`)
+  5. Test Verification (`npm run verify-tests`)
+- **Infrastructure**:
+  * Pre-commit hook (tested and working) - runs call-site audits automatically
+  * CI/CD workflow - enforces completeness before merge
+  * Vitest config - 90% coverage thresholds
+  * 7 new npm scripts
+- **The 5 Layers**:
+  1. Store Tests - Business logic, state transitions
+  2. Hook Tests - API calls, side effects, cleanup
+  3. Component Tests - UI interactions, event handlers
+  4. Integration Tests - Full data flow (Component → Store → API)
+  5. Call-Site Audits - Grep-based verification of function callers
+- **Workflow Integration**:
+  * Brainstorming → Identifies testability considerations
+  * Ultrathink Stage C → Generates test checklist + plans test strategy
+  * Ultrathink Stage D (conditional) → AI generates draft tests
+  * Ultrathink Stage E → TDD implementation with test gates
+  * Ralph Loop → Critical verification with "comprehensive" promise
+- **How It Would Have Caught The Bug**:
+  * Layer 3 (Component Test): Would verify SessionList passes workspaceId to switchSession
+  * Layer 4 (Integration Test): Would verify API call includes ?project= query param (catch 404)
+  * Layer 5 (Call-Site Audit): Would grep all switchSession calls and verify parameter count
+  * All three layers would have failed → Bug caught before commit
+- **Key Insight**: Traditional TDD answers "Does my new code work?" but fails to answer "Did I update all the places that need updating?" Call-site audits close this gap.
+- **Success Metrics**:
+  * Before: 45 tests, >90% coverage, 5 broken call sites shipped
+  * After: All 5 layers tested, call-site audits pass, bug prevented
+- **Portability**: Complete system can be copied to any project
+- **Production Ready**: Pre-commit hook tested on real commits, CI/CD workflow ready for GitHub
+- **Developer Experience**:
+  * Quick start: 5 commands (generate-checklist → generate-tests → test:watch → verify-tests → commit)
+  * AI acceleration: Test generation + healing saves hours
+  * Clear feedback: Pre-commit hook shows exactly which call sites need fixing
+  * Enforcement: Cannot merge incomplete tests (CI/CD blocks)
+- **Key Lesson**: Test coverage metrics don't catch integration bugs. You need explicit integration tests that verify API calls, cross-store coordination, and parameter passing. Call-site audits are the missing piece that prevents "forgot to update this file" bugs.
+
 ### Next Steps
+- Use `/ultrathink-with-tests` for next feature implementation
+- Try AI Test Healer when tests fail: `npm run test:heal`
 - Use ultrathink workflows for complex implementation tasks
 - Verify system with test cases from `.claude/docs/ultrathink-verification.md`
 - See PLAN.md for general implementation roadmap
