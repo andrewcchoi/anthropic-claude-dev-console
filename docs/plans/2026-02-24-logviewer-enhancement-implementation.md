@@ -10,6 +10,20 @@
 
 ---
 
+## Test Strategy Overview
+
+| Layer | Description | Tests |
+|-------|-------------|-------|
+| 1 | Store/Function Tests | 15 |
+| 2 | Hook Tests | 7 |
+| 3 | Component Tests | 18 |
+| 3b | **Regression Tests** | 12 |
+| 4 | Integration Tests | 13 |
+| 5 | Call-Site Audits | 7 |
+| **Total** | | **72** |
+
+---
+
 ## Group A: Foundation Tests (Layer 1)
 
 ### Task 1: LogStream Unit Tests
@@ -378,6 +392,419 @@ git commit -m "test(logger): add file-logger unit tests
 
 Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ```
+
+---
+
+## Group A2: Regression Tests (Layer 3b)
+
+### Task 2.5: Regression Tests for Existing LogViewer Features
+
+**Files:**
+- Create: `__tests__/components/LogViewer.regression.test.tsx`
+- Reference: `src/components/debug/LogViewer.tsx`
+
+**Purpose:** Verify existing functionality still works after enhancement. These tests should PASS on current code BEFORE any modifications.
+
+**Step 1: Create regression test file**
+
+```typescript
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { LogViewer } from '@/components/debug/LogViewer';
+import { DebugProvider } from '@/components/providers/DebugProvider';
+
+// Mock EventSource
+let mockEventSource: MockEventSource | null = null;
+
+class MockEventSource {
+  onopen: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  onmessage: ((event: { data: string }) => void) | null = null;
+  readyState = 0;
+  closed = false;
+
+  constructor(public url: string) {
+    mockEventSource = this;
+    setTimeout(() => {
+      if (!this.closed) {
+        this.readyState = 1;
+        this.onopen?.();
+      }
+    }, 0);
+  }
+
+  close() {
+    this.closed = true;
+    this.readyState = 2;
+  }
+
+  simulateMessage(log: object) {
+    this.onmessage?.({ data: JSON.stringify({ type: 'log', log }) });
+  }
+}
+
+global.EventSource = MockEventSource as any;
+
+const renderWithDebug = (debugEnabled = true) => {
+  vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => {
+    if (key === 'DEBUG_MODE') return debugEnabled ? 'true' : null;
+    return null;
+  });
+
+  return render(
+    <DebugProvider>
+      <LogViewer />
+    </DebugProvider>
+  );
+};
+
+const createLog = (overrides = {}) => ({
+  timestamp: new Date().toISOString(),
+  level: 'info' as const,
+  module: 'TestModule',
+  message: 'Test message',
+  ...overrides,
+});
+
+describe('LogViewer Regression Tests', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockEventSource = null;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    mockEventSource?.close();
+  });
+
+  describe('SSE Connection Lifecycle', () => {
+    it('connects to /api/logs/stream on mount when debug enabled', async () => {
+      renderWithDebug(true);
+
+      await waitFor(() => {
+        expect(mockEventSource).not.toBeNull();
+        expect(mockEventSource?.url).toBe('/api/logs/stream');
+      });
+    });
+
+    it('disconnects SSE on unmount', async () => {
+      const { unmount } = renderWithDebug(true);
+
+      await waitFor(() => {
+        expect(mockEventSource).not.toBeNull();
+      });
+
+      unmount();
+
+      expect(mockEventSource?.closed).toBe(true);
+    });
+
+    it('shows Connected status when SSE opens', async () => {
+      renderWithDebug(true);
+
+      await waitFor(() => {
+        expect(screen.getByText('Connected')).toBeInTheDocument();
+      });
+    });
+
+    it('shows Disconnected status on SSE error', async () => {
+      renderWithDebug(true);
+
+      await waitFor(() => {
+        expect(mockEventSource).not.toBeNull();
+      });
+
+      mockEventSource?.onerror?.();
+
+      await waitFor(() => {
+        expect(screen.getByText('Disconnected')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Level Filtering', () => {
+    it('filters logs by level correctly', async () => {
+      renderWithDebug(true);
+
+      await waitFor(() => expect(mockEventSource).not.toBeNull());
+
+      // Add logs of different levels
+      mockEventSource?.simulateMessage(createLog({ level: 'info', message: 'Info log' }));
+      mockEventSource?.simulateMessage(createLog({ level: 'error', message: 'Error log' }));
+      mockEventSource?.simulateMessage(createLog({ level: 'debug', message: 'Debug log' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Info log')).toBeInTheDocument();
+      });
+
+      // Filter to error only
+      fireEvent.change(screen.getByDisplayValue('All Levels'), { target: { value: 'error' } });
+
+      await waitFor(() => {
+        expect(screen.queryByText('Info log')).not.toBeInTheDocument();
+        expect(screen.getByText('Error log')).toBeInTheDocument();
+        expect(screen.queryByText('Debug log')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Text Search Filtering', () => {
+    it('filters logs by search text in message', async () => {
+      renderWithDebug(true);
+
+      await waitFor(() => expect(mockEventSource).not.toBeNull());
+
+      mockEventSource?.simulateMessage(createLog({ message: 'Apple fruit' }));
+      mockEventSource?.simulateMessage(createLog({ message: 'Banana fruit' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Apple fruit')).toBeInTheDocument();
+      });
+
+      fireEvent.change(screen.getByPlaceholderText('Filter logs...'), {
+        target: { value: 'apple' },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Apple fruit')).toBeInTheDocument();
+        expect(screen.queryByText('Banana fruit')).not.toBeInTheDocument();
+      });
+    });
+
+    it('filters logs by module name', async () => {
+      renderWithDebug(true);
+
+      await waitFor(() => expect(mockEventSource).not.toBeNull());
+
+      mockEventSource?.simulateMessage(createLog({ module: 'AuthModule', message: 'Auth log' }));
+      mockEventSource?.simulateMessage(createLog({ module: 'ChatModule', message: 'Chat log' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Auth log')).toBeInTheDocument();
+      });
+
+      fireEvent.change(screen.getByPlaceholderText('Filter logs...'), {
+        target: { value: 'auth' },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Auth log')).toBeInTheDocument();
+        expect(screen.queryByText('Chat log')).not.toBeInTheDocument();
+      });
+    });
+
+    it('filters logs by correlationId', async () => {
+      renderWithDebug(true);
+
+      await waitFor(() => expect(mockEventSource).not.toBeNull());
+
+      mockEventSource?.simulateMessage(createLog({ correlationId: 'abc123', message: 'Log A' }));
+      mockEventSource?.simulateMessage(createLog({ correlationId: 'xyz789', message: 'Log B' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Log A')).toBeInTheDocument();
+      });
+
+      fireEvent.change(screen.getByPlaceholderText('Filter logs...'), {
+        target: { value: 'abc123' },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Log A')).toBeInTheDocument();
+        expect(screen.queryByText('Log B')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Clear Button', () => {
+    it('clears all logs when clicked', async () => {
+      renderWithDebug(true);
+
+      await waitFor(() => expect(mockEventSource).not.toBeNull());
+
+      mockEventSource?.simulateMessage(createLog({ message: 'Log to clear' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Log to clear')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Clear'));
+
+      await waitFor(() => {
+        expect(screen.queryByText('Log to clear')).not.toBeInTheDocument();
+        expect(screen.getByText('No logs yet')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('999 Entry Limit', () => {
+    it('keeps only last 999 entries', async () => {
+      renderWithDebug(true);
+
+      await waitFor(() => expect(mockEventSource).not.toBeNull());
+
+      // Add 1001 logs
+      for (let i = 0; i < 1001; i++) {
+        mockEventSource?.simulateMessage(createLog({ message: `Log ${i}` }));
+      }
+
+      // Should show 999 in the count (or less due to slice behavior)
+      await waitFor(() => {
+        const countText = screen.getByText(/\d+ \/ \d+ logs/);
+        expect(countText).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Debug Mode Gate', () => {
+    it('shows "requires debug mode" when debug disabled', () => {
+      renderWithDebug(false);
+
+      expect(screen.getByText(/Log viewer requires debug mode/)).toBeInTheDocument();
+      expect(screen.queryByText('Connected')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Log Entry Display', () => {
+    it('displays timestamp, level, module, and message', async () => {
+      renderWithDebug(true);
+
+      await waitFor(() => expect(mockEventSource).not.toBeNull());
+
+      const timestamp = '2026-02-24T10:30:00.000Z';
+      mockEventSource?.simulateMessage({
+        timestamp,
+        level: 'warn',
+        module: 'TestModule',
+        message: 'Warning message',
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Warning message')).toBeInTheDocument();
+        expect(screen.getByText('WARN')).toBeInTheDocument();
+        expect(screen.getByText('[TestModule]')).toBeInTheDocument();
+      });
+    });
+
+    it('shows correlationId when present', async () => {
+      renderWithDebug(true);
+
+      await waitFor(() => expect(mockEventSource).not.toBeNull());
+
+      mockEventSource?.simulateMessage(createLog({ correlationId: 'corr-123' }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/ID: corr-123/)).toBeInTheDocument();
+      });
+    });
+
+    it('expands data on details click', async () => {
+      renderWithDebug(true);
+
+      await waitFor(() => expect(mockEventSource).not.toBeNull());
+
+      mockEventSource?.simulateMessage(createLog({
+        message: 'Log with data',
+        data: { key: 'value', nested: { a: 1 } },
+      }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Log with data')).toBeInTheDocument();
+      });
+
+      // Click "Show data" to expand
+      fireEvent.click(screen.getByText('Show data'));
+
+      await waitFor(() => {
+        expect(screen.getByText(/"key": "value"/)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Auto-Scroll Toggle', () => {
+    it('toggles auto-scroll state when clicked', async () => {
+      renderWithDebug(true);
+
+      await waitFor(() => expect(mockEventSource).not.toBeNull());
+
+      const autoScrollButton = screen.getByText('Auto-scroll');
+
+      // Initially enabled (blue background)
+      expect(autoScrollButton).toHaveClass('bg-blue-600');
+
+      // Click to disable
+      fireEvent.click(autoScrollButton);
+
+      await waitFor(() => {
+        expect(autoScrollButton).not.toHaveClass('bg-blue-600');
+        expect(autoScrollButton).toHaveClass('bg-gray-200');
+      });
+
+      // Click to re-enable
+      fireEvent.click(autoScrollButton);
+
+      await waitFor(() => {
+        expect(autoScrollButton).toHaveClass('bg-blue-600');
+      });
+    });
+  });
+
+  describe('Filter Count Display', () => {
+    it('shows correct filtered/total count', async () => {
+      renderWithDebug(true);
+
+      await waitFor(() => expect(mockEventSource).not.toBeNull());
+
+      // Add 3 logs
+      mockEventSource?.simulateMessage(createLog({ level: 'info', message: 'Info 1' }));
+      mockEventSource?.simulateMessage(createLog({ level: 'error', message: 'Error 1' }));
+      mockEventSource?.simulateMessage(createLog({ level: 'info', message: 'Info 2' }));
+
+      // Should show 3 / 3 logs
+      await waitFor(() => {
+        expect(screen.getByText(/3 \/ 3 logs/)).toBeInTheDocument();
+      });
+
+      // Filter to errors only
+      fireEvent.change(screen.getByDisplayValue('All Levels'), { target: { value: 'error' } });
+
+      // Should show 1 / 3 logs
+      await waitFor(() => {
+        expect(screen.getByText(/1 \/ 3 logs/)).toBeInTheDocument();
+      });
+    });
+  });
+});
+```
+
+**Step 2: Run regression tests on CURRENT code (before modifications)**
+
+Run: `npm run test __tests__/components/LogViewer.regression.test.tsx`
+Expected: ALL PASS (verifies existing functionality works)
+
+**Step 3: Commit regression tests**
+
+```bash
+git add __tests__/components/LogViewer.regression.test.tsx
+git commit -m "test(LogViewer): add regression tests for existing functionality
+
+- SSE connection lifecycle (connect, disconnect, status)
+- Level filtering (debug, info, warn, error)
+- Text search filtering (message, module, correlationId)
+- Clear button behavior
+- 999 entry limit
+- Debug mode gate
+- Log entry display (timestamp, level, module, message)
+- Data expansion (details element)
+- Auto-scroll toggle state
+- Filter count display (X / Y logs)
+
+These tests verify existing behavior before enhancement.
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+```
+
+**IMPORTANT:** These tests MUST pass before proceeding to Group B. If any fail, fix the tests (not the code) to match actual current behavior.
 
 ---
 
@@ -1355,12 +1782,13 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 | Group | Tasks | Tests |
 |-------|-------|-------|
 | A: Foundation | 2 | 15 |
+| A2: Regression | 1 | 12 |
 | B: Component | 4 | 0 (implementation) |
 | C: Component Tests | 1 | 10 |
 | D: Integration | 1 | 3 |
 | E: Call-Site Audits | 1 | 4 |
 | F: Verification | 1 | 0 |
-| **Total** | **10** | **32** |
+| **Total** | **11** | **44** |
 
-**Estimated test count:** 32 tests across 5 layers
-**Estimated commits:** 10 commits (one per task)
+**Estimated test count:** 44 tests across 6 layers (including regression)
+**Estimated commits:** 11 commits (one per task)
