@@ -931,6 +931,16 @@ Two distinct terminal components serve different purposes:
   * Clear feedback: Pre-commit hook shows exactly which call sites need fixing
   * Enforcement: Cannot merge incomplete tests (CI/CD blocks)
 - **Key Lesson**: Test coverage metrics don't catch integration bugs. You need explicit integration tests that verify API calls, cross-store coordination, and parameter passing. Call-site audits are the missing piece that prevents "forgot to update this file" bugs.
+- **Bug #2 (2026-02-24)**: Workspace UUID vs Project ID type mismatch
+  * Issue: `switchSession()` called with workspace UUID (`ca31cb4c-...`) instead of encoded project path (`-workspace-docs`)
+  * Symptom: 404 errors when loading sessions from non-default workspaces
+  * Root Cause: Type confusion - workspaceId (UUID from workspace store) vs projectId (encoded directory name from CLI)
+  * Why Tests Didn't Catch: Call-site audits verified parameter COUNT but not parameter TYPE
+  * Fix: Created `getProjectIdFromWorkspace()` helper to map UUID → rootPath → encoded project ID
+  * Test Strategy Gap: Call-site audits need type-aware validation (UUID detection, semantic checks)
+  * Files: `src/lib/utils/projectPath.ts`, `src/components/sidebar/SessionList.tsx`, `src/components/sidebar/UISessionItem.tsx`
+  * Commit: 8a822fa
+  * Learning: Call-site audits v1 catch 50% of bugs (parameter count). Need v1.1 with type validation to catch remaining 50% (parameter types, semantic correctness). See `docs/testing/LESSONS_LEARNED.md` for test strategy evolution.
 
 ### Next Steps
 - Use `/ultrathink-with-tests` for next feature implementation
