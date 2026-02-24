@@ -611,6 +611,52 @@ Two distinct terminal components serve different purposes:
   5. Verify command count matches expected total (local + skills + commands - duplicates)
 - **Key Lesson**: Distinguish between **session-specific state** (messages, executions) and **global CLI state** (skills, commands, tools). Global state should initialize once on app load, not per-session. Deduplication is necessary when CLI returns overlapping data structures.
 
+#### Server-Authoritative Session Detection with TOCTOU Prevention (2026-02-23)
+- **Problem**: "Session ID already in use" errors when switching chats or rapid navigation
+  * Root cause: Client-provided `isSessionInitialized` flag was unreliable (out of sync with filesystem)
+  * Race condition: Multiple concurrent requests with same sessionId could both see session as "new" and try to create it
+  * TOCTOU vulnerability: Time gap between checking session existence and spawning CLI process allowed conflicts
+- **Solution**: Server-authoritative filesystem check with in-memory locking
+  * Added `sessionFileExists()` function that searches `~/.claude/projects/*` directories for session JSONL files
+  * Implemented in-memory lock Map (`sessionLocks: Map<string, Promise<void>>`) to serialize concurrent requests per sessionId
+  * Lock acquisition before filesystem check, release after CLI spawn completes
+  * Eliminates TOCTOU race: lock ensures only one request checks/creates session at a time
+- **Key Implementation Details**:
+  * Made `start(controller)` function `async` in ReadableStream to support `await` on lock promises
+  * Removed client-provided `isSessionInitialized` flag entirely (server is source of truth)
+  * Made `initializedSessionIds` ephemeral (not persisted) in Zustand store - only tracks runtime state
+  * Auto-mark sessions as initialized when messages are loaded (proves session exists on disk)
+- **Enhanced Retry Logic**:
+  * Increased `MAX_SESSION_RETRIES` from 1 to 3 to handle transient failures
+  * Added exponential backoff: 1s, 2s, 4s for retry attempts (prevents thundering herd)
+  * Added 30s request timeout with AbortController (prevents indefinite hangs)
+  * User-friendly error messages show retry countdown
+- **UX Improvements**:
+  * Disabled chat input during `isLoadingHistory` state (prevents sending during load)
+  * Updated placeholder text: "Loading messages..." → "Waiting for response..." → "Ask Claude Code..."
+  * Clear visual feedback during session transitions
+- **Files Modified**:
+  * `src/app/api/claude/route.ts` - Added sessionFileExists(), lock mechanism, async start()
+  * `src/hooks/useClaudeChat.ts` - Added timeout, retry backoff, removed client-side session tracking
+  * `src/lib/store/index.ts` - Made initializedSessionIds ephemeral, auto-mark on message load
+  * `src/app/page.tsx` - Disabled input during isLoadingHistory
+  * `src/components/chat/ChatInput.tsx` - Updated placeholder for loading state
+- **Commit**: c9fddaa
+- **Key Insights**:
+  * **Server as source of truth**: Never trust client-provided state for filesystem operations
+  * **TOCTOU prevention**: Locks must span the entire check-then-act window, not just the check
+  * **Async streams**: ReadableStream's start() can be async when needed for coordination primitives
+  * **Session state layers**: Runtime tracking (initializedSessionIds) vs persistent data (messages) serve different purposes
+  * **Exponential backoff**: Essential for retry logic to avoid hammering server during transient failures
+  * **AbortController pattern**: Standard way to implement request timeouts in fetch API
+- **Testing Verification**:
+  * Rapid session switching: No more conflicts
+  * Concurrent requests with same sessionId: Properly serialized via lock
+  * Browser refresh with existing session: Correctly resumes
+  * New session creation: Correctly uses --session-id
+  * Message load timeout: Properly aborts and retries
+- **Key Lesson**: Client-server state synchronization is fundamentally unreliable for filesystem operations. Always make server authoritative and use proper concurrency control (locks) to prevent TOCTOU races. Ephemeral runtime state should never be persisted - distinguish between "what we've seen this session" and "what exists on disk."
+
 #### Dark Mode Visibility Improvements (2026-02-05)
 - Implemented CSS-only improvements for dark mode UI visibility
 - **Terminal borders**: Changed from `border dark:border-gray-600` to `border-2 dark:border-gray-500` with subtle glow effect `dark:shadow-[0_0_0_1px_rgba(107,114,128,0.3)]` for better visibility against dark terminal background (#1f2937)
