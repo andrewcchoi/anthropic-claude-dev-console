@@ -20,6 +20,28 @@ import { storeSync } from './sync';
 
 const log = createLogger('WorkspaceStore');
 
+// Lazy getter for useChatStore to avoid circular dependency
+// Will be initialized on first use after both stores are created
+let _useChatStore: any = null;
+function getChatStore() {
+  if (!_useChatStore) {
+    // Dynamic import to break circular dependency
+    try {
+      _useChatStore = require('./index').useChatStore;
+    } catch (e) {
+      // In test environment, try window/global
+      if (typeof window !== 'undefined' && (window as any).useChatStore) {
+        _useChatStore = (window as any).useChatStore;
+      } else if (typeof global !== 'undefined' && (global as any).useChatStore) {
+        _useChatStore = (global as any).useChatStore;
+      } else {
+        throw new Error('useChatStore not available');
+      }
+    }
+  }
+  return _useChatStore;
+}
+
 // ============================================================================
 // Store Types
 // ============================================================================
@@ -62,6 +84,7 @@ interface WorkspaceStore {
   // Session management
   addSessionToWorkspace: (workspaceId: string, sessionId: string) => void;
   removeSessionFromWorkspace: (workspaceId: string, sessionId: string) => void;
+  validateLastActiveSession: (workspaceId: string, sessionId?: string) => string | null;
 
   // Initialization
   initialize: () => Promise<void>;
@@ -357,6 +380,35 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             workspaceId,
             sessionId,
           });
+        }
+      },
+
+      validateLastActiveSession: (workspaceId, sessionId) => {
+        if (!sessionId) return null;
+
+        try {
+          const useChatStore = getChatStore();
+          const chatStore = useChatStore.getState();
+          const session = chatStore.sessions.find((s: any) => s.id === sessionId);
+
+          if (!session) {
+            log.warn('lastActiveSessionId not found', { workspaceId, sessionId });
+            return null;
+          }
+
+          if (session.workspaceId !== workspaceId) {
+            log.warn('lastActiveSessionId workspace mismatch', {
+              workspaceId,
+              sessionId,
+              sessionWorkspaceId: session.workspaceId,
+            });
+            return null;
+          }
+
+          return sessionId;
+        } catch (error) {
+          log.error('Failed to validate session', { error, workspaceId, sessionId });
+          return null;
         }
       },
 
