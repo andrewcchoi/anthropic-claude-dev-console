@@ -180,6 +180,21 @@ Two distinct terminal components for different use cases:
 
 ## Session Management
 
+### Auto-Select Last Active Session
+- **What**: Automatically restores the last active session when switching workspaces
+- **How**: Click workspace in sidebar → last viewed session loads automatically
+- **Fallback**: If last session was deleted, shows most recent session
+- **Empty state**: Shows "New Chat" button with keyboard hint (⌘N) when no sessions
+- **Streaming**: Gracefully stops active conversation before switching
+- **Accessibility**: Screen reader announces workspace and session name
+
+**Key Features**:
+- Zero-click session selection (95% of cases)
+- Data integrity validation with auto-repair
+- Toast notifications for user awareness
+- Keyboard navigation support
+- Focus management for accessibility
+
 ### Session Discovery
 - Automatic discovery of CLI sessions from `~/.claude/projects/`
 - Grouped by project directory
