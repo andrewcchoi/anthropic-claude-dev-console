@@ -9,7 +9,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useDebug } from '../providers/DebugProvider';
 import { type LogEntry } from '@/types/logger';
 import { DebugToggle } from '@/components/ui/DebugToggle';
-import { exportLogs, getLogStats, clearLogs as clearClientLogs } from '@/lib/logger/file-logger';
+import { exportLogs, getLogStats, clearLogs as clearClientLogs, downloadLogs } from '@/lib/logger/file-logger';
+import { showToast } from '@/lib/utils/toast';
 
 type LogTab = 'server' | 'client';
 
@@ -175,6 +176,44 @@ export function LogViewer() {
   const displayLogs = activeTab === 'server' ? filteredLogs : filteredClientLogs;
   const totalLogs = activeTab === 'server' ? logs.length : clientLogs.length;
 
+  // Download logs as JSONL
+  const handleDownload = async () => {
+    if (activeTab === 'client') {
+      await downloadLogs();
+      showToast('Logs downloaded', 'success');
+    } else {
+      // Server logs: create blob from current logs
+      const jsonl = logs.map((log) => JSON.stringify(log)).join('\n');
+      const blob = new Blob([jsonl], { type: 'application/x-jsonlines' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `server-logs-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Logs downloaded', 'success');
+    }
+  };
+
+  // Copy logs to clipboard
+  const handleCopy = async () => {
+    try {
+      let jsonl: string;
+      if (activeTab === 'client') {
+        jsonl = await exportLogs();
+      } else {
+        jsonl = logs.map((log) => JSON.stringify(log)).join('\n');
+      }
+
+      await navigator.clipboard.writeText(jsonl);
+      showToast('Logs copied to clipboard', 'success');
+    } catch (error) {
+      showToast('Clipboard unavailable, use Download instead', 'error');
+    }
+  };
+
   if (!debugEnabled) {
     return (
       <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-950 text-gray-500 dark:text-gray-500">
@@ -288,6 +327,24 @@ export function LogViewer() {
                 Refresh
               </button>
             )}
+
+            {/* Download button */}
+            <button
+              onClick={handleDownload}
+              className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded"
+              title="Download logs as JSONL"
+            >
+              Download
+            </button>
+
+            {/* Copy button */}
+            <button
+              onClick={handleCopy}
+              className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded"
+              title="Copy logs to clipboard"
+            >
+              Copy
+            </button>
 
             {/* Clear logs */}
             <button
