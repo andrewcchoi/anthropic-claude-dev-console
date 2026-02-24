@@ -3,13 +3,24 @@
  *
  * THIS IS THE TEST THAT WOULD HAVE CAUGHT THE BUG
  *
+ * v1.0: Parameter COUNT validation
  * The projectId bug happened because switchSession() was called without
  * the projectId parameter in 5 locations. This test would have caught all 5.
+ *
+ * v1.1: Parameter TYPE validation (NEW)
+ * The UUID vs projectId bug happened because workspace UUID was passed where
+ * project ID (encoded path) was expected. Now we validate parameter TYPES too.
  */
 
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { describe, it, expect } from 'vitest';
+import {
+  findCallSites,
+  readCallSiteContext,
+  checkTypePatterns,
+  SWITCH_SESSION_TYPE_PATTERNS,
+} from './type-validators';
 
 /**
  * Helper: Recursively find all TS/TSX files
@@ -239,5 +250,168 @@ describe('Meta-Test: Verify Audit Catches The Bug', () => {
     console.log('\n✅ Meta-test passed: Audit would have caught the bug!');
     console.log('   Original bug: 5 call sites missing projectId');
     console.log('   This audit detected: 2 example call sites\n');
+  });
+});
+
+/**
+ * TYPE VALIDATION AUDIT (v1.1)
+ *
+ * These tests catch parameter TYPE mismatches, not just count.
+ * The UUID vs projectId bug would have been caught by these tests.
+ */
+describe('switchSession Type Validation Audit', () => {
+  it('should detect no UUID passed as projectId parameter', async () => {
+    const callSites = await findCallSites('switchSession');
+
+    const typeIssues: Array<{
+      file: string;
+      line: number;
+      code: string;
+      pattern: string;
+      suggestion: string;
+    }> = [];
+
+    for (const site of callSites) {
+      // Get more context to understand the call better
+      const context = await readCallSiteContext(site.file, site.line, 5);
+      const fullContext = [
+        ...context.contextBefore,
+        context.code,
+        ...context.contextAfter,
+      ].join('\n');
+
+      // Check for type confusion patterns
+      const matchedPatterns = checkTypePatterns(site.code, SWITCH_SESSION_TYPE_PATTERNS);
+
+      for (const pattern of matchedPatterns) {
+        typeIssues.push({
+          file: site.file,
+          line: site.line,
+          code: site.code,
+          pattern: `Expected ${pattern.expectedType}, found ${pattern.actualType}`,
+          suggestion: pattern.suggestion,
+        });
+      }
+    }
+
+    // Report issues
+    if (typeIssues.length > 0) {
+      console.error('\n❌ TYPE AUDIT FAILED\n');
+      console.error('The following call sites have parameter TYPE mismatches:\n');
+
+      for (const issue of typeIssues) {
+        console.error(`  ${issue.file}:${issue.line}`);
+        console.error(`    ${issue.code}`);
+        console.error(`    ⚠️  ${issue.pattern}`);
+        console.error(`    💡 ${issue.suggestion}\n`);
+      }
+
+      console.error('Common fix:');
+      console.error('  Use getProjectIdFromWorkspace(workspaceId, workspaces) to convert UUID to project ID');
+      console.error('  Or use project.id directly if available\n');
+    }
+
+    expect(typeIssues).toHaveLength(0);
+  });
+
+  it('should verify projectId parameter looks like encoded path, not UUID', async () => {
+    const callSites = await findCallSites('switchSession');
+
+    // UUID pattern to detect
+    const uuidPattern = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+    const uuidAsProjectId: Array<{
+      file: string;
+      line: number;
+      code: string;
+      context: string;
+    }> = [];
+
+    for (const site of callSites) {
+      // Extract second parameter
+      const match = site.code.match(/switchSession\s*\(\s*[^,]+,\s*([^)]+)\s*\)/);
+      if (!match) continue;
+
+      const secondParam = match[1].trim();
+
+      // Check if it's a string literal that looks like a UUID
+      const stringMatch = secondParam.match(/['"]([^'"]+)['"]/);
+      if (stringMatch && uuidPattern.test(stringMatch[1])) {
+        uuidAsProjectId.push({
+          file: site.file,
+          line: site.line,
+          code: site.code,
+          context: `Literal UUID in code: ${stringMatch[1]}`,
+        });
+      }
+    }
+
+    if (uuidAsProjectId.length > 0) {
+      console.error('\n❌ UUID AS PROJECT ID DETECTED\n');
+      for (const issue of uuidAsProjectId) {
+        console.error(`  ${issue.file}:${issue.line}`);
+        console.error(`    ${issue.code}`);
+        console.error(`    ⚠️  ${issue.context}\n`);
+      }
+    }
+
+    expect(uuidAsProjectId).toHaveLength(0);
+  });
+});
+
+/**
+ * META-TEST: Verify type audit would have caught the UUID bug
+ */
+describe('Meta-Test: Verify Type Audit Catches UUID Bug', () => {
+  it('should catch workspaceId passed as projectId (the UUID bug)', () => {
+    // Simulate the buggy code that was committed
+    const buggyCallSites = [
+      {
+        file: 'src/components/sidebar/SessionList.tsx',
+        line: 132,
+        code: 'switchSession(session.id, workspaceId);',
+      },
+      {
+        file: 'src/components/sidebar/UISessionItem.tsx',
+        line: 49,
+        code: 'await switchSession(session.id, workspace.id)',
+      },
+    ];
+
+    const typeIssues = buggyCallSites.filter(site =>
+      checkTypePatterns(site.code, SWITCH_SESSION_TYPE_PATTERNS).length > 0
+    );
+
+    // The audit SHOULD detect these as failures
+    expect(typeIssues.length).toBe(2);
+
+    console.log('\n✅ Meta-test passed: Type audit would have caught the UUID bug!');
+    console.log('   Original bug: workspace UUID passed instead of project ID');
+    console.log('   This audit detected: 2 example call sites with type mismatch\n');
+  });
+
+  it('should NOT flag correct usage with project.id', () => {
+    // These are correct - using project.id (encoded path)
+    const correctCallSites = [
+      {
+        file: 'src/components/sidebar/SessionList.tsx',
+        line: 132,
+        code: 'switchSession(session.id, project.id);',
+      },
+      {
+        file: 'src/components/sidebar/ProjectList.tsx',
+        line: 109,
+        code: 'await switchSession(sessionToActivate, project.id);',
+      },
+    ];
+
+    const typeIssues = correctCallSites.filter(site =>
+      checkTypePatterns(site.code, SWITCH_SESSION_TYPE_PATTERNS).length > 0
+    );
+
+    // Should NOT detect any issues
+    expect(typeIssues).toHaveLength(0);
+
+    console.log('\n✅ Meta-test passed: Correct usage not flagged as error\n');
   });
 });
