@@ -1,6 +1,9 @@
 ---
 name: comprehensive-testing
-description: Use when implementing features to ensure comprehensive test coverage across all layers with call-site audits. Prevents integration bugs like the missing projectId parameter.
+description: Use when implementing features to ensure comprehensive test coverage across all layers with call-site audits. Prevents integration bugs like the missing projectId parameter. Integrates with ultrathink-with-tests skill for planning.
+ultrathink-integration: true
+brainstorming-integration: true
+ralph-loop-verification: true
 ---
 
 # Comprehensive Testing Strategy
@@ -13,6 +16,14 @@ Use this skill when:
 - Refactoring cross-layer code
 - Adding new integration points
 - Before creating a pull request
+
+**Better yet**: Use `/ultrathink-with-tests` which integrates this strategy into planning from the start.
+
+## Integration with Other Skills
+
+- **With ultrathink**: Use `/ultrathink-with-tests` for integrated planning + test design
+- **With brainstorming**: Brainstorming identifies testability considerations
+- **With Ralph Loop**: Verify test completeness after implementation
 
 ## The Five Layers
 
