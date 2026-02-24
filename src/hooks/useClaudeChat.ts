@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useChatStore } from '@/lib/store';
 import { useWorkspaceStore } from '@/lib/store/workspaces';
 import { ChatMessage, MessageContent, SDKMessage } from '@/types/claude';
@@ -39,6 +39,9 @@ export function useClaudeChat() {
 
   const [currentMessageId, setCurrentMessageId] = useState<string | null>(null);
   const [sessionConflictRetries, setSessionConflictRetries] = useState(0);
+
+  // Ref to track active stream controller for cleanup
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
     async (prompt: string, cwdOverride?: string, attachments?: FileAttachment[]) => {
@@ -158,6 +161,7 @@ export function useClaudeChat() {
 
         // Create AbortController for timeout handling
         const controller = new AbortController();
+        abortControllerRef.current = controller;  // Store for cleanup
         const timeoutId = setTimeout(() => {
           controller.abort();
           log.error('Request timeout', { timeout: REQUEST_TIMEOUT_MS });
@@ -448,6 +452,7 @@ export function useClaudeChat() {
         updateMessage(assistantMessageId, { isStreaming: false });
         setIsStreaming(false);
         setCurrentMessageId(null);
+        abortControllerRef.current = null;  // Clear ref after successful completion
 
         log.debug('Stream completed', {
           messageCount: useChatStore.getState().messages.length
@@ -457,6 +462,7 @@ export function useClaudeChat() {
         setIsStreaming(false);
         updateMessage(assistantMessageId, { isStreaming: false });
         setCurrentMessageId(null);
+        abortControllerRef.current = null;  // Clear ref on error
       }
     },
     [
@@ -478,9 +484,27 @@ export function useClaudeChat() {
     ]
   );
 
+  const cleanupStream = useCallback(() => {
+    try {
+      if (abortControllerRef.current) {
+        log.info('Cleaning up active stream before workspace switch');
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      // Always reset streaming state, even if no controller
+      setIsStreaming(false);
+    } catch (error) {
+      log.error('Failed to cleanup stream', { error });
+      // Force reset even if abort() fails
+      abortControllerRef.current = null;
+      setIsStreaming(false);
+    }
+  }, [setIsStreaming]);
+
   return {
     messages,
     sendMessage,
     isStreaming,
+    cleanupStream,
   };
 }
