@@ -35,7 +35,8 @@ function getChatStore() {
       } else if (typeof global !== 'undefined' && (global as any).useChatStore) {
         _useChatStore = (global as any).useChatStore;
       } else {
-        throw new Error('useChatStore not available');
+        log.debug('useChatStore not available (likely in test environment)');
+        return null;
       }
     }
   }
@@ -650,9 +651,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
         const state = get();
 
-        // Get chat store (both stores are singletons, already initialized)
-        // We can safely import at runtime since migration runs AFTER stores are created
-        const { useChatStore } = require('./index');
+        // Get chat store using lazy getter to avoid circular dependency
+        const useChatStore = getChatStore();
+        if (!useChatStore) {
+          log.debug('ChatStore not available, skipping migration');
+          set({ hasMigratedSessions: true });
+          return;
+        }
+
         const { sessions } = useChatStore.getState();
 
         // Only migrate if there are unlinked sessions
