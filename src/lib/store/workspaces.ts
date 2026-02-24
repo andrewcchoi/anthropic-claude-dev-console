@@ -85,6 +85,7 @@ interface WorkspaceStore {
   addSessionToWorkspace: (workspaceId: string, sessionId: string) => void;
   removeSessionFromWorkspace: (workspaceId: string, sessionId: string) => void;
   validateLastActiveSession: (workspaceId: string, sessionId?: string) => string | null;
+  getMostRecentSessionForWorkspace: (workspaceId: string) => any | null;
 
   // Initialization
   initialize: () => Promise<void>;
@@ -410,6 +411,25 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           log.error('Failed to validate session', { error, workspaceId, sessionId });
           return null;
         }
+      },
+
+      getMostRecentSessionForWorkspace: (workspaceId) => {
+        const useChatStore = getChatStore();
+        const chatStore = useChatStore.getState();
+        const workspaceSessions = chatStore.sessions.filter(
+          (s: any) => s.workspaceId === workspaceId
+        );
+
+        if (workspaceSessions.length === 0) return null;
+
+        // Sort by updated_at descending, return first
+        const sorted = [...workspaceSessions].sort((a: any, b: any) => {
+          const aTime = a.updated_at || a.created_at || 0;
+          const bTime = b.updated_at || b.created_at || 0;
+          return bTime - aTime;
+        });
+
+        return sorted[0];
       },
 
       // ========================================================================
