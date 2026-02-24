@@ -1,7 +1,18 @@
 /**
  * Debug mode utilities
  * Controls verbose logging at runtime
+ *
+ * Console commands (available globally):
+ * - enableDebug()  - Enable verbose logging + log saving
+ * - disableDebug() - Disable verbose logging
+ * - toggleDebug()  - Toggle debug mode
+ * - exportLogs()   - Get all logs as JSONL string
+ * - downloadLogs() - Download logs as .jsonl file
+ * - clearLogs()    - Clear all saved logs
+ * - getLogStats()  - Get log statistics
  */
+
+import { exportLogs, downloadLogs, clearLogs, getLogStats } from '@/lib/logger';
 
 const DEBUG_KEY = 'DEBUG_MODE';
 
@@ -86,15 +97,39 @@ export async function toggleDebug(): Promise<void> {
 
 /**
  * Install global debug commands
- * Makes enableDebug(), disableDebug(), and toggleDebug() available in browser console
+ * Makes enableDebug(), disableDebug(), toggleDebug(), and log functions available in browser console
  */
 export function installDebugCommands(): void {
   if (typeof window === 'undefined') return;
 
-  // Make functions available globally (fire-and-forget wrappers)
+  // Make debug functions available globally (fire-and-forget wrappers)
   (window as any).enableDebug = () => { enableDebug().catch(console.error); };
   (window as any).disableDebug = () => { disableDebug().catch(console.error); };
   (window as any).toggleDebug = () => { toggleDebug().catch(console.error); };
+
+  // Make log functions available globally
+  (window as any).exportLogs = async () => {
+    const logs = await exportLogs();
+    console.log('%c📋 Logs exported to clipboard', 'color: #22c55e; font-weight: bold;');
+    console.log('%cPaste into a .jsonl file or share directly', 'color: #6b7280;');
+    // Also copy to clipboard if available
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(logs);
+      console.log('%c✓ Copied to clipboard', 'color: #22c55e;');
+    }
+    return logs;
+  };
+  (window as any).downloadLogs = () => { downloadLogs().catch(console.error); };
+  (window as any).clearLogs = () => { clearLogs().catch(console.error); };
+  (window as any).getLogStats = async () => {
+    const stats = await getLogStats();
+    console.log('%c📊 Log Statistics', 'color: #3b82f6; font-weight: bold;');
+    console.log(`  Entries: ${stats.entryCount}`);
+    console.log(`  Size: ~${Math.round(stats.sizeBytes / 1024)}KB`);
+    if (stats.oldestEntry) console.log(`  Oldest: ${stats.oldestEntry}`);
+    if (stats.newestEntry) console.log(`  Newest: ${stats.newestEntry}`);
+    return stats;
+  };
 
   // Show welcome message with instructions
   if (process.env.NODE_ENV === 'development') {
@@ -103,9 +138,13 @@ export function installDebugCommands(): void {
       'background: #3b82f6; color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 14px;'
     );
     console.log('%cType these commands in the console:', 'color: #6b7280; font-style: italic;');
-    console.log('%c  enableDebug()  %c- Enable verbose logging', 'color: #22c55e; font-weight: bold;', 'color: #6b7280;');
+    console.log('%c  enableDebug()  %c- Enable verbose logging + log saving', 'color: #22c55e; font-weight: bold;', 'color: #6b7280;');
     console.log('%c  disableDebug() %c- Disable verbose logging', 'color: #ef4444; font-weight: bold;', 'color: #6b7280;');
     console.log('%c  toggleDebug()  %c- Toggle debug mode', 'color: #f59e0b; font-weight: bold;', 'color: #6b7280;');
+    console.log('%c  exportLogs()   %c- Copy logs to clipboard (JSONL)', 'color: #8b5cf6; font-weight: bold;', 'color: #6b7280;');
+    console.log('%c  downloadLogs() %c- Download logs as .jsonl file', 'color: #8b5cf6; font-weight: bold;', 'color: #6b7280;');
+    console.log('%c  clearLogs()    %c- Clear all saved logs', 'color: #ef4444; font-weight: bold;', 'color: #6b7280;');
+    console.log('%c  getLogStats()  %c- Show log statistics', 'color: #3b82f6; font-weight: bold;', 'color: #6b7280;');
 
     // Show current status
     const status = isDebugEnabled() ? 'ENABLED' : 'DISABLED';
