@@ -7,13 +7,23 @@ import { useWorkspaceStore } from '@/lib/store/workspaces';
 import { formatRelativeTime } from '@/lib/utils/time';
 import { Session } from '@/types/claude';
 import { CLISession } from '@/types/sessions';
-import { getProjectIdFromWorkspace } from '@/lib/utils/projectPath';
+import { getProjectIdFromWorkspace, encodeProjectPath } from '@/lib/utils/projectPath';
 
 export function SessionList() {
+  console.log('🔥🔥🔥 SessionList RENDERING 🔥🔥🔥');
+
   const [isClient, setIsClient] = useState(false);
   const { sessions: uiSessions, sessionId, switchSession, deleteSession, hiddenSessionIds } = useChatStore();
   const { sessions: cliSessions } = useSessionDiscoveryStore();
   const { activeWorkspaceId, workspaces, setActiveWorkspace } = useWorkspaceStore();
+
+  console.log('🔥 SessionList state:', {
+    activeWorkspaceId,
+    totalWorkspaces: workspaces.size,
+    uiSessions: uiSessions.length,
+    cliSessions: cliSessions.length,
+    hiddenCount: hiddenSessionIds.size,
+  });
 
   // Combine UI sessions and CLI discovered sessions
   // Convert CLI sessions to Session format
@@ -55,9 +65,17 @@ export function SessionList() {
     const workspace = workspaces.get(workspaceId);
     if (!workspace) return [];
 
+    // Get encoded project path for this workspace (e.g., "/workspace" → "-workspace")
+    const projectId = encodeProjectPath(workspace.rootPath);
+
     return allSessions.filter(s => {
-      // Explicit workspace link (preferred)
-      if (s.workspaceId === workspaceId) return true;
+      // Match by encoded project path (CLI uses this format)
+      if (s.workspaceId === projectId) return true;
+
+      // Also match if session's workspaceId starts with workspace's project path
+      // e.g., "-workspace-docs" matches "-workspace" (subdirectory sessions)
+      if (s.workspaceId && s.workspaceId.startsWith(projectId + '-')) return true;
+      if (s.workspaceId && s.workspaceId.startsWith(projectId)) return true;
 
       // Path-based matching for old sessions without workspaceId
       if (!s.workspaceId && s.cwd && workspace.rootPath) {
@@ -79,13 +97,22 @@ export function SessionList() {
   };
 
   // Filter sessions by active workspace (memoized for performance)
-  // Include sessions with matching workspaceId OR matching cwd path (for old sessions without workspaceId)
+  // Include sessions with matching workspaceId (encoded project path) OR matching cwd path
   const workspaceSessions = useMemo(() => {
     if (!activeWorkspace) return [];
 
+    // Get encoded project path for the active workspace (e.g., "/workspace" → "-workspace")
+    const activeProjectId = encodeProjectPath(activeWorkspace.rootPath);
+
     return allSessions.filter(s => {
-      // Explicit workspace link (preferred)
-      if (s.workspaceId === activeWorkspaceId) return true;
+      // Match by encoded project path (CLI uses this format)
+      // e.g., session.workspaceId === "-workspace" matches workspace.rootPath === "/workspace"
+      if (s.workspaceId === activeProjectId) return true;
+
+      // Also match if session's workspaceId starts with workspace's project path
+      // e.g., "-workspace-docs" matches "-workspace" (subdirectory sessions)
+      if (s.workspaceId && s.workspaceId.startsWith(activeProjectId + '-')) return true;
+      if (s.workspaceId && s.workspaceId.startsWith(activeProjectId)) return true;
 
       // Path-based matching for old sessions without workspaceId
       // Match if session's cwd is within workspace's rootPath
@@ -103,16 +130,25 @@ export function SessionList() {
     });
   }, [allSessions, activeWorkspaceId, activeWorkspace]);
 
-  // Unassigned sessions: no workspaceId AND don't match any workspace's path
+  // Unassigned sessions: don't match any workspace's encoded project path
   const unassignedSessions = useMemo(() => {
     const allWorkspaces = Array.from(workspaces.values());
 
     return allSessions.filter(s => {
-      // Already has a workspace link
-      if (s.workspaceId) return false;
+      // Check if session's workspaceId matches any workspace's encoded project path
+      if (s.workspaceId) {
+        for (const workspace of allWorkspaces) {
+          if (!workspace.rootPath) continue;
+          const projectId = encodeProjectPath(workspace.rootPath);
+          // Match exact or subdirectory
+          if (s.workspaceId === projectId || s.workspaceId.startsWith(projectId + '-') || s.workspaceId.startsWith(projectId)) {
+            return false; // Matches a workspace, not unassigned
+          }
+        }
+      }
 
-      // Check if it matches any workspace's path
-      if (s.cwd) {
+      // Check if it matches any workspace's path (for sessions without workspaceId)
+      if (!s.workspaceId && s.cwd) {
         const normalizedCwd = s.cwd.replace(/\/$/, '');
 
         for (const workspace of allWorkspaces) {
@@ -246,12 +282,34 @@ export function SessionList() {
   const sortedWorkspace = [...workspaceSessions].sort((a, b) => b.updated_at - a.updated_at);
   const sortedUnassigned = [...unassignedSessions].sort((a, b) => b.updated_at - a.updated_at);
 
+  // Get encoded project path for debugging
+  const activeProjectId = activeWorkspace ? encodeProjectPath(activeWorkspace.rootPath) : null;
+  console.log('🔥 SessionList FILTERED MODE:', {
+    activeWorkspaceId,
+    activeProjectId,  // The encoded path we're matching against
+    activeRootPath: activeWorkspace?.rootPath,
+    workspaceSessions: workspaceSessions.length,
+    unassignedSessions: unassignedSessions.length,
+    totalAllSessions: allSessions.length,
+    firstFewSessions: allSessions.slice(0, 3).map(s => ({
+      id: s.id.slice(0, 8),
+      workspaceId: s.workspaceId,
+      matchesActiveProjectId: s.workspaceId === activeProjectId || (s.workspaceId && s.workspaceId.startsWith(activeProjectId || '')),
+    })),
+  });
+
   if (sortedWorkspace.length === 0 && sortedUnassigned.length === 0) {
     return (
-      <div className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">
-        No sessions in this workspace
-        <div className="text-xs mt-2">Create a new chat to get started</div>
-      </div>
+      <>
+        {/* DEBUG: Visible test that code is loading */}
+        <div style={{ background: 'red', color: 'white', padding: '10px', fontWeight: 'bold', margin: '10px' }}>
+          🔥 CODE LOADED - All: {allSessions.length} | WS: {workspaceSessions.length} | activeWsId: {activeWorkspaceId?.slice(0, 8)}
+        </div>
+        <div className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">
+          No sessions in this workspace
+          <div className="text-xs mt-2">Create a new chat to get started</div>
+        </div>
+      </>
     );
   }
 
@@ -326,3 +384,4 @@ export function SessionList() {
     </div>
   );
 }
+

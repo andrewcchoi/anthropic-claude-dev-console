@@ -22,7 +22,10 @@
     "test:heal": "tsx scripts/test-automation/test-healer.ts",
     "generate-checklist": "tsx scripts/test-automation/generate-checklist.ts",
     "generate-tests": "tsx scripts/test-automation/ai-test-generator.ts",
-    "verify-tests": "tsx scripts/test-automation/verify-tests.ts"
+    "verify-tests": "tsx scripts/test-automation/verify-tests.ts",
+    "verify-env": "./scripts/verify-environment.sh",
+    "trace": "./scripts/trace-component.sh",
+    "precommit": "./.git/hooks/pre-commit"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

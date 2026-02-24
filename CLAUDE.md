@@ -2,6 +2,61 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⛔ MANDATORY PROCEDURES - DO NOT SKIP
+
+These procedures are **NON-NEGOTIABLE**. Every violation wastes hours of debugging time.
+
+### Before ANY Code Changes
+
+1. **Verify Build Passes**
+   ```bash
+   npm run build
+   ```
+   If this fails, FIX IT before doing anything else. Do not proceed with broken builds.
+
+2. **Trace Component Before Editing**
+   ```bash
+   ./scripts/trace-component.sh ComponentName
+   ```
+   Verify the component is actually used in production, not just tests.
+
+3. **Add Verification Log First**
+   Before making real changes, add a `console.log('🔥 ComponentName loaded')` and verify it appears in browser. Only then make actual changes.
+
+### After ANY Code Changes
+
+4. **Verify Build Still Passes**
+   ```bash
+   npm run build
+   ```
+   If you broke the build, fix it immediately.
+
+5. **Verify in Browser**
+   - Check browser console for errors
+   - Verify your changes are actually visible/working
+   - Remove debug logs before committing
+
+### Type Mismatches to Watch For
+
+⚠️ **UUID vs Encoded Path** - This bug has bitten us multiple times:
+- Workspace IDs are UUIDs: `316ab1b9-b102-4a78-8bf6-453d4a69870c`
+- CLI project IDs are encoded paths: `-workspace-docs`
+- **NEVER compare them directly**
+- Use `encodeProjectPath()` or `getProjectIdFromWorkspace()` to convert
+
+### Pre-Commit Verification
+
+The pre-commit hook will block commits that:
+- Fail TypeScript compilation
+- Fail call-site audits
+- Fail related tests
+
+If the hook blocks you, **do not bypass it**. Fix the issues.
+
+### Skills and Processes
+
+Skills like ultrathink, brainstorming, TDD are **not optional decorations**. They exist because skipping them causes exactly the bugs we've experienced. When a skill applies, USE IT.
+
 ## Project Overview
 
 This is a DevContainer-based development environment for building a Next.js 16 web application that replicates Claude Code functionality. The project is in **active development** with core features implemented including SSE streaming chat, CLI subprocess integration, session management, and tool execution visualization. See `PLAN.md` for the complete architecture and implementation roadmap.
