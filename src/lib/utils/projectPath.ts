@@ -10,18 +10,20 @@
 /**
  * Encode a filesystem path to a project ID (directory name)
  * @param path - Filesystem path (e.g., "/workspace/docs")
- * @returns Encoded project ID (e.g., "-workspace-docs")
+ * @returns Encoded project ID (e.g., "-workspace-docs"), or empty string if path is undefined
  */
-export function encodeProjectPath(path: string): string {
+export function encodeProjectPath(path: string | undefined | null): string {
+  if (!path) return '';
   return path.replace(/\//g, '-');
 }
 
 /**
  * Decode a project ID to a filesystem path
  * @param encoded - Encoded project ID (e.g., "-workspace-docs")
- * @returns Filesystem path (e.g., "/workspace/docs")
+ * @returns Filesystem path (e.g., "/workspace/docs"), or '/' if encoded is undefined
  */
-export function decodeProjectPath(encoded: string): string {
+export function decodeProjectPath(encoded: string | undefined | null): string {
+  if (!encoded) return '/';
   if (encoded.startsWith('-')) {
     return '/' + encoded.slice(1).replace(/-/g, '/');
   }
