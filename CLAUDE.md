@@ -53,6 +53,124 @@ The pre-commit hook will block commits that:
 
 If the hook blocks you, **do not bypass it**. Fix the issues.
 
+### Reliability Self-Check (MANDATORY)
+
+**Before finalizing ANY plan or implementation, ask: "Is this a reliable process?"**
+
+This is a **hard gate** - do not proceed until independent evaluation passes.
+
+#### Why Subagents?
+
+Self-evaluation is fundamentally flawed (grading your own exam). Subagents provide:
+- Fresh context without attachment to the code
+- Can be given explicit adversarial instructions
+- Creates audit trail of evaluation
+- Forces articulation of what to evaluate
+
+#### The Process
+
+**Step 1: Classify complexity** (determines evaluation depth)
+
+| Complexity | Lines Changed | Subagents Required |
+|------------|---------------|-------------------|
+| Trivial | <10 lines, no logic | 0 - Self-check only |
+| Small | 10-50 lines | 1 - Quick review |
+| Medium | 50-200 lines | 2 - Code + Testing |
+| Large | >200 lines | 3+ parallel specialists |
+
+**Step 2: State intended outcome**
+
+Write down (literally, in a comment or doc):
+- What should be true when done?
+- What are the acceptance criteria?
+- How will success be verified?
+
+**Step 3: Spawn evaluation subagent(s)**
+
+For Small+ changes, spawn subagent with this template:
+
+```
+You are an INDEPENDENT EVALUATOR. Your job is to find problems, not validate.
+
+Task: Evaluate [description] for reliability gaps.
+Files changed: [list files]
+Intended outcome: [from step 2]
+
+IMPORTANT: Use devil's advocate perspective. Actively look for:
+- What could go wrong?
+- What's missing?
+- What assumptions are untested?
+
+Evaluate these dimensions (score 1-10, list gaps):
+1. Complete - All requirements have implementation?
+2. Accurate - Matches intent, not just syntax?
+3. Robust - Error cases, edge cases handled?
+4. Maintainable - Follows patterns, has logging?
+5. Secure - Input validation, no injection, auth checked?
+6. Testable - Can be verified? Tests written?
+7. **Verified** - Actually tested with evidence? (screenshot, test output, etc.)
+
+Output format:
+- Dimension scores with justification
+- CRITICAL gaps (must fix)
+- MEDIUM gaps (should fix)
+- LOW gaps (nice to have)
+- Overall confidence (0-100%)
+- Recommendation: PASS / NEEDS WORK / FAIL
+```
+
+**Step 4: Address CRITICAL gaps**
+
+- CRITICAL gaps block proceeding
+- MEDIUM gaps require documented rationale if deferred
+- LOW gaps can be tracked in TODO comments
+
+**Step 5: Re-evaluate if needed**
+
+If confidence <70% or NEEDS WORK, fix and re-spawn subagent (fresh context).
+
+#### Avoiding Infinite Loops
+
+| Safeguard | Rule |
+|-----------|------|
+| Max iterations | 3 evaluation cycles per task |
+| Confidence floor | Accept at 70%+ with no CRITICAL gaps |
+| Diminishing returns | If score doesn't improve after fix, escalate to user |
+| Time-box by complexity | Trivial: 2min, Small: 10min, Medium: 20min, Large: 30min |
+| Escalation | After max iterations, present gaps to user for decision |
+
+#### Definition of "Acceptable"
+
+**Minimum bar (must have all):**
+- [ ] Confidence ≥70% from independent subagent
+- [ ] Zero CRITICAL gaps
+- [ ] MEDIUM gaps documented with deferral rationale
+- [ ] Build passes
+- [ ] "Verified" dimension has concrete evidence (not just "I looked at it")
+
+**"Verified" requires ONE of:**
+- Test output showing pass (paste actual output)
+- Screenshot of working feature
+- curl/API response demonstrating behavior
+- Console log showing expected flow
+
+**Gap Severity:**
+- **CRITICAL**: Blocks release - security, data loss, crashes, broken core functionality
+- **MEDIUM**: Should fix - performance issues, missing edge cases, poor UX
+- **LOW**: Nice to have - style, optimization, future-proofing
+
+#### Specialized Subagents by Area
+
+Use existing specialized agents when available:
+
+| Area | Subagent Type | When to Use |
+|------|---------------|-------------|
+| Code quality | `pr-review-toolkit:code-reviewer` | Any code changes |
+| Type design | `pr-review-toolkit:type-design-analyzer` | New types/interfaces |
+| Silent failures | `pr-review-toolkit:silent-failure-hunter` | Error handling changes |
+| Test coverage | `pr-review-toolkit:pr-test-analyzer` | After writing tests |
+| Security | Custom prompt with security focus | Auth, input handling, API |
+
 ### Logging Requirements
 
 **All new components, hooks, and utilities MUST include logging.** The pre-commit hook (Gate 6) will warn about missing logging.
@@ -84,10 +202,12 @@ log.error('Error occurred', { error, context });      // Errors
 ```
 
 **Exporting logs for debugging:**
-1. Enable debug mode: `enableDebug()` in browser console
-2. Reproduce the issue
-3. Export logs: `exportLogs()` (copies JSONL to clipboard) or `downloadLogs()`
+1. Reproduce the issue (info/warn/error logs are always saved)
+2. For verbose debug logs: `enableDebug()` in browser console first
+3. Export logs: `downloadLogs()` (recommended) or `exportLogs()` (clipboard)
 4. Share the JSONL file for analysis
+
+**Note**: `exportLogs()` may fail from dev console due to focus requirements. Use `downloadLogs()` instead.
 
 ### Skills and Processes
 
@@ -392,13 +512,14 @@ The DiffViewer uses Monaco's built-in responsive behavior. On narrow screens, Mo
 
 ## Debugging Infrastructure
 
-### Logging System (5 Components)
+### Logging System (6 Components)
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | Client Logger | `src/lib/logger/index.ts` | Browser-side structured logging |
 | Server Logger | `src/lib/logger/server.ts` | Server-side JSON logs with correlation IDs |
-| Debug Mode | `src/lib/debug/index.ts` | Runtime debug toggle via console |
+| Debug Mode | `src/lib/debug/index.ts` | Runtime debug toggle + global error capture |
+| File Logger | `src/lib/logger/file-logger.ts` | IndexedDB storage for log export |
 | Error Boundaries | `src/components/error/` | React error catching with fallback UI |
 | Log Streaming | `src/app/api/logs/stream/` | SSE real-time log viewer |
 
@@ -962,6 +1083,34 @@ Two distinct terminal components serve different purposes:
   * ✅ Test coverage: >90% (45 tests across all layers)
   * ✅ No data corruption or orphaned state
 - **Key Lesson**: TDD approach caught 8 edge cases early (empty workspace, deleted sessions, streaming interruption, data corruption, etc.), preventing production bugs. Server-authoritative validation with client-side caching provides best balance of performance and data integrity. Accessibility features (ARIA, focus management) must be built in from start, not retrofitted.
+
+#### Reliability Self-Check Process (2026-02-24)
+- **Problem v1**: Changes were "verified" by reading git diffs and checking build passes, but this is unreliable
+  * Git diff shows code exists, not that it works correctly
+  * Build passing only catches syntax errors
+  * Visual inspection prone to confirmation bias
+- **Problem v2**: Self-evaluation is fundamentally flawed (grading your own exam)
+  * Subagent evaluation of v1 process scored it at 35% confidence
+  * Key weakness: developer evaluates own work with inherent bias
+  * "Verified" dimension was undefined - no concrete evidence required
+- **Solution v2**: Independent subagent evaluation (not self-review)
+  * Spawn subagent with explicit adversarial instructions ("find problems, not validate")
+  * Subagent has fresh context without attachment to the code
+  * Scale evaluation depth by complexity (trivial: self-check, large: 3+ specialists)
+  * Require concrete evidence for "Verified" (test output, screenshot, API response)
+  * Use existing specialized agents (code-reviewer, silent-failure-hunter, etc.)
+- **Loop Avoidance**:
+  * Max 3 evaluation cycles
+  * Accept at 70%+ confidence with no CRITICAL gaps
+  * Time-box by complexity (trivial: 2min, large: 30min)
+  * Escalate to user after max iterations
+- **Why Subagents Work** (acceptable, not perfect):
+  * Fresh context - no emotional attachment to code
+  * Can be given explicit devil's advocate instructions
+  * Creates audit trail (explicit output vs internal rationalization)
+  * Forces articulation of evaluation criteria
+  * Limitation: Same underlying model may have similar blind spots
+- **Key Lesson**: Self-evaluation cannot catch blind spots. Independent review (even by subagent) provides meaningful improvement. "Verified" must have concrete evidence, not just attestation.
 
 ### Blockers
 - None

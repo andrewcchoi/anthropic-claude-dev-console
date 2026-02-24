@@ -292,9 +292,22 @@ Two distinct terminal components for different use cases:
 
 ### Debug Mode
 - Toggle debug mode in browser console
-- `enableDebug()`: Enable verbose logging
+- `enableDebug()`: Enable verbose logging (includes debug-level logs)
 - `disableDebug()`: Disable verbose logging
 - `toggleDebug()`: Toggle current state
+- `downloadLogs()`: Download logs as timestamped JSONL file
+- `exportLogs()`: Copy logs to clipboard
+- `clearLogs()`: Clear saved logs
+- `getLogStats()`: Show log statistics
+
+**Log Saving**:
+- `info`, `warn`, `error`: Always saved (no debug mode required)
+- `debug`: Only saved when debug mode is enabled
+
+**Global Error Capture** (always active):
+- `console.error()` and `console.warn()` calls
+- Uncaught JavaScript exceptions
+- Unhandled promise rejections
 
 ### Log Streaming
 - Real-time log viewer at `/logs`

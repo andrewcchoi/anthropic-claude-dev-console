@@ -1,8 +1,12 @@
 /**
  * File Logger with Rotation (Browser-side with IndexedDB)
  *
- * Saves logs locally when debug mode is enabled.
+ * Saves logs locally for later export/download.
  * Uses IndexedDB for storage with automatic rotation.
+ *
+ * Log saving behavior:
+ * - info, warn, error: Always saved (important operational logs)
+ * - debug: Only saved when debug mode is enabled
  *
  * Configuration:
  * - MAX_ENTRIES: 10000 log entries kept
@@ -69,6 +73,10 @@ function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
 
 /**
  * Add a log entry to the buffer
+ *
+ * Log saving behavior:
+ * - info, warn, error: Always saved (important operational logs)
+ * - debug: Only saved when debug mode is enabled
  */
 export function addLogEntry(
   level: LogEntry['level'],
@@ -77,8 +85,11 @@ export function addLogEntry(
   data?: Record<string, unknown>,
   stack?: string
 ): void {
-  // Only save logs when debug mode is enabled and in browser
-  if (!isBrowser() || !isDebugEnabled()) return;
+  if (!isBrowser()) return;
+
+  // Debug logs only saved when debug mode is enabled
+  // info/warn/error always saved
+  if (level === 'debug' && !isDebugEnabled()) return;
 
   const entry: LogEntry = {
     timestamp: new Date().toISOString(),
@@ -294,7 +305,7 @@ export async function downloadLogs(): Promise<void> {
 
   const a = document.createElement('a');
   a.href = url;
-  a.download = `claude-logs-${new Date().toISOString().slice(0, 10)}.jsonl`;
+  a.download = `claude-logs-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

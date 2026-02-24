@@ -386,6 +386,13 @@ export const useChatStore = create<ChatStore>()(
             }
           } else {
             // Failed to load messages, but continue with empty state
+            log.warn('Failed to load session messages', {
+              sessionId: id,
+              projectId,
+              status: response.status,
+              statusText: response.statusText,
+            });
+
             const session = localSession || {
               id,
               name: 'Untitled',

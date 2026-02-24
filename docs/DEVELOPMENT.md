@@ -171,9 +171,20 @@ LOG_FORMAT=pretty  # Human-readable format (dev only)
 
 **Location**: `src/lib/debug/index.ts`
 
-**Browser Console**:
+**Log Saving Behavior**:
+| Level | When Saved |
+|-------|------------|
+| `debug` | Only when debug mode is enabled |
+| `info`, `warn`, `error` | **Always saved** (important operational logs) |
+
+**Global Error Capture** (always active):
+- `console.error()` and `console.warn()` calls
+- Uncaught JavaScript exceptions
+- Unhandled promise rejections
+
+**Browser Console Commands**:
 ```javascript
-// Enable debug mode (shows all client logs)
+// Enable debug mode (shows all client logs + saves debug level)
 enableDebug()
 
 // Disable debug mode
@@ -182,9 +193,16 @@ disableDebug()
 // Toggle debug mode
 toggleDebug()
 
-// Check current state
-window.__DEBUG_MODE__  // true or false
+// Export logs
+downloadLogs()   // Downloads .jsonl file (recommended)
+exportLogs()     // Copies to clipboard (may fail from dev console)
+
+// Manage logs
+clearLogs()      // Clear all saved logs
+getLogStats()    // Show log statistics
 ```
+
+**Note**: `exportLogs()` may fail with "Document is not focused" when run from developer console. Use `downloadLogs()` instead.
 
 **React DevTools**: Install React DevTools browser extension for component inspection.
 

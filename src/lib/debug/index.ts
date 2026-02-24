@@ -10,11 +10,21 @@
  * - downloadLogs() - Download logs as .jsonl file
  * - clearLogs()    - Clear all saved logs
  * - getLogStats()  - Get log statistics
+ *
+ * Global error capture (always active):
+ * - Uncaught exceptions (window.onerror)
+ * - Unhandled promise rejections
+ * - console.error() calls
+ * - console.warn() calls
  */
 
 import { exportLogs, downloadLogs, clearLogs, getLogStats } from '@/lib/logger';
+import { addLogEntry } from '@/lib/logger/file-logger';
 
 const DEBUG_KEY = 'DEBUG_MODE';
+
+// Track if we've already installed global error handlers
+let errorHandlersInstalled = false;
 
 /**
  * Check if debug mode is enabled
@@ -96,11 +106,96 @@ export async function toggleDebug(): Promise<void> {
 }
 
 /**
+ * Install global error handlers to capture errors to the log system
+ * Captures: uncaught exceptions, unhandled promise rejections, console.error calls
+ */
+function installGlobalErrorHandlers(): void {
+  if (typeof window === 'undefined' || errorHandlersInstalled) return;
+  errorHandlersInstalled = true;
+
+  // Capture uncaught exceptions
+  window.addEventListener('error', (event) => {
+    addLogEntry(
+      'error',
+      'GlobalError',
+      event.message || 'Uncaught error',
+      {
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+      },
+      event.error?.stack
+    );
+  });
+
+  // Capture unhandled promise rejections
+  window.addEventListener('unhandledrejection', (event) => {
+    const reason = event.reason;
+    const message = reason?.message || reason?.msg || String(reason) || 'Unhandled promise rejection';
+
+    // Skip Monaco cancellation errors (these are normal)
+    if (reason?.type === 'cancelation') return;
+
+    addLogEntry(
+      'error',
+      'UnhandledRejection',
+      message,
+      { reason: typeof reason === 'object' ? JSON.stringify(reason) : reason },
+      reason?.stack
+    );
+  });
+
+  // Intercept console.error to also capture to logs
+  const originalConsoleError = console.error;
+  console.error = (...args: unknown[]) => {
+    // Call original first
+    originalConsoleError.apply(console, args);
+
+    // Extract message and data
+    const message = args.map(arg =>
+      typeof arg === 'string' ? arg :
+      arg instanceof Error ? arg.message :
+      JSON.stringify(arg)
+    ).join(' ');
+
+    const errorArg = args.find(arg => arg instanceof Error) as Error | undefined;
+
+    addLogEntry(
+      'error',
+      'Console',
+      message,
+      args.length > 1 ? { args: args.map(a => a instanceof Error ? { message: a.message, name: a.name } : a) } : undefined,
+      errorArg?.stack
+    );
+  };
+
+  // Also intercept console.warn
+  const originalConsoleWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    originalConsoleWarn.apply(console, args);
+
+    const message = args.map(arg =>
+      typeof arg === 'string' ? arg : JSON.stringify(arg)
+    ).join(' ');
+
+    addLogEntry(
+      'warn',
+      'Console',
+      message,
+      args.length > 1 ? { args } : undefined
+    );
+  };
+}
+
+/**
  * Install global debug commands
  * Makes enableDebug(), disableDebug(), toggleDebug(), and log functions available in browser console
  */
 export function installDebugCommands(): void {
   if (typeof window === 'undefined') return;
+
+  // Install global error handlers to capture all errors
+  installGlobalErrorHandlers();
 
   // Make debug functions available globally (fire-and-forget wrappers)
   (window as any).enableDebug = () => { enableDebug().catch(console.error); };
@@ -110,12 +205,24 @@ export function installDebugCommands(): void {
   // Make log functions available globally
   (window as any).exportLogs = async () => {
     const logs = await exportLogs();
-    console.log('%c📋 Logs exported to clipboard', 'color: #22c55e; font-weight: bold;');
-    console.log('%cPaste into a .jsonl file or share directly', 'color: #6b7280;');
-    // Also copy to clipboard if available
+
+    // Try to copy to clipboard (may fail if document not focused, e.g., from dev console)
+    let copiedToClipboard = false;
     if (navigator.clipboard) {
-      await navigator.clipboard.writeText(logs);
-      console.log('%c✓ Copied to clipboard', 'color: #22c55e;');
+      try {
+        await navigator.clipboard.writeText(logs);
+        copiedToClipboard = true;
+      } catch {
+        // Clipboard API requires document focus - common when running from dev console
+      }
+    }
+
+    if (copiedToClipboard) {
+      console.log('%c📋 Logs copied to clipboard', 'color: #22c55e; font-weight: bold;');
+      console.log('%cPaste into a .jsonl file or share directly', 'color: #6b7280;');
+    } else {
+      console.log('%c📋 Logs exported (clipboard unavailable)', 'color: #f59e0b; font-weight: bold;');
+      console.log('%cTip: Use downloadLogs() instead, or click in the page first then run exportLogs()', 'color: #6b7280;');
     }
     return logs;
   };
