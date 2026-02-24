@@ -86,6 +86,7 @@ interface WorkspaceStore {
   removeSessionFromWorkspace: (workspaceId: string, sessionId: string) => void;
   validateLastActiveSession: (workspaceId: string, sessionId?: string) => string | null;
   getMostRecentSessionForWorkspace: (workspaceId: string) => any | null;
+  updateWorkspaceLastActiveSession: (workspaceId: string, sessionId: string) => void;
 
   // Initialization
   initialize: () => Promise<void>;
@@ -430,6 +431,29 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         });
 
         return sorted[0];
+      },
+
+      updateWorkspaceLastActiveSession: (workspaceId, sessionId) => {
+        set((state) => {
+          const workspace = state.workspaces.get(workspaceId);
+          if (!workspace) {
+            log.warn('Workspace not found for lastActiveSessionId update', {
+              workspaceId,
+              sessionId,
+            });
+            return state;
+          }
+
+          const updatedWorkspace = {
+            ...workspace,
+            lastActiveSessionId: sessionId,
+          };
+
+          const newWorkspaces = new Map(state.workspaces);
+          newWorkspaces.set(workspaceId, updatedWorkspace);
+
+          return { workspaces: newWorkspaces };
+        });
       },
 
       // ========================================================================
