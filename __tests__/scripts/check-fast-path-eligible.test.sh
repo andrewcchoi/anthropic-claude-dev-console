@@ -166,12 +166,17 @@ echo "type UserID = string" > types.ts
 git add types.ts
 run_test "Type definition" 1 "risky pattern"
 
-# Test 12: Arrow function definition (risky)
-echo -e "${YELLOW}Test 12: Arrow function definition (risky)${NC}"
+# Test 12: Arrow function signature change (risky)
+echo -e "${YELLOW}Test 12: Arrow function signature change (risky)${NC}"
 setup_test_repo "test12"
+# First, create an existing arrow function and commit it
 echo "const handler = () => {}" > func.ts
 git add func.ts
-run_test "Arrow function definition" 1 "risky pattern"
+git commit -m "add handler" --quiet
+# Now modify the signature (add parameter)
+echo "const handler = (param) => {}" > func.ts
+git add func.ts
+run_test "Arrow function signature change" 1 "risky pattern"
 
 # Test 13: Exactly 2 files (eligible if small)
 echo -e "${YELLOW}Test 13: Exactly 2 files (eligible if small)${NC}"
@@ -213,6 +218,43 @@ setup_test_repo "test17"
 echo "test code" > example.spec.ts
 git add example.spec.ts
 run_test "Spec file (test-only)" 0 "test-only"
+
+# Test 18: Binary file (image - eligible if small)
+echo -e "${YELLOW}Test 18: Binary file (image - eligible if small)${NC}"
+setup_test_repo "test18"
+# Create a small binary file (1x1 PNG)
+printf '\x89PNG\r\n\x1a\n' > icon.png
+git add icon.png
+run_test "Binary file (small image)" 0 "Eligible"
+
+# Test 19: Empty file (0 bytes)
+echo -e "${YELLOW}Test 19: Empty file (0 bytes)${NC}"
+setup_test_repo "test19"
+touch empty.txt
+git add empty.txt
+run_test "Empty file" 0 "Eligible"
+
+# Test 20: File with special characters in name
+echo -e "${YELLOW}Test 20: File with special characters in name${NC}"
+setup_test_repo "test20"
+echo "content" > "file with spaces.ts"
+git add "file with spaces.ts"
+run_test "File with spaces in name" 0 "Eligible"
+
+# Test 21: File with unicode characters in name
+echo -e "${YELLOW}Test 21: File with unicode characters in name${NC}"
+setup_test_repo "test21"
+echo "content" > "file-with-émojis.ts"
+git add "file-with-émojis.ts"
+run_test "File with unicode in name" 0 "Eligible"
+
+# Test 22: Font file (binary - eligible if small)
+echo -e "${YELLOW}Test 22: Font file (binary - eligible if small)${NC}"
+setup_test_repo "test22"
+# Create minimal content to simulate a font file
+printf 'WOFF2' > font.woff2
+git add font.woff2
+run_test "Font file (binary)" 0 "Eligible"
 
 # Print summary
 echo ""

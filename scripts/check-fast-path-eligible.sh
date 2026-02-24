@@ -88,8 +88,11 @@ RISKY_PATTERNS=(
   '^[+-].*\.(get|post|put|delete|patch)\s*\('
   '^[+-].*route\.(get|post|put|delete|patch)'
   '^[+-].*app\.(get|post|put|delete|patch)'
-  # Request/Response shape changes
-  '^[+-].*return\s*\{[^}]*\}'
+  # Response shape changes in route handlers (NextResponse, Response)
+  # Note: Simple return statements like "return { success: true }" are allowed
+  # Only flag explicit HTTP response object creation
+  '^[+-].*NextResponse\.(json|redirect)'
+  '^[+-].*new Response\('
   '^[+-].*res\.(json|send|status)'
 )
 
