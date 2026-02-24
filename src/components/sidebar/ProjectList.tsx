@@ -1,13 +1,22 @@
 'use client';
 
+import { useCallback } from 'react';
 import { useSessionDiscoveryStore } from '@/lib/store/sessions';
 import { useChatStore } from '@/lib/store';
+import { useWorkspaceStore } from '@/lib/store/workspaces';
+import { useClaudeChat } from '@/hooks/useClaudeChat';
 import { SessionItem } from './SessionItem';
 import { UISessionItem } from './UISessionItem';
+import { createLogger } from '@/lib/logger';
+import { showToast } from '@/lib/utils/toast';
+
+const log = createLogger('ProjectList');
 
 export function ProjectList() {
   const { projects, sessions, sessionSearchQuery } = useSessionDiscoveryStore();
-  const { sessions: uiSessions, sessionId, hiddenSessionIds, collapsedProjects, toggleProjectCollapse } = useChatStore();
+  const { sessions: uiSessions, sessionId, hiddenSessionIds, collapsedProjects, toggleProjectCollapse, switchSession, setCurrentSession, isStreaming } = useChatStore();
+  const { validateLastActiveSession, getMostRecentSessionForWorkspace, updateWorkspaceLastActiveSession, setCurrentWorkspace, workspaces } = useWorkspaceStore();
+  const { cleanupStream } = useClaudeChat();
 
   // Split sessions into user and system sessions
   const userSessions = sessions.filter(s => !s.isSystem);
@@ -18,6 +27,83 @@ export function ProjectList() {
     if (!text) return false;
     return text.toLowerCase().includes(query.toLowerCase());
   };
+
+  // Workspace click handler with auto-session-selection
+  const handleWorkspaceClick = useCallback(async (project: any) => {
+    log.debug('Workspace clicked', { projectId: project.id, path: project.path });
+
+    // Step 1: Cleanup active stream if any
+    if (isStreaming) {
+      cleanupStream();
+      showToast('Stopped active conversation', 'info');
+    }
+
+    // Step 2: Update current workspace (sync)
+    // For now, we'll treat project.id as workspaceId
+    // In future, we may need explicit workspace mapping
+    setCurrentWorkspace(project.id);
+
+    // Step 3: Find workspace from store (if it exists)
+    const workspace = workspaces.get(project.id);
+
+    // Step 4: Find sessions for this project/workspace
+    const projectSessions = uiSessions.filter(
+      s => s.workspaceId === project.id && !hiddenSessionIds.has(s.id)
+    );
+
+    if (projectSessions.length === 0) {
+      // No sessions - show empty state
+      log.debug('No sessions for workspace, showing empty state', {
+        projectId: project.id,
+      });
+      setCurrentSession(null);
+
+      // Auto-focus "New Chat" button after render
+      setTimeout(() => {
+        document.getElementById('new-chat-button')?.focus();
+      }, 100);
+      return;
+    }
+
+    // Step 5: Validate lastActiveSessionId
+    let sessionToActivate = validateLastActiveSession(
+      project.id,
+      workspace?.lastActiveSessionId
+    );
+
+    if (!sessionToActivate) {
+      // Fall back to most recent
+      const mostRecent = getMostRecentSessionForWorkspace(project.id);
+      sessionToActivate = mostRecent?.id || projectSessions[0]?.id;
+
+      if (workspace?.lastActiveSessionId) {
+        log.warn('Invalid lastActiveSessionId, falling back', {
+          projectId: project.id,
+          invalidSessionId: workspace.lastActiveSessionId,
+          fallbackSessionId: sessionToActivate,
+        });
+        showToast('Restored most recent session', 'info');
+      }
+    }
+
+    // Step 6: Activate session (sync state, async messages)
+    if (sessionToActivate) {
+      await switchSession(sessionToActivate);
+      updateWorkspaceLastActiveSession(project.id, sessionToActivate);
+    }
+  }, [
+    isStreaming,
+    cleanupStream,
+    setCurrentWorkspace,
+    validateLastActiveSession,
+    getMostRecentSessionForWorkspace,
+    updateWorkspaceLastActiveSession,
+    switchSession,
+    setCurrentSession,
+    workspaces,
+    uiSessions,
+    hiddenSessionIds,
+  ]);
 
 
   // Ensure /workspace project always exists when there are browser sessions
@@ -99,7 +185,10 @@ export function ProjectList() {
           <div key={project.id} className="space-y-1">
             {/* Project header */}
             <button
-              onClick={() => toggleProjectCollapse(project.id)}
+              onClick={() => {
+                handleWorkspaceClick(project);
+                toggleProjectCollapse(project.id);
+              }}
               className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-left"
             >
               <div className="flex items-center gap-2 flex-1 min-w-0">
