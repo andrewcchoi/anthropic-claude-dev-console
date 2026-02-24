@@ -7,6 +7,26 @@ import { storeSync } from './sync';
 
 const log = createLogger('ChatStore');
 
+// Lazy getter for useWorkspaceStore to avoid circular dependency
+let _useWorkspaceStore: any = null;
+function getWorkspaceStore() {
+  if (!_useWorkspaceStore) {
+    try {
+      _useWorkspaceStore = require('./workspaces').useWorkspaceStore;
+    } catch (e) {
+      // In test environment, try window/global
+      if (typeof window !== 'undefined' && (window as any).useWorkspaceStore) {
+        _useWorkspaceStore = (window as any).useWorkspaceStore;
+      } else if (typeof global !== 'undefined' && (global as any).useWorkspaceStore) {
+        _useWorkspaceStore = (global as any).useWorkspaceStore;
+      } else {
+        log.error('useWorkspaceStore not available');
+      }
+    }
+  }
+  return _useWorkspaceStore;
+}
+
 interface TerminalSession {
   sessionId: string;
   status: 'connecting' | 'connected' | 'disconnected' | 'error';
@@ -272,6 +292,12 @@ export const useChatStore = create<ChatStore>()(
               sessionUsage: null,
               isLoadingHistory: false,
             });
+
+            // Update workspace's lastActiveSessionId even for pending sessions
+            if (pendingSession.workspaceId) {
+              const useWorkspaceStore = getWorkspaceStore();
+              useWorkspaceStore.getState().updateWorkspaceLastActiveSession(pendingSession.workspaceId, id);
+            }
             return;
           }
         }
@@ -298,6 +324,12 @@ export const useChatStore = create<ChatStore>()(
           // Mark session as initialized since it has messages (exists on disk)
           if (cached.messages.length > 0) {
             get().markSessionInitialized(id);
+          }
+
+          // Update workspace's lastActiveSessionId
+          if (session.workspaceId) {
+            const useWorkspaceStore = getWorkspaceStore();
+            useWorkspaceStore.getState().updateWorkspaceLastActiveSession(session.workspaceId, id);
           }
           return;
         }
@@ -346,6 +378,12 @@ export const useChatStore = create<ChatStore>()(
             if (messages.length > 0) {
               get().markSessionInitialized(id);
             }
+
+            // Update workspace's lastActiveSessionId
+            if (session.workspaceId) {
+              const useWorkspaceStore = getWorkspaceStore();
+              useWorkspaceStore.getState().updateWorkspaceLastActiveSession(session.workspaceId, id);
+            }
           } else {
             // Failed to load messages, but continue with empty state
             const session = localSession || {
@@ -364,6 +402,12 @@ export const useChatStore = create<ChatStore>()(
               sessionUsage: null,
               isLoadingHistory: false,
             });
+
+            // Update workspace's lastActiveSessionId
+            if (session.workspaceId) {
+              const useWorkspaceStore = getWorkspaceStore();
+              useWorkspaceStore.getState().updateWorkspaceLastActiveSession(session.workspaceId, id);
+            }
           }
         } catch (error) {
           log.error('Failed to load session messages', { error });
@@ -384,6 +428,12 @@ export const useChatStore = create<ChatStore>()(
             sessionUsage: null,
             isLoadingHistory: false,
           });
+
+          // Update workspace's lastActiveSessionId
+          if (session.workspaceId) {
+            const useWorkspaceStore = getWorkspaceStore();
+            useWorkspaceStore.getState().updateWorkspaceLastActiveSession(session.workspaceId, id);
+          }
         }
       },
 
