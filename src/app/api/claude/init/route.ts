@@ -183,6 +183,28 @@ export async function POST(req: NextRequest) {
 
           let stderrBuffer = '';
           let receivedInit = false;
+          let streamClosed = false;
+
+          // Helper to safely close stream once
+          const closeStream = () => {
+            if (streamClosed) return;
+            streamClosed = true;
+            try {
+              controller.close();
+            } catch (e) {
+              // Already closed, ignore
+            }
+          };
+
+          // Helper to safely enqueue data
+          const safeEnqueue = (data: Uint8Array) => {
+            if (streamClosed) return;
+            try {
+              controller.enqueue(data);
+            } catch (e) {
+              log.error('Failed to enqueue data', { error: e });
+            }
+          };
 
           // Handle stdout - looking for system.init message
           claude.stdout.on('data', (chunk: Buffer) => {
@@ -204,7 +226,7 @@ export async function POST(req: NextRequest) {
                     log.debug('Received system.init', { model: parsed.model });
                   }
 
-                  controller.enqueue(encoder.encode(`data: ${trimmed}\n\n`));
+                  safeEnqueue(encoder.encode(`data: ${trimmed}\n\n`));
                 }
               } catch (e) {
                 // Skip invalid JSON
@@ -246,17 +268,13 @@ export async function POST(req: NextRequest) {
                 type: 'error',
                 error: `Pre-warm failed: ${errorMessage}`,
               };
-              try {
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify(errorEvent)}\n\n`)
-                );
-              } catch (e) {
-                log.error('Failed to send error event', { error: e });
-              }
+              safeEnqueue(
+                encoder.encode(`data: ${JSON.stringify(errorEvent)}\n\n`)
+              );
             }
 
-            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-            controller.close();
+            safeEnqueue(encoder.encode('data: [DONE]\n\n'));
+            closeStream();
           });
 
           // Handle process errors
@@ -265,24 +283,24 @@ export async function POST(req: NextRequest) {
               type: 'error',
               error: `Failed to spawn CLI: ${error.message}`,
             };
-            controller.enqueue(
+            safeEnqueue(
               encoder.encode(`data: ${JSON.stringify(errorMessage)}\n\n`)
             );
-            controller.close();
+            closeStream();
           });
 
           // Send /status command to trigger system.init without API cost
           claude.stdin.write('/status\n');
           claude.stdin.end();
         } catch (error: any) {
-          const errorMessage = {
-            type: 'error',
-            error: error.message || 'Unknown error occurred',
-          };
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify(errorMessage)}\n\n`)
+          // Can't use safeEnqueue/closeStream here - they're inside start() function scope
+          // This catch is for errors during ReadableStream setup, not during streaming
+          log.error('Failed to create pre-warm stream', { error });
+          // Return error response instead
+          return new Response(
+            JSON.stringify({ type: 'error', error: error.message || 'Unknown error occurred' }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
           );
-          controller.close();
         }
       },
     });

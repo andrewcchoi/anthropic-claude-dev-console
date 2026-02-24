@@ -8,21 +8,23 @@ import { formatRelativeTime } from '@/lib/utils/time';
 import { Session } from '@/types/claude';
 import { CLISession } from '@/types/sessions';
 import { getProjectIdFromWorkspace, encodeProjectPath } from '@/lib/utils/projectPath';
+import { logDiagnosticError, diagnosticAssert } from '@/lib/logger/diagnostic';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('SessionList');
 
 export function SessionList() {
-  console.log('🔥🔥🔥 SessionList RENDERING 🔥🔥🔥');
-
   const [isClient, setIsClient] = useState(false);
   const { sessions: uiSessions, sessionId, switchSession, deleteSession, hiddenSessionIds } = useChatStore();
   const { sessions: cliSessions } = useSessionDiscoveryStore();
   const { activeWorkspaceId, workspaces, setActiveWorkspace } = useWorkspaceStore();
 
-  console.log('🔥 SessionList state:', {
+  // Debug logging (enable with enableDebug() in console)
+  log.debug('SessionList render', {
     activeWorkspaceId,
     totalWorkspaces: workspaces.size,
     uiSessions: uiSessions.length,
     cliSessions: cliSessions.length,
-    hiddenCount: hiddenSessionIds.size,
   });
 
   // Combine UI sessions and CLI discovered sessions
@@ -91,8 +93,42 @@ export function SessionList() {
 
   // Handle session click in overview mode (opens workspace tab)
   const handleSessionClickInOverview = (session: Session, workspaceId: string) => {
+    // DIAGNOSTIC: Validate inputs to catch type mismatches early
+    diagnosticAssert(
+      typeof workspaceId === 'string' && workspaceId.length > 0,
+      'SessionList',
+      'TYPE_MISMATCH',
+      'handleSessionClickInOverview: workspaceId is invalid',
+      {
+        component: 'SessionList',
+        action: 'handleSessionClickInOverview',
+        expected: 'non-empty string (workspace UUID)',
+        actual: workspaceId,
+        session: { id: session.id, workspaceId: session.workspaceId },
+      }
+    );
+
     setActiveWorkspace(workspaceId); // Open the workspace tab
+
     const projectId = getProjectIdFromWorkspace(session.workspaceId, workspaces);
+
+    // DIAGNOSTIC: Log if projectId conversion failed
+    if (!projectId) {
+      logDiagnosticError('SessionList', 'NOT_FOUND', 'Failed to get projectId from workspace', {
+        component: 'SessionList',
+        action: 'handleSessionClickInOverview',
+        sessionWorkspaceId: session.workspaceId,
+        availableWorkspaces: Array.from(workspaces.keys()),
+        hint: 'Session workspaceId should be a workspace UUID, not an encoded path',
+      });
+    }
+
+    log.debug('Switching session', {
+      sessionId: session.id,
+      projectId,
+      workspaceId,
+    });
+
     switchSession(session.id, projectId); // Switch to the session
   };
 
@@ -282,34 +318,32 @@ export function SessionList() {
   const sortedWorkspace = [...workspaceSessions].sort((a, b) => b.updated_at - a.updated_at);
   const sortedUnassigned = [...unassignedSessions].sort((a, b) => b.updated_at - a.updated_at);
 
-  // Get encoded project path for debugging
-  const activeProjectId = activeWorkspace ? encodeProjectPath(activeWorkspace.rootPath) : null;
-  console.log('🔥 SessionList FILTERED MODE:', {
+  // Debug logging for session filtering (enable with enableDebug() in console)
+  log.debug('Session filtering result', {
     activeWorkspaceId,
-    activeProjectId,  // The encoded path we're matching against
-    activeRootPath: activeWorkspace?.rootPath,
-    workspaceSessions: workspaceSessions.length,
-    unassignedSessions: unassignedSessions.length,
-    totalAllSessions: allSessions.length,
-    firstFewSessions: allSessions.slice(0, 3).map(s => ({
-      id: s.id.slice(0, 8),
-      workspaceId: s.workspaceId,
-      matchesActiveProjectId: s.workspaceId === activeProjectId || (s.workspaceId && s.workspaceId.startsWith(activeProjectId || '')),
-    })),
+    activeProjectId: activeWorkspace ? encodeProjectPath(activeWorkspace.rootPath) : null,
+    workspaceSessionCount: workspaceSessions.length,
+    unassignedSessionCount: unassignedSessions.length,
+    totalSessions: allSessions.length,
   });
+
+  // DIAGNOSTIC: Log if no sessions found when we expect some
+  if (workspaceSessions.length === 0 && allSessions.length > 0 && activeWorkspace) {
+    log.warn('No sessions matched workspace filter', {
+      activeWorkspaceId,
+      activeRootPath: activeWorkspace.rootPath,
+      encodedProjectId: encodeProjectPath(activeWorkspace.rootPath),
+      sampleSessionWorkspaceIds: allSessions.slice(0, 5).map(s => s.workspaceId),
+      hint: 'Check if session.workspaceId format matches encoded workspace path',
+    });
+  }
 
   if (sortedWorkspace.length === 0 && sortedUnassigned.length === 0) {
     return (
-      <>
-        {/* DEBUG: Visible test that code is loading */}
-        <div style={{ background: 'red', color: 'white', padding: '10px', fontWeight: 'bold', margin: '10px' }}>
-          🔥 CODE LOADED - All: {allSessions.length} | WS: {workspaceSessions.length} | activeWsId: {activeWorkspaceId?.slice(0, 8)}
-        </div>
-        <div className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">
-          No sessions in this workspace
-          <div className="text-xs mt-2">Create a new chat to get started</div>
-        </div>
-      </>
+      <div className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">
+        No sessions in this workspace
+        <div className="text-xs mt-2">Create a new chat to get started</div>
+      </div>
     );
   }
 

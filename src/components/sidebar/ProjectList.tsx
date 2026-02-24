@@ -14,11 +14,20 @@ import { encodeProjectPath } from '@/lib/utils/projectPath';
 const log = createLogger('ProjectList');
 
 export function ProjectList() {
+  console.log('🔥🔥🔥 ProjectList COMPONENT RENDERING 🔥🔥🔥');
+
   const { projects, sessions, sessionSearchQuery } = useSessionDiscoveryStore();
   const { sessions: uiSessions, sessionId, hiddenSessionIds, collapsedProjects, toggleProjectCollapse, switchSession, setCurrentSession, isStreaming } = useChatStore();
   const { validateLastActiveSession, getMostRecentSessionForWorkspace, updateWorkspaceLastActiveSession, setActiveWorkspace, workspaces } = useWorkspaceStore();
   const { cleanupStream } = useClaudeChat();
   const [announcement, setAnnouncement] = useState('');
+
+  console.log('🔥 ProjectList state:', {
+    projects: projects.length,
+    sessions: sessions.length,
+    uiSessions: uiSessions.length,
+    setActiveWorkspace: typeof setActiveWorkspace,
+  });
 
   // Split sessions into user and system sessions
   const userSessions = sessions.filter(s => !s.isSystem);
@@ -32,6 +41,7 @@ export function ProjectList() {
 
   // Workspace click handler with auto-session-selection
   const handleWorkspaceClick = useCallback(async (project: any) => {
+    console.log('🔥 WORKSPACE CLICKED:', project.id, project.path);
     log.debug('Workspace clicked', { projectId: project.id, path: project.path });
 
     // Step 1: Cleanup active stream if any
@@ -43,7 +53,12 @@ export function ProjectList() {
     // Step 2: Update current workspace (sync)
     // For now, we'll treat project.id as workspaceId
     // In future, we may need explicit workspace mapping
-    setActiveWorkspace(project.id);
+    console.log('🔥 Attempting to set active workspace:', project.id);
+    if (setActiveWorkspace) {
+      setActiveWorkspace(project.id);
+    } else {
+      console.warn('⚠️ setActiveWorkspace not available');
+    }
 
     // Step 3: Find workspace from store (if it exists)
     const workspace = workspaces.get(project.id);
@@ -146,6 +161,11 @@ export function ProjectList() {
 
   return (
     <>
+      {/* DEBUG: Visible test that code is loading */}
+      <div style={{ background: 'red', color: 'white', padding: '10px', fontWeight: 'bold' }}>
+        🔥 CODE UPDATED - Projects: {projects.length} - Sessions: {sessions.length}
+      </div>
+
       {/* Live region for announcements */}
       <div
         role="status"
@@ -162,6 +182,18 @@ export function ProjectList() {
 
         // Get CLI sessions for this project (excluding system sessions)
         let cliSessions = userSessions.filter((s) => s.projectId === project.id);
+
+        // Debug logging for Current Workspace
+        if (project.id === '-workspace') {
+          console.log('🔥 Current Workspace Debug:', {
+            projectId: project.id,
+            projectPath: project.path,
+            totalUserSessions: userSessions.length,
+            cliSessionsFound: cliSessions.length,
+            firstFewProjectIds: userSessions.slice(0, 5).map(s => s.projectId),
+            uiSessionsCount: uiSessions.length,
+          });
+        }
 
         // For workspace: mix in browser sessions (excluding current and hidden)
         let browserSessions = isWorkspace

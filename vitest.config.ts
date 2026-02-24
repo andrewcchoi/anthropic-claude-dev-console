@@ -25,9 +25,9 @@ export default defineConfig({
         statements: 90,
       },
       // Fail CI if coverage drops below thresholds
-      all: true,
+      // all: true,  // Not supported in v8 provider
       // Report uncovered lines
-      reportOnFailure: true,
+      // reportOnFailure: true,  // Not supported in v8 provider
     },
     // Organize tests by layer
     include: [
@@ -35,7 +35,7 @@ export default defineConfig({
       '__tests__/**/*.test.{ts,tsx}',
     ],
     // Run tests in parallel for speed
-    threads: true,
+    // threads: true,  // Not a valid option in this vitest version
     // Timeout for async tests
     testTimeout: 10000,
   },

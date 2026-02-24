@@ -28,7 +28,7 @@ export function RightPanel() {
         >
           <Settings className="h-5 w-5" />
         </button>
-        {debugEnabled && <DebugToggle variant="compact" />}
+        <DebugToggle variant="compact" />
       </div>
     );
   }

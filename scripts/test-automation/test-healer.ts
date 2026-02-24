@@ -15,7 +15,7 @@
  */
 
 import { promises as fs } from 'fs';
-import { exec Sync } from 'child_process';
+import { execSync } from 'child_process';
 
 interface TestFailure {
   testFile: string;
@@ -26,7 +26,7 @@ interface TestFailure {
 
 interface HealingSuggestion {
   problem: string;
-  likelyСause: string;
+  likelyCause: string;
   suggestedFix: string;
   confidence: 'high' | 'medium' | 'low';
   codeChanges?: Array<{
