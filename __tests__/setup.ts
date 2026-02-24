@@ -6,6 +6,26 @@
  */
 
 import '@testing-library/jest-dom/vitest';
+import { vi } from 'vitest';
+
+// Mock global fetch for API calls
+const mockFetch = vi.fn(() =>
+  Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve({}),
+    text: () => Promise.resolve(''),
+  })
+);
+
+Object.defineProperty(global, 'fetch', {
+  writable: true,
+  value: mockFetch,
+});
+
+// Reset fetch mock before each test
+beforeEach(() => {
+  mockFetch.mockClear();
+});
 
 // Mock window.matchMedia for components that use it (e.g., theme detection)
 Object.defineProperty(window, 'matchMedia', {

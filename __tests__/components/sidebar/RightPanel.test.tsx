@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent } from '../../../__tests__/test-utils';
 import { RightPanel } from '@/components/sidebar/RightPanel';
 import { useChatStore } from '@/lib/store';
 
@@ -14,6 +14,14 @@ vi.mock('@/components/ui/ModelSelector', () => ({
 
 vi.mock('@/components/ui/ProviderSelector', () => ({
   ProviderSelector: () => <div data-testid="provider-selector">ProviderSelector</div>,
+}));
+
+vi.mock('@/components/ui/DefaultModeSelector', () => ({
+  DefaultModeSelector: () => <div data-testid="default-mode-selector">DefaultModeSelector</div>,
+}));
+
+vi.mock('@/components/ui/DebugToggle', () => ({
+  DebugToggle: () => <div data-testid="debug-toggle">DebugToggle</div>,
 }));
 
 describe('RightPanel', () => {
@@ -141,13 +149,14 @@ describe('RightPanel', () => {
       expect(screen.getByText('Settings')).toBeInTheDocument();
     });
 
-    it('should have fixed positioning on top-right when collapsed', () => {
+    it('should have fixed positioning on right side when collapsed', () => {
       const { container } = render(<RightPanel />);
-      const button = screen.getByRole('button', { name: /settings/i });
 
-      expect(button).toHaveClass('fixed');
-      expect(button).toHaveClass('right-4');
-      expect(button).toHaveClass('top-4');
+      // When collapsed, the panel is a fixed strip on the right side
+      // Find the element with 'fixed' class (it's wrapped in providers)
+      const panel = container.querySelector('.fixed');
+      expect(panel).toBeInTheDocument();
+      expect(panel).toHaveClass('right-0');
     });
   });
 
@@ -160,11 +169,12 @@ describe('RightPanel', () => {
       expect(panel?.className).toMatch(/bg-gray-(50|900)/);
     });
 
-    it('should have correct height (full screen)', () => {
+    it('should have correct height (accounting for tab bar)', () => {
       const { container } = render(<RightPanel />);
       const panel = container.querySelector('[data-panel="right"]');
 
-      expect(panel).toHaveClass('h-screen');
+      // Height is calc(100vh - 49px) to account for workspace tab bar
+      expect(panel?.className).toContain('h-[calc(100vh-49px)]');
     });
   });
 
