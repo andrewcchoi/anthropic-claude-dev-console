@@ -118,6 +118,7 @@ export interface Workspace {
   // Session association
   sessionId: string | null;
   sessionIds: string[];  // Track all sessions for this workspace
+  lastActiveSessionId?: string;  // Last active session for auto-restore
 
   // Per-workspace UI state
   expandedFolders: Set<string>;
