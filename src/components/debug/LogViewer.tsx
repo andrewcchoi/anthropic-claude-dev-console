@@ -155,6 +155,26 @@ export function LogViewer() {
     return true;
   });
 
+  // Filter client logs (same logic as server logs)
+  const filteredClientLogs = clientLogs.filter((log) => {
+    if (levelFilter !== 'all' && log.level !== levelFilter) {
+      return false;
+    }
+    if (filter) {
+      const searchText = filter.toLowerCase();
+      return (
+        log.message.toLowerCase().includes(searchText) ||
+        log.module.toLowerCase().includes(searchText) ||
+        (log.correlationId && log.correlationId.toLowerCase().includes(searchText))
+      );
+    }
+    return true;
+  });
+
+  // Get logs to display based on active tab
+  const displayLogs = activeTab === 'server' ? filteredLogs : filteredClientLogs;
+  const totalLogs = activeTab === 'server' ? logs.length : clientLogs.length;
+
   if (!debugEnabled) {
     return (
       <div className="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-950 text-gray-500 dark:text-gray-500">
@@ -169,22 +189,52 @@ export function LogViewer() {
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950">
       {/* Header */}
-      <div className="flex-shrink-0 border-b border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900/50 p-3">
-        <div className="flex items-center justify-between gap-4">
+      <div className="flex-shrink-0 border-b border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-900/50">
+        {/* Tab Bar */}
+        <div className="flex border-b border-gray-200 dark:border-gray-700">
+          <button
+            onClick={() => setActiveTab('server')}
+            className={`px-4 py-2 text-sm font-medium ${
+              activeTab === 'server'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
+          >
+            Server Logs ({logs.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('client')}
+            className={`px-4 py-2 text-sm font-medium ${
+              activeTab === 'client'
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
+          >
+            Client Logs ({clientLogs.length})
+          </button>
+        </div>
+
+        {/* Controls */}
+        <div className="flex items-center justify-between gap-4 p-3">
           <div className="flex items-center gap-3">
-            <h3 className="font-semibold text-gray-800 dark:text-gray-200">Log Viewer</h3>
             <div className="flex items-center gap-2">
               <div
                 className={`w-2 h-2 rounded-full ${
-                  connected ? 'bg-green-500' : 'bg-red-500'
+                  activeTab === 'server'
+                    ? connected ? 'bg-green-500' : 'bg-red-500'
+                    : 'bg-blue-500'
                 }`}
               />
               <span className="text-xs text-gray-500 dark:text-gray-500">
-                {connected ? 'Connected' : 'Disconnected'}
+                {activeTab === 'server'
+                  ? connected ? 'Connected' : 'Disconnected'
+                  : 'Loaded from IndexedDB'}
               </span>
             </div>
             <span className="text-xs text-gray-500 dark:text-gray-500">
-              {filteredLogs.length} / {logs.length} logs
+              {activeTab === 'server'
+                ? `${filteredLogs.length} / ${logs.length} logs${totalReceived > logs.length ? ` (${totalReceived} received)` : ''}`
+                : `${filteredClientLogs.length} / ${clientLogs.length} logs`}
             </span>
           </div>
 
@@ -211,21 +261,50 @@ export function LogViewer() {
               className="px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-500"
             />
 
-            {/* Auto-scroll toggle */}
-            <button
-              onClick={() => setAutoScroll(!autoScroll)}
-              className={`px-2 py-1 text-xs rounded ${
-                autoScroll
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-              }`}
-            >
-              Auto-scroll
-            </button>
+            {/* Auto-scroll toggle (server only) */}
+            {activeTab === 'server' && (
+              <button
+                onClick={() => setAutoScroll(!autoScroll)}
+                className={`px-2 py-1 text-xs rounded ${
+                  autoScroll
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                }`}
+              >
+                Auto-scroll
+              </button>
+            )}
+
+            {/* Refresh button (client only) */}
+            {activeTab === 'client' && (
+              <button
+                onClick={() => {
+                  // Force reload client logs
+                  setActiveTab('server');
+                  setTimeout(() => setActiveTab('client'), 0);
+                }}
+                className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded"
+              >
+                Refresh
+              </button>
+            )}
 
             {/* Clear logs */}
             <button
-              onClick={() => setLogs([])}
+              onClick={() => {
+                if (activeTab === 'server') {
+                  setLogs([]);
+                  setTotalReceived(0);
+                } else {
+                  // Client logs: confirm before clearing
+                  if (window.confirm('Clear all client logs? This cannot be undone.')) {
+                    clearClientLogs().then(() => {
+                      setClientLogs([]);
+                      setStats({ entryCount: 0, sizeBytes: 0 });
+                    });
+                  }
+                }
+              }}
               className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded"
             >
               Clear
@@ -236,21 +315,26 @@ export function LogViewer() {
 
       {/* Logs */}
       <div className="flex-1 overflow-auto p-2 space-y-1 font-mono text-xs">
-        {filteredLogs.length === 0 ? (
+        {displayLogs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-500 space-y-3">
             <div className="text-center">
               <p className="text-base font-medium mb-2">
-                {logs.length === 0 ? 'No logs yet' : 'No logs match filter'}
+                {totalLogs === 0 ? 'No logs yet' : 'No logs match filter'}
               </p>
-              {logs.length === 0 && (
+              {totalLogs === 0 && activeTab === 'server' && (
                 <p className="text-sm text-gray-400 dark:text-gray-600">
                   Trigger some activity (chat messages, API calls) to see logs appear
+                </p>
+              )}
+              {totalLogs === 0 && activeTab === 'client' && (
+                <p className="text-sm text-gray-400 dark:text-gray-600">
+                  Enable debug mode and interact with the app to generate client logs
                 </p>
               )}
             </div>
           </div>
         ) : (
-          filteredLogs.map((log, index) => (
+          displayLogs.map((log, index) => (
             <div
               key={index}
               className={`p-2 rounded border border-gray-300 dark:border-gray-800 ${LOG_BG[log.level]}`}
