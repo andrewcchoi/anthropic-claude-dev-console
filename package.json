@@ -60,6 +60,7 @@
     "@types/uuid": "^10.0.0",
     "@types/ws": "^8.5.13",
     "@vitest/coverage-v8": "^4.0.18",
+    "fake-indexeddb": "^6.2.5",
     "glob": "^13.0.6",
     "happy-dom": "^20.4.0",
     "jsdom": "^27.4.0",
