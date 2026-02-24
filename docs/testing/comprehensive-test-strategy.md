@@ -251,6 +251,17 @@ describe('switchSession call-site audit', () => {
 
 ## Implementation Workflow
 
+### Integration with Ultrathink
+
+**For comprehensive planning + test strategy**, use:
+```bash
+/ultrathink-with-tests "Your feature description"
+```
+
+This integrates test strategy into ultrathink planning from the start.
+
+See [ULTRATHINK_INTEGRATION.md](ULTRATHINK_INTEGRATION.md) for complete details.
+
 ### Phase 1: Planning (During Ultrathink Stage C)
 
 1. **Identify test layers needed**
@@ -259,7 +270,8 @@ describe('switchSession call-site audit', () => {
    - Are there new integration points?
 
 2. **Create test checklist**
-   - Use template from `.claude/test-checklists/`
+   - Automatically generated in ultrathink Stage C
+   - Or manually: `npm run generate-checklist`
    - Mark which layers are mandatory
    - Identify call-site audits needed
 
