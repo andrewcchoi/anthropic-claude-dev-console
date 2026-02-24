@@ -202,18 +202,12 @@ The adversarial reviewer MUST check each of these explicitly:
 
 ## Red Flags (Auto-Issue Triggers)
 
-These patterns should ALWAYS generate an issue:
+See the authoritative red flags table in the [Adversarial Reviewer Skill](./../skills/adversarial-reviewer.md#red-flags-auto-reject-triggers).
 
-| Pattern | Issue Severity | Why |
-|---------|---------------|-----|
-| `any` type | Important | Type safety bypassed |
-| Empty catch `{}` | Critical | Silent failure |
-| `// TODO` | Minor | Incomplete work |
-| Magic numbers | Minor | Unclear intent |
-| Missing await | Critical | Async bug |
-| console.log | Minor | Debug code left in |
-| Commented code | Minor | Dead code |
-| No tests | Important | Untested behavior |
+Key patterns that should ALWAYS generate an issue include:
+- **Critical**: Empty catch blocks, missing `await`, parameter count changes without call site audit, UUID/path type confusion
+- **Important**: `any` types, no tests for new functions
+- **Minor**: `// TODO` comments, magic numbers, `console.log`, commented code
 
 ## Integration with Development Workflow
 
@@ -374,5 +368,4 @@ Files: SessionList.tsx, UISessionItem.tsx, store/index.ts
 ## Related Documentation
 
 - [Adversarial Reviewer Skill](./../skills/adversarial-reviewer.md)
-- [Subagent-Driven Development](https://superpowers.dev/skills/subagent-driven-development)
 - [Comprehensive Testing Strategy](./../skills/comprehensive-testing.md)

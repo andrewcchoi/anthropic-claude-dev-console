@@ -1,7 +1,6 @@
 ---
 name: adversarial-reviewer
 description: Force reviewers to find issues instead of rubber-stamping. Mandatory issue reporting with exception justification. Use for all code reviews to achieve 100% issue detection rate.
-integrates-with: subagent-driven-development
 ---
 
 # Adversarial Reviewer Mode
@@ -191,16 +190,18 @@ I certify I actively looked for problems and found none.
 
 These patterns should ALWAYS be flagged:
 
-| Pattern | Why It's a Problem |
-|---------|-------------------|
-| `any` type | Type safety bypassed |
-| Empty catch block | Silent failure |
-| `// TODO` in new code | Incomplete implementation |
-| Magic numbers | Unclear intent |
-| Missing error message | Unactionable errors |
-| No tests for new function | Untested code path |
-| Parameter count change without call site audit | Potential runtime error |
-| UUID string where path expected | Type confusion bug |
+| Pattern | Severity | Why It's a Problem |
+|---------|----------|-------------------|
+| `any` type | Important | Type safety bypassed |
+| Empty catch block `{}` | Critical | Silent failure |
+| `// TODO` in new code | Minor | Incomplete implementation |
+| Magic numbers | Minor | Unclear intent |
+| Missing `await` | Critical | Async bug, race conditions |
+| `console.log` | Minor | Debug code left in production |
+| Commented code | Minor | Dead code, maintenance burden |
+| No tests for new function | Important | Untested code path |
+| Parameter count change without call site audit | Critical | Potential runtime error |
+| UUID string where path expected | Critical | Type confusion bug |
 
 ---
 
