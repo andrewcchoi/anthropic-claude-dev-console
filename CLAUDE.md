@@ -53,6 +53,42 @@ The pre-commit hook will block commits that:
 
 If the hook blocks you, **do not bypass it**. Fix the issues.
 
+### Logging Requirements
+
+**All new components, hooks, and utilities MUST include logging.** The pre-commit hook (Gate 6) will warn about missing logging.
+
+```typescript
+// Required pattern for ALL new files:
+import { createLogger } from '@/lib/logger';
+const log = createLogger('ModuleName');
+
+// Use throughout the code:
+log.debug('Descriptive message', { relevantData });  // Development debugging
+log.info('Important event', { details });             // Normal operation
+log.warn('Potential issue', { context });             // Warnings
+log.error('Error occurred', { error, context });      // Errors
+```
+
+**What to log:**
+- Component renders with key props
+- State changes and transitions
+- API calls (request, success, failure)
+- User actions
+- Error conditions with full context
+
+**Templates available:**
+```bash
+./scripts/create-component.sh MyComponent          # New component
+./scripts/create-component.sh MyComponent sidebar  # In subdirectory
+./scripts/create-hook.sh useMyHook                 # New hook
+```
+
+**Exporting logs for debugging:**
+1. Enable debug mode: `enableDebug()` in browser console
+2. Reproduce the issue
+3. Export logs: `exportLogs()` (copies JSONL to clipboard) or `downloadLogs()`
+4. Share the JSONL file for analysis
+
 ### Skills and Processes
 
 Skills like ultrathink, brainstorming, TDD are **not optional decorations**. They exist because skipping them causes exactly the bugs we've experienced. When a skill applies, USE IT.
