@@ -13,39 +13,14 @@
  */
 
 import { promises as fs } from 'fs';
-import { join } from 'path';
 import { describe, it, expect } from 'vitest';
 import {
   findCallSites,
+  findSourceFiles,
   readCallSiteContext,
   checkTypePatterns,
   SWITCH_SESSION_TYPE_PATTERNS,
 } from './type-validators';
-
-/**
- * Helper: Recursively find all TS/TSX files
- */
-async function findFiles(dir: string, pattern: RegExp): Promise<string[]> {
-  const results: string[] = [];
-
-  try {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const fullPath = join(dir, entry.name);
-
-      if (entry.isDirectory() && entry.name !== 'node_modules' && entry.name !== '__tests__' && entry.name !== 'dist') {
-        results.push(...await findFiles(fullPath, pattern));
-      } else if (entry.isFile() && pattern.test(entry.name) && !entry.name.includes('.test.')) {
-        results.push(fullPath);
-      }
-    }
-  } catch (error) {
-    // Skip directories we can't read
-  }
-
-  return results;
-}
 
 /**
  * Helper: Find all call sites of switchSession in the codebase
@@ -53,7 +28,7 @@ async function findFiles(dir: string, pattern: RegExp): Promise<string[]> {
 async function findSwitchSessionCallSites(): Promise<
   Array<{ file: string; line: number; code: string }>
 > {
-  const files = await findFiles('src', /\.(ts|tsx)$/);
+  const files = await findSourceFiles('src', /\.(ts|tsx)$/);
 
   const callSites: Array<{ file: string; line: number; code: string }> = [];
 
