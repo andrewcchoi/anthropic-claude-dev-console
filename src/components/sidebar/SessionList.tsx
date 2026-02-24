@@ -7,6 +7,7 @@ import { useWorkspaceStore } from '@/lib/store/workspaces';
 import { formatRelativeTime } from '@/lib/utils/time';
 import { Session } from '@/types/claude';
 import { CLISession } from '@/types/sessions';
+import { getProjectIdFromWorkspace } from '@/lib/utils/projectPath';
 
 export function SessionList() {
   const [isClient, setIsClient] = useState(false);
@@ -73,7 +74,8 @@ export function SessionList() {
   // Handle session click in overview mode (opens workspace tab)
   const handleSessionClickInOverview = (session: Session, workspaceId: string) => {
     setActiveWorkspace(workspaceId); // Open the workspace tab
-    switchSession(session.id, session.workspaceId); // Switch to the session
+    const projectId = getProjectIdFromWorkspace(session.workspaceId, workspaces);
+    switchSession(session.id, projectId); // Switch to the session
   };
 
   // Filter sessions by active workspace (memoized for performance)
@@ -206,7 +208,10 @@ export function SessionList() {
               {sortedUnassigned.map((session) => (
                 <div
                   key={session.id}
-                  onClick={() => switchSession(session.id, session.workspaceId)}
+                  onClick={() => {
+                    const projectId = getProjectIdFromWorkspace(session.workspaceId, workspaces);
+                    switchSession(session.id, projectId);
+                  }}
                   className={`p-2 rounded cursor-pointer text-sm truncate ${
                     session.id === sessionId
                       ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100'
@@ -256,7 +261,10 @@ export function SessionList() {
       {sortedWorkspace.map((session) => (
         <div
           key={session.id}
-          onClick={() => switchSession(session.id, session.workspaceId)}
+          onClick={() => {
+            const projectId = getProjectIdFromWorkspace(session.workspaceId, workspaces);
+            switchSession(session.id, projectId);
+          }}
           className={`p-2 rounded cursor-pointer text-sm truncate ${
             session.id === sessionId
               ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100'
@@ -288,7 +296,10 @@ export function SessionList() {
           {sortedUnassigned.map((session) => (
             <div
               key={session.id}
-              onClick={() => switchSession(session.id, session.workspaceId)}
+              onClick={() => {
+                const projectId = getProjectIdFromWorkspace(session.workspaceId, workspaces);
+                switchSession(session.id, projectId);
+              }}
               className={`p-2 rounded cursor-pointer text-sm truncate ${
                 session.id === sessionId
                   ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100'

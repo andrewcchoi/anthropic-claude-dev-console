@@ -6,6 +6,7 @@ import { useWorkspaceStore } from '@/lib/store/workspaces';
 import { formatSmartTime } from '@/lib/utils/time';
 import { cn } from '@/lib/utils';
 import { createLogger } from '@/lib/logger';
+import { getProjectIdFromWorkspace } from '@/lib/utils/projectPath';
 
 const log = createLogger('UISessionItem');
 
@@ -43,8 +44,9 @@ export function UISessionItem({ session }: UISessionItemProps) {
       }
     }
 
-    // Switch to session
-    await switchSession(session.id, session.workspaceId);
+    // Switch to session - convert workspace UUID to project ID
+    const projectId = getProjectIdFromWorkspace(session.workspaceId, workspaces);
+    await switchSession(session.id, projectId);
   };
 
   const handleHide = (e: React.MouseEvent) => {

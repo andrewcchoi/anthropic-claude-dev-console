@@ -9,6 +9,7 @@ import { SessionItem } from './SessionItem';
 import { UISessionItem } from './UISessionItem';
 import { createLogger } from '@/lib/logger';
 import { showToast } from '@/lib/utils/toast';
+import { encodeProjectPath } from '@/lib/utils/projectPath';
 
 const log = createLogger('ProjectList');
 
@@ -89,6 +90,7 @@ export function ProjectList() {
 
     // Step 6: Activate session (sync state, async messages)
     if (sessionToActivate) {
+      // Note: project.id is already the encoded path (e.g., "-workspace-docs")
       await switchSession(sessionToActivate, project.id);
       updateWorkspaceLastActiveSession(project.id, sessionToActivate);
 
