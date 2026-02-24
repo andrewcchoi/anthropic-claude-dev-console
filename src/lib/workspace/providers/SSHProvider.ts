@@ -97,7 +97,8 @@ export class SSHProvider extends BaseProvider {
     const hostname = (config as any).hostname || (config as any).host;
     const port = (config as any).port ?? 22;
     const username = (config as any).username || (config as any).user;
-    const remotePath = (config as any).remotePath || (config as any).path || '/';
+    // Use nullish coalescing to allow explicit empty string to trigger validation
+    const remotePath = (config as any).remotePath ?? (config as any).path ?? '/';
 
     // Validate hostname
     if (!hostname || !validateHostname(hostname)) {

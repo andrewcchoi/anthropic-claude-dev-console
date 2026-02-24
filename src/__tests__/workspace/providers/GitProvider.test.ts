@@ -3,6 +3,7 @@
  * Phase 2 - Git Provider Implementation
  */
 
+import { vi } from 'vitest';
 import { GitProvider } from '@/lib/workspace/providers/GitProvider';
 import { ValidationError, ConnectionError } from '@/lib/workspace/errors';
 import { promises as fs } from 'fs';
@@ -149,7 +150,7 @@ describe('GitProvider', () => {
         branch: 'main',
       });
 
-      const progressCallback = jest.fn();
+      const progressCallback = vi.fn();
       provider.setProgressCallback(progressCallback);
 
       // Callback is stored - we can't test it fires without actual clone
