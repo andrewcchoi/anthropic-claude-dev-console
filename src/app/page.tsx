@@ -28,7 +28,7 @@ import { createLogger } from '@/lib/logger';
 const log = createLogger('Home');
 
 export default function Home() {
-  const { messages, sendMessage, isStreaming } = useClaudeChat();
+  const { messages, sendMessage, isStreaming, cleanupStream } = useClaudeChat();
   const { error, sidebarOpen, isLoadingHistory, previewOpen, rightPanelOpen, sessionId, availableSkills, availableCommands } = useChatStore();
   const { prewarmCli } = useCliPrewarm();
   const hasInitialized = useRef(false);
