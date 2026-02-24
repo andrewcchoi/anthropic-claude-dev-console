@@ -825,7 +825,7 @@ export const useChatStore = create<ChatStore>()(
       name: 'claude-code-sessions',
       partialize: (state) => ({
         sessions: state.sessions,
-        sessionId: state.sessionId,
+        // sessionId: NOT persisted - fresh UUID generated on each page load to avoid conflicts
         currentSession: state.currentSession,
         preferredModel: state.preferredModel,
         provider: state.provider,
