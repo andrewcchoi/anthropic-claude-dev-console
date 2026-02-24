@@ -295,6 +295,10 @@ export const useChatStore = create<ChatStore>()(
             sessionUsage: null,
             isLoadingHistory: false,
           });
+          // Mark session as initialized since it has messages (exists on disk)
+          if (cached.messages.length > 0) {
+            get().markSessionInitialized(id);
+          }
           return;
         }
 
@@ -337,6 +341,11 @@ export const useChatStore = create<ChatStore>()(
               sessionUsage: null,
               isLoadingHistory: false,
             });
+
+            // Mark session as initialized since we loaded messages from disk
+            if (messages.length > 0) {
+              get().markSessionInitialized(id);
+            }
           } else {
             // Failed to load messages, but continue with empty state
             const session = localSession || {
@@ -775,7 +784,7 @@ export const useChatStore = create<ChatStore>()(
         sidebarTab: state.sidebarTab,
         hiddenSessionIds: Array.from(state.hiddenSessionIds), // Convert Set to Array for JSON
         collapsedProjects: Array.from(state.collapsedProjects), // Convert Set to Array for JSON
-        initializedSessionIds: Array.from(state.initializedSessionIds), // Convert Set to Array for JSON
+        // initializedSessionIds: NOT persisted - ephemeral runtime state only
         // pendingSessionId: NOT persisted - resets on refresh
       }),
       onRehydrateStorage: () => (state) => {
@@ -792,9 +801,8 @@ export const useChatStore = create<ChatStore>()(
           state.collapsedProjects = new Set();
         }
 
-        if (state && Array.isArray(state.initializedSessionIds)) {
-          state.initializedSessionIds = new Set(state.initializedSessionIds);
-        } else if (state && !state.initializedSessionIds) {
+        // Always initialize as empty Set (ephemeral, not persisted)
+        if (state) {
           state.initializedSessionIds = new Set();
         }
 

@@ -141,7 +141,7 @@ export default function Home() {
             )}
             <MessageList messages={messages} isLoadingHistory={isLoadingHistory} />
             <UsageDisplay />
-            <ChatInput onSend={handleSend} disabled={isStreaming} />
+            <ChatInput onSend={handleSend} disabled={isStreaming || isLoadingHistory} />
           </div>
         </div>
       ) : (

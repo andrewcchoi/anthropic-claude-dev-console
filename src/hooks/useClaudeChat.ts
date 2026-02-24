@@ -9,7 +9,8 @@ import { serializeError } from '@/lib/utils/errorUtils';
 
 const log = createLogger('ClaudeChat');
 
-const MAX_SESSION_RETRIES = 1;
+const MAX_SESSION_RETRIES = 3;  // Increased from 1 to handle transient failures
+const REQUEST_TIMEOUT_MS = 30000;  // 30 second timeout for API requests
 
 export function useClaudeChat() {
   // Get workspace info from hook (not getState())
@@ -155,9 +156,17 @@ export function useClaudeChat() {
           isSessionInitialized,
         });
 
+        // Create AbortController for timeout handling
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          log.error('Request timeout', { timeout: REQUEST_TIMEOUT_MS });
+        }, REQUEST_TIMEOUT_MS);
+
         const response = await fetch('/api/claude', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
           body: JSON.stringify({
             prompt: enhancedPrompt,
             sessionId: currentSessionId,
@@ -169,6 +178,8 @@ export function useClaudeChat() {
             isSessionInitialized,
           }),
         });
+
+        clearTimeout(timeoutId);  // Clear timeout on successful response
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -409,9 +420,17 @@ export function useClaudeChat() {
                   });
 
                   setSessionConflictRetries(prev => prev + 1);
-                  // Use startNewSession to properly link to workspace
-                  startNewSession(activeWorkspace?.id, activeWorkspace?.rootPath);
-                  setError('Session conflict detected, created new session...');
+
+                  // Exponential backoff: 1s, 2s, 4s for retries 0, 1, 2
+                  const retryDelay = Math.min(1000 * Math.pow(2, sessionConflictRetries), 10000);
+                  log.debug('Retrying with backoff', { delay: retryDelay, attempt: sessionConflictRetries + 1 });
+
+                  setTimeout(() => {
+                    // Use startNewSession to properly link to workspace
+                    startNewSession(activeWorkspace?.id, activeWorkspace?.rootPath);
+                  }, retryDelay);
+
+                  setError(`Session conflict detected, retrying in ${Math.round(retryDelay / 1000)}s...`);
                 } else if (message.type === 'error') {
                   // Only show errors if we haven't received a successful result
                   if (!receivedSuccessResult) {

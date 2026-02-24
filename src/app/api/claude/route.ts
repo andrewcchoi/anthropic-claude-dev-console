@@ -1,7 +1,7 @@
 import { spawn } from 'child_process';
 import { NextRequest } from 'next/server';
 import { appendFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
+import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { parseTelemetry } from '@/lib/telemetry';
@@ -13,6 +13,41 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const TELEMETRY_LOG = '/workspace/logs/telemetry.jsonl';
+
+// In-memory locks to prevent TOCTOU races
+// Maps sessionId -> Promise that resolves when the lock is released
+const sessionLocks = new Map<string, Promise<void>>();
+
+/**
+ * Search for a session file across all project directories
+ * Returns true if the session exists anywhere in ~/.claude/projects/
+ */
+function sessionFileExists(sessionId: string): boolean {
+  const projectsDir = join(homedir(), '.claude', 'projects');
+
+  try {
+    if (!existsSync(projectsDir)) {
+      return false;
+    }
+
+    const projects = readdirSync(projectsDir, { withFileTypes: true });
+
+    for (const project of projects) {
+      if (project.isDirectory()) {
+        const sessionPath = join(projectsDir, project.name, `${sessionId}.jsonl`);
+        if (existsSync(sessionPath)) {
+          log.debug('Session file found', { sessionId, project: project.name });
+          return true;
+        }
+      }
+    }
+
+    return false;
+  } catch (error) {
+    log.error('Error checking session file existence', { sessionId, error });
+    return false;
+  }
+}
 
 // Sanitize stderr to prevent secret exposure in logs
 const sanitizeStderr = (stderr: string): string => {
@@ -94,7 +129,7 @@ export async function POST(req: NextRequest) {
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
-      start(controller) {
+      async start(controller) {
         try {
           // Build Claude CLI arguments
           const args = [
@@ -111,19 +146,43 @@ export async function POST(req: NextRequest) {
             args.push('--permission-mode', validatedMode);
           }
 
-          // Determine whether to use --resume or --session-id based on client state
+          // Determine whether to use --resume or --session-id based on SERVER-SIDE filesystem check
           if (sessionId) {
-            // Use client-provided flag to determine if session has been initialized
-            // (avoids filesystem checks which fail due to CLI's cwd-based organization)
-            if (isSessionInitialized) {
-              args.push('--resume', sessionId);  // Resume existing session
-              log.debug('Resuming existing session', { sessionId });
-            } else {
-              args.push('--session-id', sessionId);  // Create new session
-              log.debug('Creating new session', { sessionId });
-              // Add model flag for new sessions only
-              if (model) {
-                args.push('--model', model);
+            // LOCK ACQUISITION: Prevent concurrent requests with same sessionId
+            // This eliminates TOCTOU race between existsSync() and CLI spawn
+            let lockResolve: (() => void) | undefined;
+            try {
+              // Wait for any existing lock on this sessionId
+              while (sessionLocks.has(sessionId)) {
+                await sessionLocks.get(sessionId);
+              }
+
+              // Create new lock promise
+              const lockPromise = new Promise<void>((resolve) => {
+                lockResolve = resolve;
+              });
+              sessionLocks.set(sessionId, lockPromise);
+
+              // SERVER-AUTHORITATIVE CHECK: Check filesystem (source of truth)
+              // This replaces client-provided isSessionInitialized flag
+              const sessionExists = sessionFileExists(sessionId);
+
+              if (sessionExists) {
+                args.push('--resume', sessionId);  // Resume existing session
+                log.debug('Resuming existing session', { sessionId, method: 'server-filesystem-check' });
+              } else {
+                args.push('--session-id', sessionId);  // Create new session
+                log.debug('Creating new session', { sessionId, method: 'server-filesystem-check' });
+                // Add model flag for new sessions only
+                if (model) {
+                  args.push('--model', model);
+                }
+              }
+            } finally {
+              // LOCK RELEASE: Allow next request to proceed
+              sessionLocks.delete(sessionId);
+              if (lockResolve) {
+                lockResolve();
               }
             }
           } else if (model) {
