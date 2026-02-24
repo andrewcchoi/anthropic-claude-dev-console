@@ -138,7 +138,7 @@ function calculateStats(
 
   const stats: ReviewerStats[] = [];
 
-  for (const [reviewer, reviews] of reviewerGroups) {
+  for (const [reviewer, reviews] of Array.from(reviewerGroups)) {
     const approvals = reviews.filter(r => r.decision === 'approved').length;
     const rejections = reviews.filter(r => r.decision === 'rejected').length;
     const fixes_needed = reviews.filter(r => r.decision === 'fixes_needed').length;
@@ -156,7 +156,7 @@ function calculateStats(
     // Get unique tasks reviewed by this reviewer
     const tasksReviewed = new Set(reviews.map(r => r.task));
 
-    for (const task of tasksReviewed) {
+    for (const task of Array.from(tasksReviewed)) {
       const taskReviews = reviews.filter(r => r.task === task);
       const taskBugs = bugsByTask.get(task) || [];
 
@@ -239,7 +239,7 @@ function calculateStats(
       const missedCategories = bugs
         .filter(b => b.should_have_caught === reviewer)
         .map(b => b.category);
-      const uniqueCategories = [...new Set(missedCategories)];
+      const uniqueCategories = Array.from(new Set(missedCategories));
       if (uniqueCategories.length > 0) {
         recommendations.push(`Focus on: ${uniqueCategories.join(', ')} - frequently missed`);
       }
@@ -348,7 +348,7 @@ Analyzes reviewer decisions and post-merge bugs to calculate accuracy metrics.
 Use this script to calibrate reviewers over time.
 
 USAGE:
-  npx ts-node scripts/reviewer-stats.ts [OPTIONS]
+  npx tsx scripts/reviewer-stats.ts [OPTIONS]
 
 OPTIONS:
   --json         Output in JSON format (for programmatic use)
@@ -357,16 +357,16 @@ OPTIONS:
   --help         Show this help message
 
 EXAMPLES:
-  npx ts-node scripts/reviewer-stats.ts
+  npx tsx scripts/reviewer-stats.ts
     Show stats for all reviewers, all time
 
-  npx ts-node scripts/reviewer-stats.ts --days=30
+  npx tsx scripts/reviewer-stats.ts --days=30
     Show stats for last 30 days
 
-  npx ts-node scripts/reviewer-stats.ts --reviewer=spec --json
+  npx tsx scripts/reviewer-stats.ts --reviewer=spec --json
     Show JSON stats for spec reviewer only
 
-  npx ts-node scripts/reviewer-stats.ts --days=7 --json > weekly-report.json
+  npx tsx scripts/reviewer-stats.ts --days=7 --json > weekly-report.json
     Generate weekly report in JSON format
 
 FILES:
@@ -386,10 +386,14 @@ function main(): void {
     process.exit(0);
   }
 
-  // Find log files
+  // Find log files (fall back to .example files if real files don't exist)
   const logsDir = path.join(process.cwd(), '.claude', 'logs');
-  const decisionsFile = path.join(logsDir, 'reviewer-decisions.jsonl');
-  const bugsFile = path.join(logsDir, 'post-merge-bugs.jsonl');
+  const decisionsFile = fs.existsSync(path.join(logsDir, 'reviewer-decisions.jsonl'))
+    ? path.join(logsDir, 'reviewer-decisions.jsonl')
+    : path.join(logsDir, 'reviewer-decisions.example.jsonl');
+  const bugsFile = fs.existsSync(path.join(logsDir, 'post-merge-bugs.jsonl'))
+    ? path.join(logsDir, 'post-merge-bugs.jsonl')
+    : path.join(logsDir, 'post-merge-bugs.example.jsonl');
 
   // Parse data
   let decisions = parseJsonl<ReviewerDecision>(decisionsFile);
