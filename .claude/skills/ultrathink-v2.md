@@ -32,6 +32,101 @@ Ultrathink V2 is a complete development workflow that orchestrates multiple skil
 
 ---
 
+## Subagent Philosophy
+
+**Key Principle:** Each subagent focuses on ONE area and becomes the expert in that area. Nothing else.
+
+### Why Fresh Subagents?
+
+1. **Prevents context pollution** - Mixed context from previous phases causes confusion and hallucination
+2. **Laser-focused expertise** - A "Requirements" subagent only thinks about requirements, not architecture
+3. **Reduces hallucination** - Fresh context prevents bleed-through of assumptions from other areas
+4. **Controller synthesizes** - You (the controller) maintain state; subagents do focused work
+
+### The Controller/Subagent Model
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                      CONTROLLER (You)                    │
+│  - Maintains workflow state across phases                │
+│  - Synthesizes outputs from subagents                    │
+│  - Makes decisions at gates                              │
+│  - Owns the Memory section in CLAUDE.md                  │
+└─────────────────────────────────────────────────────────┘
+                           │
+         ┌─────────────────┼─────────────────┐
+         │                 │                 │
+         ▼                 ▼                 ▼
+   ┌───────────┐     ┌───────────┐     ┌───────────┐
+   │ Subagent  │     │ Subagent  │     │ Subagent  │
+   │   (Arch)  │     │   (Req)   │     │   (Risk)  │
+   │           │     │           │     │           │
+   │ ONE FOCUS │     │ ONE FOCUS │     │ ONE FOCUS │
+   └───────────┘     └───────────┘     └───────────┘
+        │                 │                 │
+        └─────────────────┼─────────────────┘
+                          │
+                          ▼
+                   Controller synthesizes
+```
+
+### Rules for Subagents
+
+**DO:**
+- Give each subagent a single, clear focus area
+- Provide only the context needed for that focus
+- Spawn fresh subagents at each phase transition
+- Let subagents be opinionated within their domain
+
+**DO NOT:**
+- Carry context between phases (creates pollution)
+- Give subagents multiple responsibilities
+- Let subagents make decisions outside their focus
+- Reuse subagents across different focus areas
+
+### Subagent Spawn Template
+
+Use this template when spawning any subagent:
+
+```
+Task tool:
+  description: "[Phase N] [Focus Area] Subagent"
+  prompt: |
+    You are a [ROLE] subagent. Your ONLY focus is [SPECIFIC AREA].
+
+    ## Your Focus
+    [One sentence describing exactly what to analyze/produce]
+
+    ## Context Provided
+    [Minimal context needed - spec excerpt, file list, etc.]
+
+    ## DO NOT
+    - Consider other phases of the workflow
+    - Carry assumptions from elsewhere
+    - Work outside your focus area
+    - Make architectural decisions (unless you're the Arch subagent)
+    - Worry about implementation details (unless you're the Implementer)
+
+    ## YOUR JOB
+    [Specific deliverable in 2-3 bullets]
+
+    ## Output Format
+    [Exact format expected - markdown, JSON, checklist, etc.]
+```
+
+### Phase-Specific Subagent Roster
+
+| Phase | Subagents to Spawn | Focus |
+|-------|-------------------|-------|
+| 0→1 (Brainstorm) | 6 parallel | Arch, Req, Conv, Risk, Dep, Wild |
+| 1→2 (Validate) | 1 | Spec validation only |
+| 2→3 (Plan) | 3 sequential | Stage A, B, C planning |
+| 3→4 (Gates) | 1 per gate | Adversarial review only |
+| 4→5 (Implement) | 1 per task | Single task implementation |
+| Post-impl | 2 sequential | Spec compliance, Code quality |
+
+---
+
 ## Quick Reference Card
 
 ```
@@ -91,7 +186,7 @@ Ultrathink V2 is a complete development workflow that orchestrates multiple skil
 
 ---
 
-## Workflow Diagram
+## Workflow Diagram (with Subagent Spawning)
 
 ```
                               +-----------------+
@@ -107,60 +202,83 @@ Ultrathink V2 is a complete development workflow that orchestrates multiple skil
                    [Trivial: YES]            [Trivial: NO]
                           |                         |
                  +--------v--------+       +--------v--------+
-                 | /fast-path-dev  |       |   BRAINSTORM    |
-                 | (self-review,   |       |  (15 min, spec) |
+                 | /fast-path-dev  |       |  PHASE 1:       |
+                 | (self-review,   |       |  BRAINSTORM     |
                  |  commit, done)  |       +--------+--------+
                  +-----------------+                |
-                                           +--------v--------+
-                                           | SPEC VALIDATION |
+                                                    |
+                                    ┌───────────────┼───────────────┐
+                                    │    SPAWN 6 PARALLEL SUBAGENTS │
+                                    │  ┌─────┬─────┬─────┬─────┬─────┬─────┐
+                                    │  │Arch │ Req │Conv │Risk │ Dep │Wild │
+                                    │  └─────┴─────┴─────┴─────┴─────┴─────┘
+                                    └───────────────┼───────────────┘
+                                                    │
+                                                    ▼ (synthesize outputs)
+                                           +--------+--------+
+                                           |  PHASE 2:       |
+                                           |  SPEC VALIDATION|
                                            +--------+--------+
                                                     |
+                                    ┌───────────────┼───────────────┐
+                                    │ SPAWN 1 SPEC-VALIDATOR SUBAGENT│
+                                    └───────────────┼───────────────┘
+                                                    │
                                        +------------+------------+
                                        |                         |
                                 [CRITICAL: YES]          [CRITICAL: NO]
                                        |                         |
                               +--------v--------+       +--------v--------+
-                              | Fix spec, loop |       | PLAN (Stage A)  |
-                              +--------+--------+       |  || agents      |
-                                       |               |  || DA           |
-                                       +---------------+--------+---------+
-                                                               |
-                                                      +--------v--------+
-                                                      | [!] ADV REVIEW  |
-                                                      | (max 3 iter)    |
-                                                      +--------+--------+
-                                                               |
-                                                  +------------+------------+
-                                                  |                         |
-                                           [Issues: YES]              [Pass]
-                                                  |                         |
-                                         +--------v--------+       +--------v--------+
-                                         | Fix -> Re-review|       | Stage B/C       |
-                                         | (iter < 3)      |       | (Critique/Final)|
-                                         +--------+--------+       +--------+--------+
-                                                  |                         |
-                                         [iter >= 3]               +--------v--------+
-                                                  |                | [!] ADV REVIEW  |
-                                         +--------v--------+       +--------+--------+
-                                         |   ESCALATE     |                |
-                                         | (user decides) |       +--------v--------+
-                                         +-----------------+       | Stage D (Tests) |
-                                                                   +--------+--------+
-                                                                           |
-                                                                  +--------v--------+
-                                                                  | Stage E (Impl)  |
-                                                                  |  per group      |
-                                                                  |  [!] ADV REVIEW |
-                                                                  +--------+--------+
-                                                                           |
-                                                                  +--------v--------+
-                                                                  |   LOG DECISION  |
-                                                                  | (calibration)   |
-                                                                  +--------+--------+
-                                                                           |
-                                                                  +--------v--------+
-                                                                  |      DONE       |
-                                                                  +-----------------+
+                              | Fix spec, loop |       |  PHASE 3: PLAN  |
+                              +--------+--------+       +--------+--------+
+                                       |                         |
+                                       └───────────┐   ┌─────────┼─────────┐
+                                                   │   │SPAWN PLANNING SUBAGENTS│
+                                                   │   │  Stage A → B → C  │
+                                                   │   └─────────┼─────────┘
+                                                   │             │
+                                                   └─────────────+
+                                                                 |
+                                                      +----------v---------+
+                                                      |  PHASE 4: GATES    |
+                                                      +----------+---------+
+                                                                 |
+                                                  ┌──────────────┼──────────────┐
+                                                  │SPAWN ADVERSARIAL-REVIEWER   │
+                                                  │  (fresh per gate)           │
+                                                  └──────────────┼──────────────┘
+                                                                 |
+                                                  +──────────────+──────────────+
+                                                  |                              |
+                                           [Issues: YES]                   [Pass]
+                                                  |                              |
+                                         +--------v--------+           +─────────v─────────+
+                                         | Fix -> Re-review|           |  PHASE 5: IMPL   |
+                                         | (iter < 3)      |           +─────────+─────────+
+                                         +--------+--------+                     |
+                                                  |              ┌───────────────┼───────────────┐
+                                         [iter >= 3]             │SPAWN IMPLEMENTER SUBAGENT     │
+                                                  |              │  (1 per task, fresh each)     │
+                                         +--------v--------+     └───────────────┼───────────────┘
+                                         |   ESCALATE     |                      |
+                                         | (user decides) |            +─────────v─────────+
+                                         +-----------------+           | POST-IMPL REVIEW |
+                                                                       +─────────+─────────+
+                                                                                 |
+                                                           ┌─────────────────────┼─────────────────────┐
+                                                           │SPAWN 2 SEQUENTIAL REVIEWERS              │
+                                                           │  1. Spec-compliance reviewer             │
+                                                           │  2. Code-quality reviewer                │
+                                                           └─────────────────────┼─────────────────────┘
+                                                                                 |
+                                                                       +─────────v─────────+
+                                                                       |   LOG DECISION    |
+                                                                       | (calibration)     |
+                                                                       +─────────+─────────+
+                                                                                 |
+                                                                       +─────────v─────────+
+                                                                       |       DONE        |
+                                                                       +───────────────────+
 ```
 
 ---
@@ -205,18 +323,207 @@ Before starting the full workflow, check if the change qualifies for fast-path.
 
 Structured exploration of requirements before planning.
 
-### Brainstorm Agents (Parallel)
+### Spawn 6 Parallel Brainstorm Subagents
 
-Launch these agents in parallel:
+**IMPORTANT:** Spawn these as 6 separate subagents, each with ONE focus area only.
 
 ```
-|| Requirements agent: What exactly needs to happen?
-|| Alternatives agent: What are different approaches?
-|| Constraints agent: What limitations exist?
-|| Dependencies agent: What does this depend on?
-|| Wild card agent: What's a radically different approach?
-|| User perspective agent: What would the user expect?
+┌─────────────────────────────────────────────────────────────────────┐
+│ PHASE 1 TRANSITION: Spawn 6 Parallel Brainstorm Subagents          │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐
+│  │  ARCH   │  │   REQ   │  │  CONV   │  │  RISK   │  │   DEP   │  │  WILD   │
+│  │         │  │         │  │         │  │         │  │         │  │         │
+│  │Structure│  │ What    │  │Existing │  │ What    │  │ What    │  │Radical  │
+│  │& design │  │ exactly │  │patterns │  │ could   │  │ depends │  │ alter-  │
+│  │decisions│  │ needs   │  │ in code │  │go wrong │  │on what? │  │ natives │
+│  └─────────┘  └─────────┘  └─────────┘  └─────────┘  └─────────┘  └─────────┘
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
 ```
+
+#### Subagent 1: Architecture (Arch)
+```
+Task tool:
+  description: "Phase 1 - Architecture Subagent"
+  prompt: |
+    You are an ARCHITECTURE subagent. Your ONLY focus is system structure.
+
+    ## Your Focus
+    Analyze how this feature fits into the existing architecture.
+
+    ## Context
+    [Provide: feature description, relevant file paths]
+
+    ## DO NOT
+    - Define requirements (that's Req subagent's job)
+    - Identify risks (that's Risk subagent's job)
+    - Suggest wild alternatives (that's Wild subagent's job)
+
+    ## YOUR JOB
+    - Where does this feature belong in the codebase?
+    - What components/modules are affected?
+    - What are the structural dependencies?
+
+    ## Output Format
+    - Component diagram (ASCII or description)
+    - List of affected files/modules
+    - Structural decisions needed
+```
+
+#### Subagent 2: Requirements (Req)
+```
+Task tool:
+  description: "Phase 1 - Requirements Subagent"
+  prompt: |
+    You are a REQUIREMENTS subagent. Your ONLY focus is what needs to happen.
+
+    ## Your Focus
+    Define exactly what the feature must do, in precise terms.
+
+    ## Context
+    [Provide: feature description, user request]
+
+    ## DO NOT
+    - Design architecture (that's Arch subagent's job)
+    - Worry about how to implement (that's later phases)
+    - Consider edge cases deeply (that's Risk subagent's job)
+
+    ## YOUR JOB
+    - What are the functional requirements?
+    - What are the acceptance criteria?
+    - What must be true when done?
+
+    ## Output Format
+    - [R1] Requirement 1...
+    - [R2] Requirement 2...
+    - Acceptance criteria checklist
+```
+
+#### Subagent 3: Conventions (Conv)
+```
+Task tool:
+  description: "Phase 1 - Conventions Subagent"
+  prompt: |
+    You are a CONVENTIONS subagent. Your ONLY focus is existing patterns.
+
+    ## Your Focus
+    Identify existing patterns in the codebase that should be followed.
+
+    ## Context
+    [Provide: relevant code samples, similar features]
+
+    ## DO NOT
+    - Invent new patterns (follow existing ones)
+    - Make architectural decisions
+    - Define requirements
+
+    ## YOUR JOB
+    - What patterns does this codebase use for similar features?
+    - What naming conventions apply?
+    - What file organization should be followed?
+
+    ## Output Format
+    - Pattern 1: [description] - see [file]
+    - Pattern 2: [description] - see [file]
+    - Conventions to follow: [list]
+```
+
+#### Subagent 4: Risk (Risk)
+```
+Task tool:
+  description: "Phase 1 - Risk Subagent"
+  prompt: |
+    You are a RISK subagent. Your ONLY focus is what could go wrong.
+
+    ## Your Focus
+    Identify risks, edge cases, and potential failure modes.
+
+    ## Context
+    [Provide: feature description, affected systems]
+
+    ## DO NOT
+    - Solve the risks (just identify them)
+    - Define requirements
+    - Make architectural decisions
+
+    ## YOUR JOB
+    - What could fail?
+    - What are the edge cases?
+    - What are the security concerns?
+    - What performance issues might arise?
+
+    ## Output Format
+    - RISK-1: [description] - Impact: [H/M/L]
+    - RISK-2: [description] - Impact: [H/M/L]
+    - Edge cases: [list]
+```
+
+#### Subagent 5: Dependencies (Dep)
+```
+Task tool:
+  description: "Phase 1 - Dependencies Subagent"
+  prompt: |
+    You are a DEPENDENCIES subagent. Your ONLY focus is what depends on what.
+
+    ## Your Focus
+    Map dependencies - both what this feature needs and what needs this feature.
+
+    ## Context
+    [Provide: feature description, affected modules]
+
+    ## DO NOT
+    - Make architectural decisions
+    - Define requirements
+    - Assess risks
+
+    ## YOUR JOB
+    - What existing code does this feature depend on?
+    - What will depend on this feature?
+    - What is the order of implementation?
+    - What can be parallelized?
+
+    ## Output Format
+    - Depends on: [module] -> [module] -> [module]
+    - Depended on by: [list]
+    - Implementation order: [1, 2, 3...]
+    - Parallelizable: [groups]
+```
+
+#### Subagent 6: Wild Card (Wild)
+```
+Task tool:
+  description: "Phase 1 - Wild Card Subagent"
+  prompt: |
+    You are a WILD CARD subagent. Your ONLY focus is radical alternatives.
+
+    ## Your Focus
+    Challenge assumptions. Propose a completely different approach.
+
+    ## Context
+    [Provide: feature description, current thinking]
+
+    ## DO NOT
+    - Be conservative (that's everyone else's job)
+    - Worry about feasibility (just propose ideas)
+    - Filter yourself
+
+    ## YOUR JOB
+    - What if we solved this completely differently?
+    - What would a 10x simpler solution look like?
+    - What assumptions are we making that could be wrong?
+    - What would a competitor do?
+
+    ## Output Format
+    - Wild idea 1: [description]
+    - Wild idea 2: [description]
+    - Assumption challenged: [description]
+```
+
+### After Subagents Complete
+
+**Controller synthesizes** outputs into a spec document:
 
 ### Brainstorm Output
 
@@ -251,6 +558,81 @@ Create a spec document:
 ## Phase 2: Spec Validation (Gate)
 
 Run spec validation BEFORE starting ultrathink planning.
+
+### Spawn Spec-Validator Subagent
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ PHASE 1→2 TRANSITION: Spawn Spec-Validator Subagent                │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  Input: Brainstorm spec document from Phase 1                      │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │                    SPEC-VALIDATOR                            │    │
+│  │                                                              │    │
+│  │  Focus: Validate spec ONLY (no implementation thinking)     │    │
+│  │                                                              │    │
+│  │  Checks:                                                     │    │
+│  │  ├── Type consistency (UUID vs path, etc.)                  │    │
+│  │  ├── Logical consistency (no conflicts)                     │    │
+│  │  ├── Dependency validity (things exist)                     │    │
+│  │  └── Feasibility (can be done)                              │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### Spec-Validator Subagent Template
+```
+Task tool:
+  description: "Phase 2 - Spec Validator Subagent"
+  prompt: |
+    You are a SPEC VALIDATOR subagent. Your ONLY focus is validating the spec.
+
+    ## Your Focus
+    Find problems in the spec BEFORE implementation begins.
+
+    ## Spec to Validate
+    [Paste the spec document from Phase 1]
+
+    ## DO NOT
+    - Think about implementation
+    - Suggest architectural changes
+    - Add new requirements
+    - Be lenient (your job is to find problems)
+
+    ## YOUR JOB
+    Validate these four dimensions:
+
+    1. TYPE CONSISTENCY
+       - Do all referenced types exist?
+       - Are UUIDs and paths distinguished correctly?
+       - Do parameter types match function signatures?
+
+    2. LOGICAL CONSISTENCY
+       - Are there conflicting requirements?
+       - Are state transitions valid?
+       - Are edge cases defined?
+
+    3. DEPENDENCY VALIDITY
+       - Do all referenced functions/modules exist?
+       - Are all API endpoints available?
+       - Are external services accessible?
+
+    4. FEASIBILITY
+       - Is the timeline realistic?
+       - Are there technical blockers?
+       - Can performance requirements be met?
+
+    ## Output Format
+    | Check | Finding | Severity | Fix |
+    |-------|---------|----------|-----|
+
+    CRITICAL findings block proceeding.
+    HIGH findings need mitigation plan.
+    MEDIUM/LOW can proceed with documentation.
+```
 
 ### The Four Validations
 
@@ -307,6 +689,36 @@ Use `/spec-validator` or run manually:
 
 Standard ultrathink planning with adversarial review integration.
 
+### Spawn Planning Subagents (Stages A, B, C)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ PHASE 2→3 TRANSITION: Spawn Planning Subagents                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  Stage A: Spawn 7 parallel analysis subagents                      │
+│  ┌─────┬─────┬─────┬─────┬─────┬─────┬─────┐                       │
+│  │Arch │ Req │Conv │Risk │ Dep │Wild │ DA  │                       │
+│  └─────┴─────┴─────┴─────┴─────┴─────┴─────┘                       │
+│        ↓ synthesize ↓                                              │
+│                                                                     │
+│  Stage B: Spawn 3 parallel critique subagents (if complexity > 3)  │
+│  ┌─────────────┬─────────────┬─────────────┐                       │
+│  │  Critical   │    Alt      │ Feasibility │                       │
+│  │  Analysis   │  Explorer   │   Check     │                       │
+│  └─────────────┴─────────────┴─────────────┘                       │
+│        ↓ refine ↓                                                  │
+│                                                                     │
+│  Stage C: Spawn 1 Finalization subagent                            │
+│  ┌─────────────────────────────────────────┐                       │
+│  │           FINALIZER                      │                       │
+│  │  Groups tasks, defines gates, outputs   │                       │
+│  │  parallel_groups structure              │                       │
+│  └─────────────────────────────────────────┘                       │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
 ### Stage A: PLAN
 
 ```
@@ -316,6 +728,37 @@ Standard ultrathink planning with adversarial review integration.
 [!] ADVERSARIAL REVIEW GATE (max 3 iterations)
 ```
 
+**Spawn 7 Parallel Subagents for Stage A:**
+
+Each subagent gets ONLY the spec document. No implementation context.
+
+```
+Task tool:
+  description: "Stage A - [Focus] Subagent"
+  prompt: |
+    You are a [FOCUS] PLANNING subagent. Your ONLY job is [specific focus].
+
+    ## Spec Document
+    [Paste validated spec from Phase 2]
+
+    ## YOUR FOCUS: [One of the following]
+    - Arch: How should this be structured? What components?
+    - Req: What are the atomic implementation steps? What order?
+    - Conv: What existing patterns apply? What conventions to follow?
+    - Risk: What could go wrong? What mitigations needed?
+    - Dep: What can be parallelized? What's the dependency graph?
+    - Wild: What's a radically simpler approach we're missing?
+    - DA: What's WRONG with the current approach? (MUST oppose)
+
+    ## DO NOT
+    - Work outside your focus area
+    - Implement anything
+    - Agree with the majority (DA only)
+
+    ## Output Format
+    [Focus-specific format - see Phase 1 templates]
+```
+
 **Agent Focus:**
 - Arch: structure, dependencies
 - Req: atomic steps, order
@@ -323,7 +766,7 @@ Standard ultrathink planning with adversarial review integration.
 - Risk: edge cases, failures
 - Dep: parallelizable components
 - Wild: radical alternatives
-- DA: steelmanned counter-proposal
+- DA: steelmanned counter-proposal (MUST oppose per INV-4)
 
 ### Stage B: CRITIQUE (Conditional)
 
@@ -354,6 +797,66 @@ x2:
 ## Phase 4: Adversarial Review Gates
 
 Every `[!]` gate uses adversarial-reviewer mode with iteration limits.
+
+### Spawn Adversarial-Reviewer Subagent (at each gate)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ PHASE 3→4 TRANSITION: Spawn Adversarial-Reviewer at Each Gate     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ⚠️  CRITICAL: Fresh subagent for EACH gate                        │
+│  ⚠️  Do NOT reuse reviewer across gates (context pollution)        │
+│                                                                     │
+│  [!] Gate 1 ─────► ┌──────────────────┐                            │
+│                    │ ADVERSARIAL-1    │ (fresh)                    │
+│                    └──────────────────┘                            │
+│                              ↓                                      │
+│  [!] Gate 2 ─────► ┌──────────────────┐                            │
+│                    │ ADVERSARIAL-2    │ (fresh)                    │
+│                    └──────────────────┘                            │
+│                              ↓                                      │
+│  [!] Gate 3 ─────► ┌──────────────────┐                            │
+│                    │ ADVERSARIAL-3    │ (fresh)                    │
+│                    └──────────────────┘                            │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### Adversarial-Reviewer Subagent Template
+```
+Task tool:
+  description: "Gate Review - Adversarial Reviewer (Gate N)"
+  prompt: |
+    You are an ADVERSARIAL REVIEWER subagent. Your ONLY job is to find issues.
+
+    ## What You're Reviewing
+    [Paste: output from previous phase/stage]
+
+    ## CRITICAL RULES
+    - You MUST find at least 1 issue (Critical/Important/Minor)
+    - You are NOT here to validate or approve
+    - You are here to break things, find gaps, challenge assumptions
+    - "Looks good" is NOT an acceptable output
+
+    ## DO NOT
+    - Approve without finding issues
+    - Be lenient because the work looks reasonable
+    - Skip any checklist item
+    - Carry context from previous gates (you are fresh)
+
+    ## YOUR JOB
+    Go through EVERY item in the checklist below. Find problems.
+
+    ## Review Checklist
+    [Include full checklist - see below]
+
+    ## Output Format
+    | Finding | Severity | Location | Fix |
+    |---------|----------|----------|-----|
+
+    MUST include at least 1 row.
+```
 
 ### Adversarial Review Protocol
 
@@ -451,6 +954,78 @@ C. **User provides tiebreaker decision**
 
 Standard ultrathink implementation with adversarial gates.
 
+### Spawn Implementer Subagents
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ PHASE 4→5 TRANSITION: Spawn Implementer Subagents                  │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ⚠️  CRITICAL: ONE subagent per task                               │
+│  ⚠️  Fresh subagent for each task (no accumulated context)         │
+│                                                                     │
+│  parallel_groups from Stage C:                                     │
+│  [[task1, task2], [task3], [task4, task5]]                         │
+│                                                                     │
+│  Group 1: Spawn in parallel                                        │
+│  ┌──────────────┐  ┌──────────────┐                                │
+│  │ IMPLEMENTER  │  │ IMPLEMENTER  │                                │
+│  │   Task 1     │  │   Task 2     │                                │
+│  └──────────────┘  └──────────────┘                                │
+│         ↓ [!] gate ↓                                               │
+│                                                                     │
+│  Group 2: Sequential (depends on Group 1)                          │
+│  ┌──────────────┐                                                  │
+│  │ IMPLEMENTER  │ (fresh)                                          │
+│  │   Task 3     │                                                  │
+│  └──────────────┘                                                  │
+│         ↓ [!] gate ↓                                               │
+│                                                                     │
+│  Group 3: Spawn in parallel                                        │
+│  ┌──────────────┐  ┌──────────────┐                                │
+│  │ IMPLEMENTER  │  │ IMPLEMENTER  │                                │
+│  │   Task 4     │  │   Task 5     │                                │
+│  └──────────────┘  └──────────────┘                                │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### Implementer Subagent Template
+```
+Task tool:
+  description: "Implementation - Task [N]: [Task Title]"
+  prompt: |
+    You are an IMPLEMENTER subagent. Your ONLY job is to implement ONE task.
+
+    ## Task to Implement
+    [Task description from plan]
+
+    ## Files You May Modify
+    [Specific file list - no others]
+
+    ## Acceptance Criteria
+    [From spec - what must be true when done]
+
+    ## DO NOT
+    - Implement other tasks (one task only)
+    - Modify files outside your list
+    - Make architectural changes
+    - Skip tests
+    - Carry context from other tasks
+
+    ## YOUR JOB
+    1. Implement the task
+    2. Write/update tests for the task
+    3. Verify tests pass
+    4. Document what you changed
+
+    ## Output Format
+    - Files modified: [list]
+    - Tests added/modified: [list]
+    - Test output: [paste actual output]
+    - Verification: [how you know it works]
+```
+
 ### Stage D: TEST (Conditional)
 
 Skip if no testable code.
@@ -470,6 +1045,100 @@ D4: pass -> E | fail -> D2 | @restore("post-finalize") if systemic
 ```
 per parallel_groups from C:
   || independent -> [!] ADVERSARIAL REVIEW -> -> dependent
+```
+
+### Post-Implementation: Spawn Review Subagents
+
+After all implementation tasks complete, spawn two sequential review subagents:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ POST-IMPLEMENTATION: Spawn 2 Sequential Review Subagents           │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ⚠️  CRITICAL: These are DIFFERENT from adversarial gate reviews   │
+│  ⚠️  Focus on holistic quality, not just issue-finding            │
+│                                                                     │
+│  Step 1: Spec Compliance Review                                    │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │               SPEC-COMPLIANCE REVIEWER                       │    │
+│  │                                                              │    │
+│  │  Focus: Does implementation match spec?                     │    │
+│  │  Input: Original spec + implemented code                    │    │
+│  │  Output: Compliance checklist with gaps                     │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│         ↓ must pass before next step                               │
+│                                                                     │
+│  Step 2: Code Quality Review                                       │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │                CODE-QUALITY REVIEWER                         │    │
+│  │                                                              │    │
+│  │  Focus: Is the code maintainable and correct?               │    │
+│  │  Input: Implemented code only (no spec bias)                │    │
+│  │  Output: Quality assessment with improvements               │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### Spec-Compliance Reviewer Subagent Template
+```
+Task tool:
+  description: "Post-Impl Review - Spec Compliance"
+  prompt: |
+    You are a SPEC COMPLIANCE REVIEWER. Your ONLY focus is: does the implementation match the spec?
+
+    ## Original Spec
+    [Paste spec from Phase 1/2]
+
+    ## Implemented Code
+    [Paste or reference the implemented files]
+
+    ## DO NOT
+    - Evaluate code quality (that's the next reviewer's job)
+    - Suggest improvements beyond spec compliance
+    - Consider things not in the spec
+
+    ## YOUR JOB
+    For each requirement in the spec:
+    - [ ] R1: [requirement] → Implemented? Where?
+    - [ ] R2: [requirement] → Implemented? Where?
+    ...
+
+    ## Output Format
+    | Requirement | Status | Location | Gap |
+    |-------------|--------|----------|-----|
+
+    Status: COMPLETE / PARTIAL / MISSING
+```
+
+#### Code-Quality Reviewer Subagent Template
+```
+Task tool:
+  description: "Post-Impl Review - Code Quality"
+  prompt: |
+    You are a CODE QUALITY REVIEWER. Your ONLY focus is code quality.
+
+    ## Code to Review
+    [Paste or reference the implemented files]
+
+    ## DO NOT
+    - Check spec compliance (already done)
+    - Suggest feature changes
+    - Consider the original requirements
+
+    ## YOUR JOB
+    Evaluate the code on these dimensions:
+    1. Readability - Is the code clear?
+    2. Maintainability - Can it be easily modified?
+    3. Error handling - Are failures handled?
+    4. Logging - Is there appropriate logging?
+    5. Testing - Are tests comprehensive?
+    6. Security - Any vulnerabilities?
+
+    ## Output Format
+    | Dimension | Score (1-10) | Issues | Suggestions |
+    |-----------|--------------|--------|-------------|
 ```
 
 ---
@@ -743,6 +1412,8 @@ E: Group 1: || store-validation | workspace-helpers
 
 ## Anti-Patterns
 
+### Workflow Anti-Patterns
+
 | Anti-Pattern | Reality |
 |--------------|---------|
 | "Skip spec validation, looks simple" | Type bugs are subtle. Always validate. |
@@ -751,6 +1422,42 @@ E: Group 1: || store-validation | workspace-helpers
 | "Fast-path for 'small' refactor" | Cross-file = not trivial. Use full flow. |
 | "I'll log decisions later" | Log immediately or forget. |
 | "Skip brainstorm, I know what to do" | Brainstorm catches blind spots. |
+
+### Subagent Anti-Patterns
+
+| Anti-Pattern | Reality | Fix |
+|--------------|---------|-----|
+| "Reuse the same reviewer for multiple gates" | Context pollution causes blind spots | Fresh subagent per gate |
+| "Give one subagent multiple focus areas" | Jack of all trades, master of none | One focus per subagent |
+| "Carry context between phases" | Previous assumptions bleed through | Clear context at phase transitions |
+| "Let subagent make decisions outside its focus" | Role confusion, conflicting outputs | Strict focus boundaries |
+| "Skip spawning subagent for simple task" | Consistency matters; always use pattern | Spawn even for simple tasks |
+| "Controller implements instead of synthesizing" | Controller coordinates, doesn't code | Delegate all implementation |
+
+### Why These Anti-Patterns Fail
+
+**Context Pollution Example:**
+```
+BAD: Reuse reviewer who saw Phase 1 brainstorming
+     → Reviewer assumes things that were discussed but not implemented
+     → Misses gaps because "we talked about this"
+
+GOOD: Fresh reviewer with ONLY the implementation
+      → Reviews what IS, not what was discussed
+      → Catches actual gaps
+```
+
+**Multi-Focus Example:**
+```
+BAD: "Subagent, analyze architecture AND requirements AND risks"
+     → Output is shallow on all three
+     → Misses depth in each area
+
+GOOD: Three separate subagents, each goes DEEP
+      → Architecture subagent: detailed component analysis
+      → Requirements subagent: precise acceptance criteria
+      → Risk subagent: comprehensive failure modes
+```
 
 ---
 
