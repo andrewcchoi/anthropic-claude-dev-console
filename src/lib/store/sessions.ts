@@ -68,11 +68,19 @@ export const useSessionDiscoveryStore = create<SessionDiscoveryState>((set, get)
         discoveryError: null,
       });
     } catch (error) {
-      log.error('Session discovery failed', { error });
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      log.error('Session discovery failed', {
+        message: errorMessage,
+        stack: errorStack,
+        errorType: error?.constructor?.name,
+      });
       set({
         isDiscovering: false,
         discoveryError: errorMessage,
+        // Update lastDiscoveryTime even on error to prevent immediate retry
+        // This provides a natural debounce between failed attempts
+        lastDiscoveryTime: Date.now(),
       });
     }
   },
