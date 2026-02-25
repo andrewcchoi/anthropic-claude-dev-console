@@ -44,9 +44,9 @@ export function Sidebar() {
   };
 
   if (!sidebarOpen) {
-    // Collapsed state: Show vertical strip on left edge
+    // Collapsed state: Show vertical strip on left edge (below workspace tab bar)
     return (
-      <div className="fixed left-0 top-0 h-screen w-10 bg-gray-100 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col items-center py-4 gap-2 z-40">
+      <div className="fixed left-0 top-[49px] h-[calc(100vh-49px)] w-10 bg-gray-100 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col items-center py-4 gap-2 z-40">
         <button
           onClick={toggleSidebar}
           aria-label="Open sidebar"

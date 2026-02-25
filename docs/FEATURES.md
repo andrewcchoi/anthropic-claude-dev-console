@@ -180,6 +180,21 @@ Two distinct terminal components for different use cases:
 
 ## Session Management
 
+### Auto-Select Last Active Session
+- **What**: Automatically restores the last active session when switching workspaces
+- **How**: Click workspace in sidebar → last viewed session loads automatically
+- **Fallback**: If last session was deleted, shows most recent session
+- **Empty state**: Shows "New Chat" button with keyboard hint (⌘N) when no sessions
+- **Streaming**: Gracefully stops active conversation before switching
+- **Accessibility**: Screen reader announces workspace and session name
+
+**Key Features**:
+- Zero-click session selection (95% of cases)
+- Data integrity validation with auto-repair
+- Toast notifications for user awareness
+- Keyboard navigation support
+- Focus management for accessibility
+
 ### Session Discovery
 - Automatic discovery of CLI sessions from `~/.claude/projects/`
 - Grouped by project directory
@@ -277,9 +292,22 @@ Two distinct terminal components for different use cases:
 
 ### Debug Mode
 - Toggle debug mode in browser console
-- `enableDebug()`: Enable verbose logging
+- `enableDebug()`: Enable verbose logging (includes debug-level logs)
 - `disableDebug()`: Disable verbose logging
 - `toggleDebug()`: Toggle current state
+- `downloadLogs()`: Download logs as timestamped JSONL file
+- `exportLogs()`: Copy logs to clipboard
+- `clearLogs()`: Clear saved logs
+- `getLogStats()`: Show log statistics
+
+**Log Saving**:
+- `info`, `warn`, `error`: Always saved (no debug mode required)
+- `debug`: Only saved when debug mode is enabled
+
+**Global Error Capture** (always active):
+- `console.error()` and `console.warn()` calls
+- Uncaught JavaScript exceptions
+- Unhandled promise rejections
 
 ### Log Streaming
 - Real-time log viewer at `/logs`

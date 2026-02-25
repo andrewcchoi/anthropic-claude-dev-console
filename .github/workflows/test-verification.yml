@@ -1,0 +1,158 @@
+name: Test Verification
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+jobs:
+  verify-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for git diff
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run test suite
+        run: npm test
+
+      - name: Check coverage thresholds
+        run: npm test -- --coverage --silent
+        env:
+          COVERAGE_THRESHOLD_LINES: 90
+          COVERAGE_THRESHOLD_BRANCHES: 90
+          COVERAGE_THRESHOLD_FUNCTIONS: 90
+          COVERAGE_THRESHOLD_STATEMENTS: 90
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: ./coverage/coverage-final.json
+          flags: unittests
+          name: codecov-umbrella
+
+      - name: Run call-site audits
+        run: npm run test:audits
+        if: always()
+
+      - name: Generate test checklist
+        run: npm run generate-checklist -- --git-diff
+        if: always()
+
+      - name: Verify test completeness
+        run: npm run verify-tests
+
+      - name: Fail if checklist incomplete
+        if: failure()
+        run: |
+          if [ -f .test-checklist-failures ]; then
+            echo "❌ Test verification failed:"
+            cat .test-checklist-failures
+            exit 1
+          fi
+
+      - name: Comment PR with checklist
+        if: github.event_name == 'pull_request' && failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            let body = '## ❌ Test Verification Failed\n\n';
+
+            if (fs.existsSync('.test-checklist-failures')) {
+              const failures = fs.readFileSync('.test-checklist-failures', 'utf8');
+              body += '### Errors\n\n```\n' + failures + '\n```\n\n';
+            }
+
+            if (fs.existsSync('.test-checklist.md')) {
+              const checklist = fs.readFileSync('.test-checklist.md', 'utf8');
+              body += '### Test Checklist\n\n' + checklist;
+            }
+
+            body += '\n\n---\n';
+            body += 'Fix these issues before merging. See [Test Strategy](../docs/testing/comprehensive-test-strategy.md) for details.';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+  call-site-audit:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check for function signature changes
+        id: check-signatures
+        run: |
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '\.(ts|tsx)$' || true)
+
+          if [ -n "$CHANGED_FILES" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run call-site audits
+        if: steps.check-signatures.outputs.changed == 'true'
+        run: |
+          echo "📋 Files with potential signature changes:"
+          echo "${{ steps.check-signatures.outputs.files }}"
+          npm run test:audits
+
+      - name: Comment PR if audits fail
+        if: failure() && steps.check-signatures.outputs.changed == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const body = `## ⚠️ Call-Site Audit Required
+
+This PR modifies function signatures. Please ensure all call sites are updated:
+
+1. Run \`npm run generate-checklist -- --git-diff\`
+2. Check Layer 5 (Call-Site Audits) in \`.test-checklist.md\`
+3. Create audit tests in \`__tests__/audits/\` for each modified function
+4. Run \`npm run test:audits\` to verify
+
+**Why this matters**: The [projectId bug](/docs/testing/comprehensive-test-strategy.md#appendix-real-world-example) happened because we modified a function signature but didn't update all callers. Call-site audits prevent this.
+
+See: [Comprehensive Test Strategy - Layer 5](/docs/testing/comprehensive-test-strategy.md#layer-5-call-site-audits-new)`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });

@@ -94,6 +94,7 @@ export interface Session {
   created_at: number;
   updated_at: number;
   cwd: string;
+  workspaceId?: string;  // NEW: Optional workspace link
 }
 
 export interface ToolExecution {

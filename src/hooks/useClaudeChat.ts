@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useChatStore } from '@/lib/store';
+import { useWorkspaceStore } from '@/lib/store/workspaces';
 import { ChatMessage, MessageContent, SDKMessage } from '@/types/claude';
 import { FileAttachment } from '@/types/upload';
 import { v4 as uuidv4 } from 'uuid';
@@ -8,13 +9,23 @@ import { serializeError } from '@/lib/utils/errorUtils';
 
 const log = createLogger('ClaudeChat');
 
+const MAX_SESSION_RETRIES = 3;  // Increased from 1 to handle transient failures
+const REQUEST_TIMEOUT_MS = 30000;  // 30 second timeout for API requests
+
 export function useClaudeChat() {
+  // Get workspace info from hook (not getState())
+  const activeWorkspaceId = useWorkspaceStore(state => state.activeWorkspaceId);
+  const workspaces = useWorkspaceStore(state => state.workspaces);
+  const activeWorkspace = activeWorkspaceId ? workspaces.get(activeWorkspaceId) : null;
+
   const {
     messages,
     addMessage,
     updateMessage,
     sessionId,
     setSessionId,
+    startNewSession,
+    currentSession,
     isStreaming,
     setIsStreaming,
     setError,
@@ -22,12 +33,35 @@ export function useClaudeChat() {
     updateToolExecution,
     updateUsage,
     saveCurrentSession,
+    initializedSessionIds,
+    markSessionInitialized,
   } = useChatStore();
 
   const [currentMessageId, setCurrentMessageId] = useState<string | null>(null);
+  const [sessionConflictRetries, setSessionConflictRetries] = useState(0);
+
+  // Ref to track active stream controller for cleanup
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
-    async (prompt: string, cwd?: string, attachments?: FileAttachment[]) => {
+    async (prompt: string, cwdOverride?: string, attachments?: FileAttachment[]) => {
+      // Priority order for working directory:
+      // 1. Explicit override (highest)
+      // 2. Session's original cwd (for existing sessions - prevents resume errors)
+      // 3. Workspace's rootPath (for new sessions)
+      // 4. Default fallback (lowest)
+      const effectiveCwd = cwdOverride || currentSession?.cwd || activeWorkspace?.rootPath || '/workspace';
+
+      log.debug('Sending message with workspace context', {
+        sessionId: sessionId,
+        workspaceId: activeWorkspace?.id,
+        cwd: effectiveCwd,
+        sessionCwd: currentSession?.cwd,
+        workspaceRootPath: activeWorkspace?.rootPath,
+        isWorkspaceContext: !!activeWorkspace,
+        isOverride: !!cwdOverride,
+      });
+
       let enhancedPrompt = prompt;
       let userMessageContent: MessageContent[] = [{ type: 'text', text: prompt }];
 
@@ -116,20 +150,40 @@ export function useClaudeChat() {
           contentLength: prompt.length
         });
 
-        log.debug('Starting stream', { endpoint: '/api/claude' });
+        // Check if this session has been initialized (sent at least one message)
+        const isSessionInitialized = currentSessionId ? initializedSessionIds.has(currentSessionId) : false;
+
+        log.debug('Starting stream', {
+          endpoint: '/api/claude',
+          sessionId: currentSessionId,
+          isSessionInitialized,
+        });
+
+        // Create AbortController for timeout handling
+        const controller = new AbortController();
+        abortControllerRef.current = controller;  // Store for cleanup
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          log.error('Request timeout', { timeout: REQUEST_TIMEOUT_MS });
+        }, REQUEST_TIMEOUT_MS);
+
         const response = await fetch('/api/claude', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
           body: JSON.stringify({
             prompt: enhancedPrompt,
             sessionId: currentSessionId,
-            cwd,
+            cwd: effectiveCwd,
             model: preferredModel || 'opusplan',
             provider,
             providerConfig,
             defaultMode,
+            isSessionInitialized,
           }),
         });
+
+        clearTimeout(timeoutId);  // Clear timeout on successful response
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -324,6 +378,13 @@ export function useClaudeChat() {
                   // Final result
                   if (message.subtype === 'success') {
                     receivedSuccessResult = true;
+                    // Reset retry counter on successful completion
+                    setSessionConflictRetries(0);
+                    // Mark session as initialized after first successful message
+                    if (currentSessionId && !initializedSessionIds.has(currentSessionId)) {
+                      markSessionInitialized(currentSessionId);
+                      log.debug('Session marked as initialized', { sessionId: currentSessionId });
+                    }
                     // Extract and update usage stats
                     if (message.total_cost_usd !== undefined || message.usage) {
                       updateUsage({
@@ -338,10 +399,42 @@ export function useClaudeChat() {
                     setError(serializeError(message.error));
                   }
                 } else if (message.type === 'session_locked') {
-                  // Session ID conflict - generate new session and retry
-                  const newSessionId = uuidv4();
-                  setSessionId(newSessionId);
-                  setError('Session conflict detected, regenerating session...');
+                  // Check retry limit
+                  if (sessionConflictRetries >= MAX_SESSION_RETRIES) {
+                    log.error('Session conflict retry limit reached', {
+                      retries: sessionConflictRetries,
+                      sessionId,
+                      workspaceId: activeWorkspace?.id,
+                    });
+
+                    setError(
+                      'Unable to create session after retry. This may be due to provider configuration issues. ' +
+                      'Please check Settings → Provider or try switching to Anthropic provider.'
+                    );
+                    setIsStreaming(false);
+                    setSessionConflictRetries(0); // Reset for next attempt
+                    return;
+                  }
+
+                  // Session ID conflict - generate new session with proper workspace linking
+                  log.warn('Session locked, creating new session', {
+                    oldSessionId: sessionId,
+                    workspaceId: activeWorkspace?.id,
+                    retryCount: sessionConflictRetries + 1,
+                  });
+
+                  setSessionConflictRetries(prev => prev + 1);
+
+                  // Exponential backoff: 1s, 2s, 4s for retries 0, 1, 2
+                  const retryDelay = Math.min(1000 * Math.pow(2, sessionConflictRetries), 10000);
+                  log.debug('Retrying with backoff', { delay: retryDelay, attempt: sessionConflictRetries + 1 });
+
+                  setTimeout(() => {
+                    // Use startNewSession to properly link to workspace
+                    startNewSession(activeWorkspace?.id, activeWorkspace?.rootPath);
+                  }, retryDelay);
+
+                  setError(`Session conflict detected, retrying in ${Math.round(retryDelay / 1000)}s...`);
                 } else if (message.type === 'error') {
                   // Only show errors if we haven't received a successful result
                   if (!receivedSuccessResult) {
@@ -359,6 +452,7 @@ export function useClaudeChat() {
         updateMessage(assistantMessageId, { isStreaming: false });
         setIsStreaming(false);
         setCurrentMessageId(null);
+        abortControllerRef.current = null;  // Clear ref after successful completion
 
         log.debug('Stream completed', {
           messageCount: useChatStore.getState().messages.length
@@ -368,9 +462,14 @@ export function useClaudeChat() {
         setIsStreaming(false);
         updateMessage(assistantMessageId, { isStreaming: false });
         setCurrentMessageId(null);
+        abortControllerRef.current = null;  // Clear ref on error
       }
     },
     [
+      activeWorkspace,
+      currentSession,
+      sessionId,
+      startNewSession,
       addMessage,
       updateMessage,
       setSessionId,
@@ -380,12 +479,32 @@ export function useClaudeChat() {
       updateToolExecution,
       updateUsage,
       saveCurrentSession,
+      initializedSessionIds,
+      markSessionInitialized,
     ]
   );
+
+  const cleanupStream = useCallback(() => {
+    try {
+      if (abortControllerRef.current) {
+        log.info('Cleaning up active stream before workspace switch');
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      // Always reset streaming state, even if no controller
+      setIsStreaming(false);
+    } catch (error) {
+      log.error('Failed to cleanup stream', { error });
+      // Force reset even if abort() fails
+      abortControllerRef.current = null;
+      setIsStreaming(false);
+    }
+  }, [setIsStreaming]);
 
   return {
     messages,
     sendMessage,
     isStreaming,
+    cleanupStream,
   };
 }

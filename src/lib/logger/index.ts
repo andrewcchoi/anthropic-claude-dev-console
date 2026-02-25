@@ -1,9 +1,22 @@
 /**
  * Centralized logging system with level control and environment-aware formatting
+ *
+ * When debug mode is enabled, logs are also saved to:
+ * - Browser: IndexedDB (with localStorage fallback)
+ * - Server: .claude/logs/app.log (with rotation)
+ *
+ * Export logs with: exportLogs() (returns JSONL string)
+ * Get stats with: getLogStats()
+ * Clear logs with: clearLogs()
  */
+
+import { addLogEntry } from './file-logger';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 export type LogFormat = 'pretty' | 'json';
+
+// Re-export file logger functions for convenience
+export { exportLogs, clearLogs, getLogStats, downloadLogs } from './file-logger';
 
 interface LogEntry {
   timestamp: string;
@@ -122,7 +135,17 @@ class Logger {
       data,
     };
 
+    // Output to console
     this.formatEntry(entry);
+
+    // Also save to file/IndexedDB when debug mode is enabled
+    // This happens automatically via file-logger's isDebugEnabled() check
+    addLogEntry(
+      level,
+      module,
+      message,
+      data as Record<string, unknown> | undefined
+    );
   }
 
   public debug(module: string, message: string, data?: unknown): void {

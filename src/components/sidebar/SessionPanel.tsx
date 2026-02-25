@@ -3,16 +3,18 @@
 import { useEffect } from 'react';
 import { useChatStore } from '@/lib/store';
 import { useSessionDiscoveryStore } from '@/lib/store/sessions';
+import { useWorkspaceStore } from '@/lib/store/workspaces';
 import { useCliPrewarm } from '@/hooks/useCliPrewarm';
 import { SessionSearch } from './SessionSearch';
 import { RefreshButton } from './RefreshButton';
-import { ProjectList } from './ProjectList';
+import { SessionList } from './SessionList';
 import { Loader2 } from 'lucide-react';
 
 const STALE_THRESHOLD = 60000; // 60 seconds
 
 export function SessionPanel() {
   const { startNewSession, isPrewarming } = useChatStore();
+  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
   const {
     discoverSessions,
     lastDiscoveryTime,
@@ -44,8 +46,14 @@ export function SessionPanel() {
   }, [lastDiscoveryTime, isDiscovering, discoverSessions]);
 
   const handleNewChat = () => {
-    const newSessionId = startNewSession();
-    prewarmCli(newSessionId);
+    // Get active workspace context
+    const activeWorkspace = activeWorkspaceId ? workspaces.get(activeWorkspaceId) : null;
+
+    // Pass workspace context to session creation
+    startNewSession(activeWorkspace?.id, activeWorkspace?.rootPath);
+
+    // NOTE: Don't pre-warm new sessions - it causes "Session ID already in use" conflicts
+    // Pre-warm only happens on app startup in page.tsx for global CLI initialization
   };
 
   const handleRefresh = () => {
@@ -56,6 +64,7 @@ export function SessionPanel() {
     <>
       <div className="p-4 space-y-2">
         <button
+          id="new-chat-button"
           onClick={handleNewChat}
           disabled={isPrewarming}
           className="w-full rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 active:scale-[0.98] active:bg-blue-800 dark:active:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 transition-all duration-150"
@@ -89,13 +98,13 @@ export function SessionPanel() {
           </div>
         )}
 
-        {/* Projects with sessions - no collapsible wrapper */}
+        {/* Sessions filtered by active workspace */}
         {isDiscovering && !lastDiscoveryTime ? (
           <div className="text-sm text-gray-400 dark:text-gray-500 py-4 text-center">
             Discovering sessions...
           </div>
         ) : (
-          <ProjectList />
+          <SessionList />
         )}
       </div>
     </>

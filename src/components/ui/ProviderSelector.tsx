@@ -74,6 +74,7 @@ export function ProviderSelector() {
         <input
           type="password"
           placeholder="Anthropic API Key"
+          autoComplete="off"
           value={providerConfig.anthropicApiKey || ''}
           onChange={(e) => setProviderConfig({ anthropicApiKey: e.target.value })}
           disabled={isStreaming}
@@ -87,6 +88,7 @@ export function ProviderSelector() {
           <input
             type="password"
             placeholder="AWS Access Key ID"
+            autoComplete="off"
             value={providerConfig.awsAccessKeyId || ''}
             onChange={(e) => setProviderConfig({ awsAccessKeyId: e.target.value })}
             disabled={isStreaming}
@@ -95,6 +97,7 @@ export function ProviderSelector() {
           <input
             type="password"
             placeholder="AWS Secret Access Key"
+            autoComplete="off"
             value={providerConfig.awsSecretAccessKey || ''}
             onChange={(e) => setProviderConfig({ awsSecretAccessKey: e.target.value })}
             disabled={isStreaming}
@@ -142,6 +145,7 @@ export function ProviderSelector() {
           <input
             type="password"
             placeholder="Foundry API Key"
+            autoComplete="off"
             value={providerConfig.foundryApiKey || ''}
             onChange={(e) => setProviderConfig({ foundryApiKey: e.target.value })}
             disabled={isStreaming}

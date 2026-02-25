@@ -3,8 +3,29 @@ import { persist } from 'zustand/middleware';
 import { ChatMessage, Session, ToolExecution, UsageStats, Provider, ProviderConfig, DefaultMode } from '@/types/claude';
 import { v4 as uuidv4 } from 'uuid';
 import { createLogger } from '../logger';
+import { storeSync } from './sync';
 
 const log = createLogger('ChatStore');
+
+// Lazy getter for useWorkspaceStore to avoid circular dependency
+let _useWorkspaceStore: any = null;
+function getWorkspaceStore() {
+  if (!_useWorkspaceStore) {
+    try {
+      _useWorkspaceStore = require('./workspaces').useWorkspaceStore;
+    } catch (e) {
+      // In test environment, try window/global
+      if (typeof window !== 'undefined' && (window as any).useWorkspaceStore) {
+        _useWorkspaceStore = (window as any).useWorkspaceStore;
+      } else if (typeof global !== 'undefined' && (global as any).useWorkspaceStore) {
+        _useWorkspaceStore = (global as any).useWorkspaceStore;
+      } else {
+        log.error('useWorkspaceStore not available');
+      }
+    }
+  }
+  return _useWorkspaceStore;
+}
 
 interface TerminalSession {
   sessionId: string;
@@ -28,16 +49,23 @@ interface ChatStore {
   hiddenSessionIds: Set<string>;
   collapsedProjects: Set<string>;
   pendingSessionId: string | null;
+  initializedSessionIds: Set<string>;  // Track sessions that have sent at least one message
   setSessionId: (id: string) => void;
+  markSessionInitialized: (id: string) => void;
   setCurrentSession: (session: Session | null) => void;
   addSession: (session: Session) => void;
-  startNewSession: () => string;
+  startNewSession: (workspaceId?: string, cwd?: string) => string;
   switchSession: (sessionId: string, projectId?: string) => Promise<void>;
   updateSessionName: (sessionId: string, name: string) => void;
   deleteSession: (sessionId: string) => void;
   hideSession: (sessionId: string) => void;
   toggleProjectCollapse: (projectId: string) => void;
   saveCurrentSession: () => void;
+
+  // NEW: Workspace-session linking
+  unlinkSessionFromWorkspace: (sessionId: string) => void;
+  linkSessionToWorkspace: (sessionId: string, workspaceId: string) => void;
+  unlinkMultipleSessionsFromWorkspace: (sessionIds: string[]) => void;  // NEW: Batch unlink
 
   // Init data from CLI
   availableCommands: string[];
@@ -150,9 +178,18 @@ interface ChatStore {
 
 export const useChatStore = create<ChatStore>()(
   persist(
-    (set, get) => ({
-      // Messages
-      messages: [],
+    (set, get) => {
+      // Set up sync coordinator subscriptions INSIDE store creator
+      storeSync.subscribe((event) => {
+        if (event.type === 'workspace_deleted' && event.payload.sessionIds) {
+          const state = get();
+          state.unlinkMultipleSessionsFromWorkspace(event.payload.sessionIds);
+        }
+      });
+
+      return {
+        // Messages
+        messages: [],
       addMessage: (message) =>
         set((state) => ({ messages: [...state.messages, message] })),
       updateMessage: (id, updates) =>
@@ -171,16 +208,26 @@ export const useChatStore = create<ChatStore>()(
       hiddenSessionIds: new Set<string>(),
       collapsedProjects: new Set<string>(),
       pendingSessionId: null,
+      initializedSessionIds: new Set<string>(),
       setSessionId: (id) => set({ sessionId: id }),
       setCurrentSession: (session) => set({ currentSession: session }),
+      markSessionInitialized: (id) =>
+        set((state) => {
+          const newInitialized = new Set(state.initializedSessionIds);
+          newInitialized.add(id);
+          return { initializedSessionIds: newInitialized };
+        }),
       addSession: (session) =>
         set((state) => ({ sessions: [...state.sessions, session] })),
 
-      startNewSession: () => {
+      startNewSession: (workspaceId?: string, cwd?: string) => {
         const currentId = get().sessionId;
         if (currentId) {
           get().cacheCurrentSession();
         }
+
+        // Use provided cwd or fallback to default
+        const effectiveCwd = cwd || '/workspace';
 
         const newSessionId = uuidv4();
         const newSession: Session = {
@@ -188,20 +235,34 @@ export const useChatStore = create<ChatStore>()(
           name: 'New Chat',
           created_at: Date.now(),
           updated_at: Date.now(),
-          cwd: '/workspace',
+          cwd: effectiveCwd,
+          workspaceId,  // Can be undefined for unassigned sessions
         };
 
-        log.debug('Starting new session', { id: newSessionId });
-        set({
+        log.debug('Creating session with workspace context', {
           sessionId: newSessionId,
-          currentSession: null,  // Keep null - not confirmed yet
-          pendingSessionId: newSessionId,  // Track as pending
-          sessions: [newSession, ...get().sessions],
-          messages: [],
-          toolExecutions: [],
-          sessionUsage: null,
-          error: null,
-          currentModel: null,
+          workspaceId: workspaceId || 'none',
+          cwd: effectiveCwd,
+          hasWorkspace: !!workspaceId,
+        });
+
+        set((state) => {
+          // Emit sync event for workspace store to handle
+          if (workspaceId) {
+            storeSync.sessionCreated(newSessionId, workspaceId);
+          }
+
+          return {
+            sessionId: newSessionId,
+            currentSession: null,  // Keep null - not confirmed yet
+            pendingSessionId: newSessionId,  // Track as pending
+            sessions: [newSession, ...state.sessions],
+            messages: [],
+            toolExecutions: [],
+            sessionUsage: null,
+            error: null,
+            currentModel: null,
+          };
         });
         return newSessionId;
       },
@@ -231,6 +292,12 @@ export const useChatStore = create<ChatStore>()(
               sessionUsage: null,
               isLoadingHistory: false,
             });
+
+            // Update workspace's lastActiveSessionId even for pending sessions
+            if (pendingSession.workspaceId) {
+              const useWorkspaceStore = getWorkspaceStore();
+              useWorkspaceStore.getState().updateWorkspaceLastActiveSession(pendingSession.workspaceId, id);
+            }
             return;
           }
         }
@@ -254,6 +321,16 @@ export const useChatStore = create<ChatStore>()(
             sessionUsage: null,
             isLoadingHistory: false,
           });
+          // Mark session as initialized since it has messages (exists on disk)
+          if (cached.messages.length > 0) {
+            get().markSessionInitialized(id);
+          }
+
+          // Update workspace's lastActiveSessionId
+          if (session.workspaceId) {
+            const useWorkspaceStore = getWorkspaceStore();
+            useWorkspaceStore.getState().updateWorkspaceLastActiveSession(session.workspaceId, id);
+          }
           return;
         }
 
@@ -296,8 +373,26 @@ export const useChatStore = create<ChatStore>()(
               sessionUsage: null,
               isLoadingHistory: false,
             });
+
+            // Mark session as initialized since we loaded messages from disk
+            if (messages.length > 0) {
+              get().markSessionInitialized(id);
+            }
+
+            // Update workspace's lastActiveSessionId
+            if (session.workspaceId) {
+              const useWorkspaceStore = getWorkspaceStore();
+              useWorkspaceStore.getState().updateWorkspaceLastActiveSession(session.workspaceId, id);
+            }
           } else {
             // Failed to load messages, but continue with empty state
+            log.warn('Failed to load session messages', {
+              sessionId: id,
+              projectId,
+              status: response.status,
+              statusText: response.statusText,
+            });
+
             const session = localSession || {
               id,
               name: 'Untitled',
@@ -314,6 +409,12 @@ export const useChatStore = create<ChatStore>()(
               sessionUsage: null,
               isLoadingHistory: false,
             });
+
+            // Update workspace's lastActiveSessionId
+            if (session.workspaceId) {
+              const useWorkspaceStore = getWorkspaceStore();
+              useWorkspaceStore.getState().updateWorkspaceLastActiveSession(session.workspaceId, id);
+            }
           }
         } catch (error) {
           log.error('Failed to load session messages', { error });
@@ -334,6 +435,12 @@ export const useChatStore = create<ChatStore>()(
             sessionUsage: null,
             isLoadingHistory: false,
           });
+
+          // Update workspace's lastActiveSessionId
+          if (session.workspaceId) {
+            const useWorkspaceStore = getWorkspaceStore();
+            useWorkspaceStore.getState().updateWorkspaceLastActiveSession(session.workspaceId, id);
+          }
         }
       },
 
@@ -376,19 +483,37 @@ export const useChatStore = create<ChatStore>()(
         }
       },
 
-      deleteSession: (id) =>
-        set((state) => ({
-          sessions: state.sessions.filter((s) => s.id !== id),
-          ...(state.sessionId === id
-            ? {
+      deleteSession: (id) => {
+        try {
+          set((state) => {
+            const session = state.sessions.find(s => s.id === id);
+
+            // Remove from workspace's sessionIds before deleting
+            if (session?.workspaceId) {
+              log.debug('Removing session from workspace before deletion', {
+                sessionId: id,
+                workspaceId: session.workspaceId,
+              });
+
+              // Emit sync event so workspace store can clean up
+              storeSync.sessionDeleted(id, session.workspaceId);
+            }
+
+            return {
+              sessions: state.sessions.filter((s) => s.id !== id),
+              ...(state.sessionId === id ? {
                 sessionId: null,
                 currentSession: null,
                 messages: [],
                 toolExecutions: [],
                 sessionUsage: null,
-              }
-            : {}),
-        })),
+              } : {}),
+            };
+          });
+        } catch (error) {
+          log.error('Failed to delete session', { error, sessionId: id });
+        }
+      },
 
       hideSession: (id) =>
         set((state) => ({
@@ -412,6 +537,101 @@ export const useChatStore = create<ChatStore>()(
             s.id === id ? { ...s, name, updated_at: Date.now() } : s
           ),
         })),
+
+      unlinkSessionFromWorkspace: (sessionId) => {
+        try {
+          let previousWorkspaceId: string | undefined;
+
+          set((state) => {
+            const session = state.sessions.find(s => s.id === sessionId);
+            previousWorkspaceId = session?.workspaceId;
+
+            if (!session || !previousWorkspaceId) return state;
+
+            log.debug('Unlinking session from workspace', {
+              sessionId,
+              previousWorkspaceId,
+              reason: 'workspace_deleted',
+            });
+
+            return {
+              sessions: state.sessions.map(s =>
+                s.id === sessionId ? { ...s, workspaceId: undefined } : s
+              ),
+              ...(state.sessionId === sessionId ? { currentSession: { ...session, workspaceId: undefined } } : {}),
+            };
+          });
+
+          // Emit sync event AFTER state update completes
+          if (previousWorkspaceId) {
+            storeSync.sessionUnlinked(sessionId, previousWorkspaceId);
+          }
+        } catch (error) {
+          log.error('Failed to unlink session from workspace', { error, sessionId });
+        }
+      },
+
+      linkSessionToWorkspace: (sessionId, workspaceId) => {
+        try {
+          let shouldEmitEvent = false;
+
+          set((state) => {
+            const session = state.sessions.find(s => s.id === sessionId);
+            if (!session) {
+              log.warn('Session not found for linking', { sessionId });
+              return state;
+            }
+
+            log.debug('Linking session to workspace', {
+              sessionId,
+              workspaceId,
+              previousWorkspaceId: session.workspaceId,
+            });
+
+            shouldEmitEvent = true;
+
+            return {
+              sessions: state.sessions.map(s =>
+                s.id === sessionId ? { ...s, workspaceId } : s
+              ),
+              ...(state.sessionId === sessionId ? { currentSession: { ...session, workspaceId } } : {}),
+            };
+          });
+
+          // Emit sync event AFTER state update completes
+          if (shouldEmitEvent) {
+            storeSync.sessionLinked(sessionId, workspaceId);
+          }
+        } catch (error) {
+          log.error('Failed to link session to workspace', { error, sessionId, workspaceId });
+        }
+      },
+
+      // NEW: Batch unlink for workspace deletion (performance optimization)
+      unlinkMultipleSessionsFromWorkspace: (sessionIds: string[]) => {
+        try {
+          set((state) => {
+            log.debug('Batch unlinking sessions', {
+              count: sessionIds.length,
+            });
+
+            // Check if current session needs unlinking (with null safety)
+            const currentSessionUpdate =
+              state.sessionId && sessionIds.includes(state.sessionId) && state.currentSession
+                ? { currentSession: { ...state.currentSession, workspaceId: undefined } }
+                : {};
+
+            return {
+              sessions: state.sessions.map(s =>
+                sessionIds.includes(s.id) ? { ...s, workspaceId: undefined } : s
+              ),
+              ...currentSessionUpdate,
+            };
+          });
+        } catch (error) {
+          log.error('Failed to batch unlink sessions', { error, sessionIds });
+        }
+      },
 
       // Tool executions
       toolExecutions: [],
@@ -606,12 +826,13 @@ export const useChatStore = create<ChatStore>()(
       setSearchQuery: (query) => set({ searchQuery: query }),
       clearExpandedFolders: () => set({ expandedFolders: new Set<string>() }),
       expandFolders: (paths) => set({ expandedFolders: new Set(paths) }),
-    }),
+      };
+    },
     {
       name: 'claude-code-sessions',
       partialize: (state) => ({
         sessions: state.sessions,
-        sessionId: state.sessionId,
+        // sessionId: NOT persisted - fresh UUID generated on each page load to avoid conflicts
         currentSession: state.currentSession,
         preferredModel: state.preferredModel,
         provider: state.provider,
@@ -620,6 +841,7 @@ export const useChatStore = create<ChatStore>()(
         sidebarTab: state.sidebarTab,
         hiddenSessionIds: Array.from(state.hiddenSessionIds), // Convert Set to Array for JSON
         collapsedProjects: Array.from(state.collapsedProjects), // Convert Set to Array for JSON
+        // initializedSessionIds: NOT persisted - ephemeral runtime state only
         // pendingSessionId: NOT persisted - resets on refresh
       }),
       onRehydrateStorage: () => (state) => {
@@ -634,6 +856,11 @@ export const useChatStore = create<ChatStore>()(
           state.collapsedProjects = new Set(state.collapsedProjects);
         } else if (state && !state.collapsedProjects) {
           state.collapsedProjects = new Set();
+        }
+
+        // Always initialize as empty Set (ephemeral, not persisted)
+        if (state) {
+          state.initializedSessionIds = new Set();
         }
 
         // Validate sessionId against currentSession to prevent orphaned state

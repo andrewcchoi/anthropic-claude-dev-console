@@ -1,7 +1,7 @@
 import { spawn } from 'child_process';
 import { NextRequest } from 'next/server';
 import { appendFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
+import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { parseTelemetry } from '@/lib/telemetry';
@@ -14,10 +14,57 @@ export const dynamic = 'force-dynamic';
 
 const TELEMETRY_LOG = '/workspace/logs/telemetry.jsonl';
 
+// In-memory locks to prevent TOCTOU races
+// Maps sessionId -> Promise that resolves when the lock is released
+const sessionLocks = new Map<string, Promise<void>>();
+
+/**
+ * Search for a session file across all project directories
+ * Returns true if the session exists anywhere in ~/.claude/projects/
+ */
+function sessionFileExists(sessionId: string): boolean {
+  const projectsDir = join(homedir(), '.claude', 'projects');
+
+  try {
+    if (!existsSync(projectsDir)) {
+      return false;
+    }
+
+    const projects = readdirSync(projectsDir, { withFileTypes: true });
+
+    for (const project of projects) {
+      if (project.isDirectory()) {
+        const sessionPath = join(projectsDir, project.name, `${sessionId}.jsonl`);
+        if (existsSync(sessionPath)) {
+          log.debug('Session file found', { sessionId, project: project.name });
+          return true;
+        }
+      }
+    }
+
+    return false;
+  } catch (error) {
+    log.error('Error checking session file existence', { sessionId, error });
+    return false;
+  }
+}
+
+// Sanitize stderr to prevent secret exposure in logs
+const sanitizeStderr = (stderr: string): string => {
+  // Remove API keys (sk- prefix + 32+ chars)
+  let sanitized = stderr.replace(/sk-[a-zA-Z0-9_-]{32,}/g, '[API_KEY_REDACTED]');
+  // Remove long tokens (48+ chars)
+  sanitized = sanitized.replace(/[a-zA-Z0-9_-]{48,}/g, '[TOKEN_REDACTED]');
+  // Remove file paths with usernames
+  sanitized = sanitized.replace(/\/home\/[^\/\s]+/g, '/home/[USER]');
+  sanitized = sanitized.replace(/\/Users\/[^\/\s]+/g, '/Users/[USER]');
+  return sanitized;
+};
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { prompt, sessionId, cwd, model, provider, providerConfig, defaultMode } = body;
+    const { prompt, sessionId, cwd, model, provider, providerConfig, defaultMode, isSessionInitialized } = body;
 
     log.debug('Received chat request', {
       sessionId,
@@ -35,6 +82,46 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Validate provider configuration BEFORE spawning CLI
+    if (provider === 'foundry') {
+      const config = providerConfig as any;
+
+      if (!config?.foundryApiKey) {
+        const errorMsg = 'Foundry provider requires API key. Please configure in Settings.';
+        log.error('Missing foundry API key', {
+          provider,
+          hasConfig: !!providerConfig,
+          configKeys: providerConfig ? Object.keys(providerConfig) : [],
+        });
+
+        return new Response(
+          JSON.stringify({ error: errorMsg }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      if (!config?.foundryResource) {
+        const errorMsg = 'Foundry provider requires resource configuration.';
+        log.error('Missing foundry resource', { provider });
+
+        return new Response(
+          JSON.stringify({ error: errorMsg }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      log.debug('Foundry provider config validated', {
+        hasApiKey: !!config.foundryApiKey,
+        hasResource: !!config.foundryResource,
+      });
+    }
+
     // Validate defaultMode
     const VALID_MODES = ['default', 'acceptEdits', 'plan', 'dontAsk', 'bypassPermissions'] as const;
     const validatedMode = defaultMode && VALID_MODES.includes(defaultMode) ? defaultMode : 'default';
@@ -42,7 +129,7 @@ export async function POST(req: NextRequest) {
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
-      start(controller) {
+      async start(controller) {
         try {
           // Build Claude CLI arguments
           const args = [
@@ -59,18 +146,43 @@ export async function POST(req: NextRequest) {
             args.push('--permission-mode', validatedMode);
           }
 
-          // Check if session file exists to determine whether to use --resume or --session-id
+          // Determine whether to use --resume or --session-id based on SERVER-SIDE filesystem check
           if (sessionId) {
-            const sessionPath = join(homedir(), '.claude', 'projects', '-workspace', `${sessionId}.jsonl`);
-            const sessionExists = existsSync(sessionPath);
+            // LOCK ACQUISITION: Prevent concurrent requests with same sessionId
+            // This eliminates TOCTOU race between existsSync() and CLI spawn
+            let lockResolve: (() => void) | undefined;
+            try {
+              // Wait for any existing lock on this sessionId
+              while (sessionLocks.has(sessionId)) {
+                await sessionLocks.get(sessionId);
+              }
 
-            if (sessionExists) {
-              args.push('--resume', sessionId);  // Resume existing session
-            } else {
-              args.push('--session-id', sessionId);  // Create new session
-              // Add model flag for new sessions only
-              if (model) {
-                args.push('--model', model);
+              // Create new lock promise
+              const lockPromise = new Promise<void>((resolve) => {
+                lockResolve = resolve;
+              });
+              sessionLocks.set(sessionId, lockPromise);
+
+              // SERVER-AUTHORITATIVE CHECK: Check filesystem (source of truth)
+              // This replaces client-provided isSessionInitialized flag
+              const sessionExists = sessionFileExists(sessionId);
+
+              if (sessionExists) {
+                args.push('--resume', sessionId);  // Resume existing session
+                log.debug('Resuming existing session', { sessionId, method: 'server-filesystem-check' });
+              } else {
+                args.push('--session-id', sessionId);  // Create new session
+                log.debug('Creating new session', { sessionId, method: 'server-filesystem-check' });
+                // Add model flag for new sessions only
+                if (model) {
+                  args.push('--model', model);
+                }
+              }
+            } finally {
+              // LOCK RELEASE: Allow next request to proceed
+              sessionLocks.delete(sessionId);
+              if (lockResolve) {
+                lockResolve();
               }
             }
           } else if (model) {
@@ -209,7 +321,13 @@ export async function POST(req: NextRequest) {
 
           // Capture stderr for error reporting
           claude.stderr.on('data', (chunk: Buffer) => {
-            stderrBuffer += chunk.toString();
+            const stderrChunk = chunk.toString();
+            stderrBuffer += stderrChunk;
+
+            // Log sanitized stderr for debugging (only in debug mode)
+            if (process.env.LOG_LEVEL === 'debug' || process.env.NODE_ENV === 'development') {
+              log.debug('CLI stderr output', { stderr: sanitizeStderr(stderrChunk) });
+            }
           });
 
           // Handle process completion
@@ -239,25 +357,44 @@ export async function POST(req: NextRequest) {
               }
             }
 
-            // Only report errors if we didn't receive a success result and exit code is non-zero
-            if (code !== 0 && !receivedSuccessResult && stderrBuffer) {
+            // Report errors if we didn't receive a success result and exit code is non-zero
+            if (code !== 0 && !receivedSuccessResult) {
+              const errorMessage = stderrBuffer || `CLI exited with code ${code} (no error output)`;
+
+              log.error('CLI process failed', {
+                exitCode: code,
+                hadStderr: !!stderrBuffer,
+                stderrLength: stderrBuffer.length,
+                provider,
+                model,
+              });
+
               // Check for session lock error
               if (stderrBuffer.includes('already in use')) {
-                const errorMessage = {
+                const errorEvent = {
                   type: 'session_locked',
                   error: 'Session ID conflict - regenerating',
                 };
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify(errorMessage)}\n\n`)
-                );
+                try {
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify(errorEvent)}\n\n`)
+                  );
+                } catch (e) {
+                  log.error('Failed to send session_locked event', { error: e });
+                }
               } else {
-                const errorMessage = {
+                const errorEvent = {
                   type: 'error',
-                  error: `Claude CLI exited with code ${code}: ${stderrBuffer}`,
+                  error: errorMessage,
+                  code: code,
                 };
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify(errorMessage)}\n\n`)
-                );
+                try {
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify(errorEvent)}\n\n`)
+                  );
+                } catch (e) {
+                  log.error('Failed to send error event', { error: e });
+                }
               }
             }
             controller.enqueue(encoder.encode('data: [DONE]\n\n'));

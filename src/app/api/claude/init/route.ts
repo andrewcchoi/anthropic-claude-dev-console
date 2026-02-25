@@ -10,6 +10,18 @@ const log = createServerLogger('ClaudeInitAPI');
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// Sanitize stderr to prevent secret exposure in logs
+const sanitizeStderr = (stderr: string): string => {
+  // Remove API keys (sk- prefix + 32+ chars)
+  let sanitized = stderr.replace(/sk-[a-zA-Z0-9_-]{32,}/g, '[API_KEY_REDACTED]');
+  // Remove long tokens (48+ chars)
+  sanitized = sanitized.replace(/[a-zA-Z0-9_-]{48,}/g, '[TOKEN_REDACTED]');
+  // Remove file paths with usernames
+  sanitized = sanitized.replace(/\/home\/[^\/\s]+/g, '/home/[USER]');
+  sanitized = sanitized.replace(/\/Users\/[^\/\s]+/g, '/Users/[USER]');
+  return sanitized;
+};
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -28,6 +40,46 @@ export async function POST(req: NextRequest) {
         JSON.stringify({ error: 'Session ID is required' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Validate provider configuration BEFORE spawning CLI
+    if (provider === 'foundry') {
+      const config = providerConfig as any;
+
+      if (!config?.foundryApiKey) {
+        const errorMsg = 'Foundry provider requires API key. Please configure in Settings.';
+        log.error('Missing foundry API key', {
+          provider,
+          hasConfig: !!providerConfig,
+          configKeys: providerConfig ? Object.keys(providerConfig) : [],
+        });
+
+        return new Response(
+          JSON.stringify({ error: errorMsg }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      if (!config?.foundryResource) {
+        const errorMsg = 'Foundry provider requires resource configuration.';
+        log.error('Missing foundry resource', { provider });
+
+        return new Response(
+          JSON.stringify({ error: errorMsg }),
+          {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      log.debug('Foundry provider config validated', {
+        hasApiKey: !!config.foundryApiKey,
+        hasResource: !!config.foundryResource,
+      });
     }
 
     // Validate defaultMode
@@ -131,6 +183,28 @@ export async function POST(req: NextRequest) {
 
           let stderrBuffer = '';
           let receivedInit = false;
+          let streamClosed = false;
+
+          // Helper to safely close stream once
+          const closeStream = () => {
+            if (streamClosed) return;
+            streamClosed = true;
+            try {
+              controller.close();
+            } catch (e) {
+              // Already closed, ignore
+            }
+          };
+
+          // Helper to safely enqueue data
+          const safeEnqueue = (data: Uint8Array) => {
+            if (streamClosed) return;
+            try {
+              controller.enqueue(data);
+            } catch (e) {
+              log.error('Failed to enqueue data', { error: e });
+            }
+          };
 
           // Handle stdout - looking for system.init message
           claude.stdout.on('data', (chunk: Buffer) => {
@@ -152,7 +226,7 @@ export async function POST(req: NextRequest) {
                     log.debug('Received system.init', { model: parsed.model });
                   }
 
-                  controller.enqueue(encoder.encode(`data: ${trimmed}\n\n`));
+                  safeEnqueue(encoder.encode(`data: ${trimmed}\n\n`));
                 }
               } catch (e) {
                 // Skip invalid JSON
@@ -162,7 +236,13 @@ export async function POST(req: NextRequest) {
 
           // Capture stderr
           claude.stderr.on('data', (chunk: Buffer) => {
-            stderrBuffer += chunk.toString();
+            const stderrChunk = chunk.toString();
+            stderrBuffer += stderrChunk;
+
+            // Log sanitized stderr for debugging (only in debug mode)
+            if (process.env.LOG_LEVEL === 'debug' || process.env.NODE_ENV === 'development') {
+              log.debug('CLI stderr output', { stderr: sanitizeStderr(stderrChunk) });
+            }
           });
 
           // Handle process completion
@@ -172,18 +252,29 @@ export async function POST(req: NextRequest) {
               receivedInit
             });
 
-            if (!receivedInit && stderrBuffer) {
-              const errorMessage = {
+            // Report errors if we didn't receive init message
+            if (!receivedInit) {
+              const errorMessage = stderrBuffer || `CLI pre-warm exited with code ${code} (no error output)`;
+
+              log.error('CLI pre-warm failed', {
+                exitCode: code,
+                hadStderr: !!stderrBuffer,
+                stderrLength: stderrBuffer.length,
+                provider,
+                model,
+              });
+
+              const errorEvent = {
                 type: 'error',
-                error: `Pre-warm failed: ${stderrBuffer}`,
+                error: `Pre-warm failed: ${errorMessage}`,
               };
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify(errorMessage)}\n\n`)
+              safeEnqueue(
+                encoder.encode(`data: ${JSON.stringify(errorEvent)}\n\n`)
               );
             }
 
-            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-            controller.close();
+            safeEnqueue(encoder.encode('data: [DONE]\n\n'));
+            closeStream();
           });
 
           // Handle process errors
@@ -192,24 +283,24 @@ export async function POST(req: NextRequest) {
               type: 'error',
               error: `Failed to spawn CLI: ${error.message}`,
             };
-            controller.enqueue(
+            safeEnqueue(
               encoder.encode(`data: ${JSON.stringify(errorMessage)}\n\n`)
             );
-            controller.close();
+            closeStream();
           });
 
           // Send /status command to trigger system.init without API cost
           claude.stdin.write('/status\n');
           claude.stdin.end();
         } catch (error: any) {
-          const errorMessage = {
-            type: 'error',
-            error: error.message || 'Unknown error occurred',
-          };
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify(errorMessage)}\n\n`)
+          // Can't use safeEnqueue/closeStream here - they're inside start() function scope
+          // This catch is for errors during ReadableStream setup, not during streaming
+          log.error('Failed to create pre-warm stream', { error });
+          // Return error response instead
+          return new Response(
+            JSON.stringify({ type: 'error', error: error.message || 'Unknown error occurred' }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
           );
-          controller.close();
         }
       },
     });

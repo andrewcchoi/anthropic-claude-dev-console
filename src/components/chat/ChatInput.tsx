@@ -34,7 +34,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modeMenuRef = useRef<HTMLDivElement>(null);
   const { attachments, addFiles, removeAttachment, clearAttachments } = useFileUpload();
-  const { pendingInputText, setPendingInputText, searchQuery, setSearchQuery, defaultMode, setDefaultMode, isStreaming } = useChatStore();
+  const { pendingInputText, setPendingInputText, searchQuery, setSearchQuery, defaultMode, setDefaultMode, isStreaming, isLoadingHistory } = useChatStore();
 
   // Handle pending input text from file reference insertion
   useEffect(() => {
@@ -760,7 +760,11 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            placeholder={disabled ? "Waiting for response..." : "Ask Claude Code... (Cmd/Ctrl+Enter to send)"}
+            placeholder={
+              isLoadingHistory ? "Loading messages..." :
+              disabled ? "Waiting for response..." :
+              "Ask Claude Code... (Cmd/Ctrl+Enter to send)"
+            }
             className="flex-1 resize-none rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
             rows={3}
           />

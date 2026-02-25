@@ -17,8 +17,10 @@ export function useCliPrewarm() {
     preferredModel,
   } = useChatStore();
 
-  const prewarmCli = async (sessionId: string) => {
-    log.debug('Starting CLI pre-warm', { sessionId });
+  const prewarmCli = async (sessionId: string, cwd?: string) => {
+    const effectiveCwd = cwd || '/workspace';
+
+    log.debug('Starting CLI pre-warm', { sessionId, cwd: effectiveCwd });
     setIsPrewarming(true);
     setPrewarmError(null);
 
@@ -28,7 +30,7 @@ export function useCliPrewarm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId,
-          cwd: '/workspace',
+          cwd: effectiveCwd,
           model: preferredModel,
           provider,
           providerConfig,
@@ -48,13 +50,15 @@ export function useCliPrewarm() {
       }
 
       let systemInfo: SystemInfoContent | null = null;
+      let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
