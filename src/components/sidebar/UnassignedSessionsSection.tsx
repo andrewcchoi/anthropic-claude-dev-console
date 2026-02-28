@@ -40,6 +40,7 @@ export function UnassignedSessionsSection({
                    bg-orange-50 dark:bg-orange-950/20
                    text-orange-900 dark:text-orange-100
                    hover:bg-orange-100 dark:hover:bg-orange-950/30
+                   focus:ring-2 focus:ring-orange-500/50 focus:outline-none
                    transition-colors"
         aria-expanded={!isCollapsed}
         aria-controls={`unassigned-sessions-${workspaceId}`}
@@ -61,7 +62,7 @@ export function UnassignedSessionsSection({
           className="ml-6 mt-1 space-y-1"
         >
           {sessions.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+            <div className="px-3 py-2 text-sm text-gray-600 dark:text-gray-200">
               No unassigned sessions
             </div>
           ) : (
@@ -69,7 +70,6 @@ export function UnassignedSessionsSection({
               <SessionItem
                 key={session.id}
                 session={session}
-                // @ts-expect-error - sectionType will be added in Phase 3 Task 3.1
                 sectionType="unassigned"
               />
             ))

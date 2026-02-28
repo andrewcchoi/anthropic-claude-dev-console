@@ -10,11 +10,14 @@ import { createLogger } from '@/lib/logger';
 
 const log = createLogger('SessionItem');
 
+type SectionType = 'home' | 'system' | 'unassigned';
+
 interface SessionItemProps {
   session: CLISession;
+  sectionType?: SectionType;
 }
 
-export function SessionItem({ session }: SessionItemProps) {
+export function SessionItem({ session, sectionType = 'home' }: SessionItemProps) {
   const { sessionId, switchSession } = useChatStore();
   const { loadSessionDetails } = useSessionDiscoveryStore();
   const [isHovered, setIsHovered] = useState(false);
@@ -36,6 +39,13 @@ export function SessionItem({ session }: SessionItemProps) {
 
   const relativeTime = formatSmartTime(session.modifiedAt);
 
+  // Border colors based on section type
+  const borderColorClass = {
+    home: 'border-l-green-500 dark:border-l-green-400',
+    system: 'border-l-blue-500 dark:border-l-blue-400',
+    unassigned: 'border-l-orange-500 dark:border-l-orange-400',
+  }[sectionType];
+
   return (
     <div
       onClick={handleClick}
@@ -43,14 +53,15 @@ export function SessionItem({ session }: SessionItemProps) {
       onMouseLeave={() => setIsHovered(false)}
       className={cn(
         'p-2.5 rounded-lg cursor-pointer text-sm',
-        'border-l-4 border-transparent',
+        'border-l-4',
         'mb-1.5 transition-colors',
         isActive && [
           'bg-blue-50 dark:bg-blue-950',
-          'border-l-blue-500 dark:border-l-blue-400',
+          borderColorClass,
           'text-blue-900 dark:text-blue-100',
         ],
         !isActive && [
+          'border-transparent',
           'hover:bg-gray-50 dark:hover:bg-gray-800/50',
           'hover:border-l-gray-300 dark:hover:border-l-gray-600',
           'text-gray-700 dark:text-gray-300',

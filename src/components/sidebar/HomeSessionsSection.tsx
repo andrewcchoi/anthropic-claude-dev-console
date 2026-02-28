@@ -40,6 +40,7 @@ export function HomeSessionsSection({
                    bg-green-50 dark:bg-green-950/20
                    text-green-900 dark:text-green-100
                    hover:bg-green-100 dark:hover:bg-green-950/30
+                   focus:ring-2 focus:ring-green-500/50 focus:outline-none
                    transition-colors"
         aria-expanded={!isCollapsed}
         aria-controls={`home-sessions-${workspaceId}`}
@@ -61,7 +62,7 @@ export function HomeSessionsSection({
           className="ml-6 mt-1 space-y-1"
         >
           {sessions.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+            <div className="px-3 py-2 text-sm text-gray-600 dark:text-gray-200">
               No home sessions
             </div>
           ) : (
@@ -69,7 +70,6 @@ export function HomeSessionsSection({
               <SessionItem
                 key={session.id}
                 session={session}
-                // @ts-expect-error - sectionType will be added in Phase 3 Task 3.1
                 sectionType="home"
               />
             ))
