@@ -7,6 +7,8 @@ import { storeSync } from './sync';
 
 const log = createLogger('ChatStore');
 
+type MetadataColorScheme = 'semantic' | 'gradient';
+
 // Lazy getter for useWorkspaceStore to avoid circular dependency
 let _useWorkspaceStore: any = null;
 function getWorkspaceStore() {
@@ -126,6 +128,10 @@ interface ChatStore {
   // Default mode selection
   defaultMode: DefaultMode;
   setDefaultMode: (mode: DefaultMode) => void;
+
+  // Metadata color scheme
+  metadataColorScheme: MetadataColorScheme;
+  setMetadataColorScheme: (scheme: MetadataColorScheme) => void;
 
   // Tool executions
   toolExecutions: ToolExecution[];
@@ -747,6 +753,10 @@ export const useChatStore = create<ChatStore>()(
       defaultMode: 'plan',
       setDefaultMode: (mode) => set({ defaultMode: mode }),
 
+      // Metadata color scheme
+      metadataColorScheme: 'semantic',
+      setMetadataColorScheme: (scheme) => set({ metadataColorScheme: scheme }),
+
       // Init data from CLI
       availableCommands: [],
       availableTools: [],
@@ -852,6 +862,7 @@ export const useChatStore = create<ChatStore>()(
         provider: state.provider,
         providerConfig: state.providerConfig,
         defaultMode: state.defaultMode,
+        metadataColorScheme: state.metadataColorScheme,
         sidebarTab: state.sidebarTab,
         hiddenSessionIds: Array.from(state.hiddenSessionIds), // Convert Set to Array for JSON
         collapsedProjects: Array.from(state.collapsedProjects), // Convert Set to Array for JSON
