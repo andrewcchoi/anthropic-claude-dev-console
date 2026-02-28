@@ -13,7 +13,18 @@ import { createLogger } from '@/lib/logger';
 const log = createLogger('RightPanel');
 
 export function RightPanel() {
-  const { rightPanelOpen, toggleRightPanel, sessionId, setStatusPanelOpen } = useChatStore();
+  const {
+    rightPanelOpen,
+    toggleRightPanel,
+    sessionId,
+    setStatusPanelOpen,
+    currentModel,
+    workingDirectory,
+    activePermissionMode,
+    availableTools,
+    mcpServers,
+    cliVersion,
+  } = useChatStore();
   const { debugEnabled } = useDebug();
 
   if (!rightPanelOpen) {
@@ -101,6 +112,64 @@ export function RightPanel() {
 
           {/* Debug Toggle */}
           <DebugToggle variant="full" openLogs className="w-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700" />
+        </div>
+
+        {/* Session Info Panel */}
+        <div className="border-t border-gray-200 dark:border-gray-700 p-4 text-xs text-gray-500 dark:text-gray-400 space-y-2">
+          {currentModel && (
+            <div className="flex justify-between">
+              <span>Model:</span>
+              <span className="font-mono text-gray-700 dark:text-gray-300 truncate ml-2">
+                {currentModel}
+              </span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span>Directory:</span>
+            <span className="font-mono text-gray-700 dark:text-gray-300 truncate ml-2">
+              {workingDirectory}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span>Mode:</span>
+            <span className="font-mono text-gray-700 dark:text-gray-300">
+              {activePermissionMode}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span>Tools:</span>
+            <span className="font-mono text-gray-700 dark:text-gray-300">
+              {availableTools.length} available
+            </span>
+          </div>
+          {mcpServers.length > 0 && (
+            <div className="flex justify-between">
+              <span>MCP:</span>
+              <span className="font-mono text-gray-700 dark:text-gray-300">
+                {mcpServers.filter(s => s.status === 'connected').length}/{mcpServers.length} connected
+              </span>
+            </div>
+          )}
+          {cliVersion && (
+            <div className="flex justify-between">
+              <span>CLI:</span>
+              <span className="font-mono text-gray-700 dark:text-gray-300">
+                v{cliVersion}
+              </span>
+            </div>
+          )}
+          {sessionId && (
+            <div className="flex justify-between">
+              <span>Session:</span>
+              <span
+                className="font-mono text-gray-700 dark:text-gray-300 truncate ml-2 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
+                title={`Click to copy: ${sessionId}`}
+                onClick={() => navigator.clipboard.writeText(sessionId)}
+              >
+                {sessionId.slice(0, 8)}...
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>

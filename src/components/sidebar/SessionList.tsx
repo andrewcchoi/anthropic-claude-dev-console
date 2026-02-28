@@ -43,6 +43,8 @@ export function SessionList() {
           updated_at: cli.modifiedAt,
           cwd: cli.cwd || '',
           workspaceId: cli.projectId, // Map projectId to workspaceId
+          messageCount: cli.messageCount, // Preserve message count
+          gitBranch: cli.gitBranch,       // Preserve git branch
         })),
     ];
 
@@ -251,8 +253,24 @@ export function SessionList() {
                   }`}
                 >
                   <div className="truncate">{session.name}</div>
+                  {session.gitBranch && (
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3v12M18 9a3 3 0 01-3 3h-6" />
+                      </svg>
+                      <span className="truncate">{session.gitBranch}</span>
+                    </div>
+                  )}
                   <div className="text-xs text-gray-500 dark:text-gray-400 flex justify-between mt-1">
-                    <span>{formatRelativeTime(session.updated_at)}</span>
+                    <span>
+                      {session.messageCount !== undefined && (
+                        <>
+                          {session.messageCount} msg{session.messageCount !== 1 ? 's' : ''}
+                          <span className="mx-1">·</span>
+                        </>
+                      )}
+                      {formatRelativeTime(session.updated_at)}
+                    </span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -290,8 +308,24 @@ export function SessionList() {
                   }`}
                 >
                   <div className="truncate">{session.name}</div>
+                  {session.gitBranch && (
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3v12M18 9a3 3 0 01-3 3h-6" />
+                      </svg>
+                      <span className="truncate">{session.gitBranch}</span>
+                    </div>
+                  )}
                   <div className="text-xs text-gray-500 dark:text-gray-400 flex justify-between mt-1">
-                    <span>{formatRelativeTime(session.updated_at)}</span>
+                    <span>
+                      {session.messageCount !== undefined && (
+                        <>
+                          {session.messageCount} msg{session.messageCount !== 1 ? 's' : ''}
+                          <span className="mx-1">·</span>
+                        </>
+                      )}
+                      {formatRelativeTime(session.updated_at)}
+                    </span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -363,8 +397,24 @@ export function SessionList() {
           }`}
         >
           <div className="truncate">{session.name}</div>
+          {session.gitBranch && (
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3v12M18 9a3 3 0 01-3 3h-6" />
+              </svg>
+              <span className="truncate">{session.gitBranch}</span>
+            </div>
+          )}
           <div className="text-xs text-gray-500 dark:text-gray-400 flex justify-between mt-1">
-            <span>{formatRelativeTime(session.updated_at)}</span>
+            <span>
+              {session.messageCount !== undefined && (
+                <>
+                  {session.messageCount} msg{session.messageCount !== 1 ? 's' : ''}
+                  <span className="mx-1">·</span>
+                </>
+              )}
+              {formatRelativeTime(session.updated_at)}
+            </span>
             <button
               onClick={(e) => {
                 e.stopPropagation();

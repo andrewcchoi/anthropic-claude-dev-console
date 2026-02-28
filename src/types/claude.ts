@@ -95,6 +95,8 @@ export interface Session {
   updated_at: number;
   cwd: string;
   workspaceId?: string;  // NEW: Optional workspace link
+  messageCount?: number;  // NEW: Number of messages in session
+  gitBranch?: string;     // NEW: Git branch name
 }
 
 export interface ToolExecution {
