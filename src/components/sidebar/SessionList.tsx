@@ -133,38 +133,19 @@ export function SessionList() {
   };
 
   // Filter sessions by active workspace (memoized for performance)
-  // Include sessions with matching workspaceId (encoded project path) OR matching cwd path
   const workspaceSessions = useMemo(() => {
-    if (!activeWorkspace) return [];
+    // No workspace selected - show all (backwards compat)
+    if (!activeWorkspace) {
+      return allSessions;
+    }
 
-    // Get encoded project path for the active workspace (e.g., "/workspace" → "-workspace")
-    const activeProjectId = encodeProjectPath(activeWorkspace.rootPath);
-
+    // Filter by workspace projectId (simple equality check)
+    // CLISession has projectId, Session has workspaceId
     return allSessions.filter(s => {
-      // Match by encoded project path (CLI uses this format)
-      // e.g., session.workspaceId === "-workspace" matches workspace.rootPath === "/workspace"
-      if (s.workspaceId === activeProjectId) return true;
-
-      // Also match if session's workspaceId starts with workspace's project path
-      // e.g., "-workspace-docs" matches "-workspace" (subdirectory sessions)
-      if (s.workspaceId && s.workspaceId.startsWith(activeProjectId + '-')) return true;
-      if (s.workspaceId && s.workspaceId.startsWith(activeProjectId)) return true;
-
-      // Path-based matching for old sessions without workspaceId
-      // Match if session's cwd is within workspace's rootPath
-      if (!s.workspaceId && s.cwd && activeWorkspace.rootPath) {
-        // Normalize paths for comparison (remove trailing slashes)
-        const normalizedCwd = s.cwd.replace(/\/$/, '');
-        const normalizedRoot = activeWorkspace.rootPath.replace(/\/$/, '');
-
-        // Exact match or subdirectory
-        return normalizedCwd === normalizedRoot ||
-               normalizedCwd.startsWith(normalizedRoot + '/');
-      }
-
-      return false;
+      const sessionProjectId = 'projectId' in s ? s.projectId : s.workspaceId;
+      return sessionProjectId === activeWorkspace.projectId;
     });
-  }, [allSessions, activeWorkspaceId, activeWorkspace]);
+  }, [allSessions, activeWorkspace]);
 
   // Unassigned sessions: don't match any workspace's encoded project path
   const unassignedSessions = useMemo(() => {
@@ -378,43 +359,6 @@ export function SessionList() {
           </div>
         </div>
       ))}
-
-      {/* Unassigned sessions (show only if not empty) */}
-      {sortedUnassigned.length > 0 && (
-        <>
-          <div className="text-xs text-gray-500 dark:text-gray-400 px-3 py-2 mt-4 border-t border-gray-200 dark:border-gray-700">
-            Unassigned
-          </div>
-          {sortedUnassigned.map((session) => (
-            <div
-              key={session.id}
-              onClick={() => {
-                const projectId = getProjectIdFromWorkspace(session.workspaceId, workspaces);
-                switchSession(session.id, projectId);
-              }}
-              className={`p-2 rounded cursor-pointer text-sm truncate ${
-                session.id === sessionId
-                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100'
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
-              }`}
-            >
-              <div className="truncate">{session.name}</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 flex justify-between mt-1">
-                <span>{formatRelativeTime(session.updated_at)}</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteSession(session.id);
-                  }}
-                  className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-          ))}
-        </>
-      )}
     </div>
   );
 }
