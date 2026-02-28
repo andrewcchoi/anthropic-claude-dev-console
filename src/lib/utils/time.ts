@@ -62,3 +62,44 @@ export function formatSmartTime(timestamp: number): string {
   // Fall back to relative time
   return formatRelativeTime(timestamp);
 }
+
+/**
+ * Format timestamp as ISO date + relative time
+ * Example: "2026-02-28 14:30 (2h ago)"
+ */
+export function formatISOWithRelative(timestamp: number): string {
+  const date = new Date(timestamp);
+
+  // ISO format: YYYY-MM-DD HH:MM
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+
+  const isoDate = `${year}-${month}-${day} ${hours}:${minutes}`;
+
+  // Relative time
+  const now = Date.now();
+  const diff = now - timestamp;
+  const seconds = Math.floor(diff / 1000);
+  const minutes_count = Math.floor(seconds / 60);
+  const hours_count = Math.floor(minutes_count / 60);
+  const days = Math.floor(hours_count / 24);
+  const weeks = Math.floor(days / 7);
+
+  let relative: string;
+  if (seconds < 60) {
+    relative = 'just now';
+  } else if (minutes_count < 60) {
+    relative = `${minutes_count}m ago`;
+  } else if (hours_count < 24) {
+    relative = `${hours_count}h ago`;
+  } else if (days < 7) {
+    relative = `${days}d ago`;
+  } else {
+    relative = `${weeks}w ago`;
+  }
+
+  return `${isoDate} (${relative})`;
+}
