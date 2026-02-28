@@ -16,6 +16,7 @@ import { StatusPanel } from '@/components/panels/StatusPanel';
 import { ModelPanel } from '@/components/panels/ModelPanel';
 import { TodosPanel } from '@/components/panels/TodosPanel';
 import { RenameDialog } from '@/components/panels/RenameDialog';
+import { SettingsPanel } from '@/components/panels/SettingsPanel';
 import { ToastContainer } from '@/components/ui/ToastContainer';
 import { WorkspaceTabBar } from '@/components/workspace/WorkspaceTabBar';
 import { AddWorkspaceDialog } from '@/components/workspace/AddWorkspaceDialog';
@@ -183,6 +184,7 @@ export default function Home() {
       <ModelPanel />
       <TodosPanel />
       <RenameDialog />
+      <SettingsPanel />
       <ToastContainer />
       <AddWorkspaceDialog
         isOpen={isAddDialogOpen}

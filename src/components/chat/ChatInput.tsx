@@ -120,6 +120,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
         setModelPanelOpen,
         setTodosPanelOpen,
         setRenameDialogOpen,
+        setSettingsPanelOpen,
         messages,
         currentSession,
       } = useChatStore.getState();
@@ -501,6 +502,9 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
           } else {
             setRenameDialogOpen(true);
           }
+          break;
+        case 'openSettingsPanel':
+          setSettingsPanelOpen(true);
           break;
         case 'openContextPanel':
         case 'openConfigPanel':

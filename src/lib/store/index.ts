@@ -99,11 +99,13 @@ interface ChatStore {
   isModelPanelOpen: boolean;
   isTodosPanelOpen: boolean;
   isRenameDialogOpen: boolean;
+  isSettingsPanelOpen: boolean;
   setStatusPanelOpen: (open: boolean) => void;
   setHelpPanelOpen: (open: boolean) => void;
   setModelPanelOpen: (open: boolean) => void;
   setTodosPanelOpen: (open: boolean) => void;
   setRenameDialogOpen: (open: boolean) => void;
+  setSettingsPanelOpen: (open: boolean) => void;
   clearChat: () => void;
 
   // Session cache for preserving messages when switching
@@ -834,11 +836,13 @@ export const useChatStore = create<ChatStore>()(
       isModelPanelOpen: false,
       isTodosPanelOpen: false,
       isRenameDialogOpen: false,
+      isSettingsPanelOpen: false,
       setStatusPanelOpen: (open) => set({ isStatusPanelOpen: open }),
       setHelpPanelOpen: (open) => set({ isHelpPanelOpen: open }),
       setModelPanelOpen: (open) => set({ isModelPanelOpen: open }),
       setTodosPanelOpen: (open) => set({ isTodosPanelOpen: open }),
       setRenameDialogOpen: (open) => set({ isRenameDialogOpen: open }),
+      setSettingsPanelOpen: (open) => set({ isSettingsPanelOpen: open }),
       clearChat: () => set({ messages: [], toolExecutions: [], sessionUsage: null }),
 
       // Session cache
