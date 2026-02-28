@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useChatStore } from '@/lib/store';
 import { useSessionDiscoveryStore } from '@/lib/store/sessions';
 import { useWorkspaceStore } from '@/lib/store/workspaces';
@@ -9,7 +9,9 @@ import { SessionSearch } from './SessionSearch';
 import { RefreshButton } from './RefreshButton';
 import { SessionList } from './SessionList';
 import { Loader2 } from 'lucide-react';
+import { createLogger } from '@/lib/logger';
 
+const log = createLogger('SessionPanel');
 const STALE_THRESHOLD = 60000; // 60 seconds
 
 export function SessionPanel() {
@@ -24,6 +26,7 @@ export function SessionPanel() {
     isDiscovering,
   } = useSessionDiscoveryStore();
   const { prewarmCli } = useCliPrewarm();
+  const hasDiscovered = useRef(false);
 
   // Helper to format relative time
   const formatRelativeTime = (timestamp: number): string => {
@@ -38,9 +41,17 @@ export function SessionPanel() {
   };
 
   useEffect(() => {
+    // Guard against React Strict Mode double-invoke
+    if (hasDiscovered.current) {
+      log.debug('Discovery already initiated, skipping');
+      return;
+    }
+
     // Auto-discover on mount if stale or never discovered
     const isStale = !lastDiscoveryTime || (Date.now() - lastDiscoveryTime > STALE_THRESHOLD);
     if (isStale && !isDiscovering) {
+      log.debug('Initiating session discovery');
+      hasDiscovered.current = true;
       discoverSessions(true); // Quick scan
     }
   }, [lastDiscoveryTime, isDiscovering, discoverSessions]);
