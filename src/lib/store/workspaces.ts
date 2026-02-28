@@ -17,7 +17,8 @@ import {
 } from '../workspace/types';
 import { createLogger } from '../logger';
 import { storeSync } from './sync';
-import { encodeProjectPath } from '../utils/projectPath';
+import { encodeProjectPath, decodeProjectPath } from '../utils/projectPath';
+import type { CLISession } from '@/types/sessions';
 
 const log = createLogger('WorkspaceStore');
 
@@ -97,6 +98,10 @@ interface WorkspaceStore {
   migrateFromLegacy: () => Promise<void>;
   migrateExistingSessions: () => void;
   migrateToWorkspaces: () => Promise<void>;
+
+  // Orphaned sessions
+  getOrphanedSessions: (sessions: CLISession[]) => CLISession[];
+  handleOrphanedSessions: (orphans: CLISession[]) => Promise<void>;
 }
 
 // ============================================================================
@@ -796,6 +801,60 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
           throw error;
         }
+      },
+
+      getOrphanedSessions: (sessions: CLISession[]) => {
+        const state = get();
+        const projectIds = new Set(
+          Array.from(state.workspaces.values()).map(w => w.projectId)
+        );
+
+        return sessions.filter(s => !projectIds.has(s.projectId));
+      },
+
+      handleOrphanedSessions: async (orphans: CLISession[]) => {
+        if (orphans.length === 0) {
+          log.debug('No orphaned sessions to handle');
+          return;
+        }
+
+        log.info('Handling orphaned sessions', {
+          orphanCount: orphans.length,
+        });
+
+        // Group by projectId
+        const orphansByProject = new Map<string, CLISession[]>();
+        for (const session of orphans) {
+          const group = orphansByProject.get(session.projectId) || [];
+          group.push(session);
+          orphansByProject.set(session.projectId, group);
+        }
+
+        // Create workspace for each unique projectId
+        for (const [projectId, sessionGroup] of orphansByProject) {
+          const decodedPath = decodeProjectPath(projectId);
+          const name = decodedPath.split('/').pop() || projectId;
+
+          log.info('Creating workspace for orphaned sessions', {
+            projectId,
+            path: decodedPath,
+            sessionCount: sessionGroup.length,
+          });
+
+          await get().addWorkspace(
+            {
+              type: 'local',
+              path: decodedPath,
+            },
+            {
+              name: `${name} (Recovered)`,
+            }
+          );
+        }
+
+        log.info('Orphaned session handling complete', {
+          workspacesCreated: orphansByProject.size,
+        });
       },
       };
     },

@@ -16,7 +16,7 @@ const STALE_THRESHOLD = 60000; // 60 seconds
 
 export function SessionPanel() {
   const { startNewSession, isPrewarming } = useChatStore();
-  const { activeWorkspaceId, workspaces, migrateToWorkspaces } = useWorkspaceStore();
+  const { activeWorkspaceId, workspaces, migrateToWorkspaces, getOrphanedSessions, handleOrphanedSessions } = useWorkspaceStore();
   const {
     discoverSessions,
     lastDiscoveryTime,
@@ -24,6 +24,7 @@ export function SessionPanel() {
     systemSessionCount,
     discoveryError,
     isDiscovering,
+    sessions,
   } = useSessionDiscoveryStore();
   const { prewarmCli } = useCliPrewarm();
   const hasDiscovered = useRef(false);
@@ -60,6 +61,13 @@ export function SessionPanel() {
 
           // 2. Migrate to workspaces
           await migrateToWorkspaces();
+
+          // 3. Handle orphaned sessions
+          const orphans = getOrphanedSessions(sessions);
+          if (orphans.length > 0) {
+            log.info('Found orphaned sessions', { count: orphans.length });
+            await handleOrphanedSessions(orphans);
+          }
         } catch (error) {
           log.error('Initialization failed', { error });
         }
@@ -67,7 +75,7 @@ export function SessionPanel() {
 
       init();
     }
-  }, [lastDiscoveryTime, isDiscovering, discoverSessions, migrateToWorkspaces]);
+  }, [lastDiscoveryTime, isDiscovering, discoverSessions, migrateToWorkspaces, getOrphanedSessions, handleOrphanedSessions, sessions]);
 
   const handleNewChat = () => {
     // Get active workspace context
