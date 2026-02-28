@@ -1,10 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import { CLISession } from '@/types/sessions';
 import { useChatStore } from '@/lib/store';
 import { useSessionDiscoveryStore } from '@/lib/store/sessions';
-import { formatISOWithRelative, formatDuration } from '@/lib/utils/time';
+import { formatISOWithRelative } from '@/lib/utils/time';
 import { cn } from '@/lib/utils';
 import { createLogger } from '@/lib/logger';
 
@@ -20,12 +19,7 @@ interface SessionItemProps {
 export function SessionItem({ session, sectionType = 'home' }: SessionItemProps) {
   const { sessionId, switchSession, metadataColorScheme } = useChatStore();
   const { loadSessionDetails } = useSessionDiscoveryStore();
-  const [isHovered, setIsHovered] = useState(false);
   const isActive = sessionId === session.id;
-
-  const handleHover = () => {
-    setIsHovered(true);
-  };
 
   const handleClick = async () => {
     log.debug('Session clicked', {
@@ -61,8 +55,6 @@ export function SessionItem({ session, sectionType = 'home' }: SessionItemProps)
   return (
     <div
       onClick={handleClick}
-      onMouseEnter={handleHover}
-      onMouseLeave={() => setIsHovered(false)}
       className={cn(
         'p-2.5 rounded-lg cursor-pointer text-sm',
         'border-l-4',
