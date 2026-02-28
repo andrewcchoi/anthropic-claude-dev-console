@@ -8,6 +8,7 @@ import { useCliPrewarm } from '@/hooks/useCliPrewarm';
 import { SessionSearch } from './SessionSearch';
 import { RefreshButton } from './RefreshButton';
 import { SessionList } from './SessionList';
+import { CollapseAllButton } from './CollapseAllButton';
 import { Loader2 } from 'lucide-react';
 import { createLogger } from '@/lib/logger';
 
@@ -109,6 +110,11 @@ export function SessionPanel() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
+        {/* Collapse/Expand All button */}
+        <div className="mb-3">
+          <CollapseAllButton />
+        </div>
+
         {/* Search and refresh controls */}
         <div className="flex items-center gap-2 mb-3" suppressHydrationWarning>
           <SessionSearch />
