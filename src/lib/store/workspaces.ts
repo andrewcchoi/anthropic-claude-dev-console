@@ -102,6 +102,10 @@ interface WorkspaceStore {
   // Orphaned sessions
   getOrphanedSessions: (sessions: CLISession[]) => CLISession[];
   handleOrphanedSessions: (orphans: CLISession[]) => Promise<void>;
+
+  // Archive
+  archiveWorkspace: (id: string) => void;
+  restoreWorkspace: (id: string) => void;
 }
 
 // ============================================================================
@@ -855,6 +859,46 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         log.info('Orphaned session handling complete', {
           workspacesCreated: orphansByProject.size,
         });
+      },
+
+      archiveWorkspace: (id: string) => {
+        const state = get();
+        const workspace = state.workspaces.get(id);
+
+        if (!workspace) {
+          log.warn('Workspace not found for archiving', { id });
+          return;
+        }
+
+        log.info('Archiving workspace', {
+          workspaceId: id,
+          name: workspace.name,
+        });
+
+        // Mark as archived
+        get().updateWorkspaceState(id, { isArchived: true });
+
+        // If was active, switch to another
+        if (state.activeWorkspaceId === id) {
+          const nextWorkspace = Array.from(state.workspaces.values()).find(
+            (w) => !w.isArchived && w.id !== id
+          );
+
+          if (nextWorkspace) {
+            get().setActiveWorkspace(nextWorkspace.id);
+            log.debug('Switched to next workspace', {
+              newActiveId: nextWorkspace.id,
+            });
+          } else {
+            // No other workspaces - clear active
+            set({ activeWorkspaceId: null });
+          }
+        }
+      },
+
+      restoreWorkspace: (id: string) => {
+        log.info('Restoring workspace', { workspaceId: id });
+        get().updateWorkspaceState(id, { isArchived: false });
       },
       };
     },
