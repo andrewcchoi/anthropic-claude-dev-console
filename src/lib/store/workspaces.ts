@@ -96,6 +96,7 @@ interface WorkspaceStore {
   // Initialization
   initialize: () => Promise<void>;
   migrateFromLegacy: () => Promise<void>;
+  migrateGrootWorkspace: () => Promise<void>;
   migrateExistingSessions: () => void;
   migrateToWorkspaces: () => Promise<void>;
 
@@ -638,6 +639,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         // Check for legacy workspace and migrate
         await get().migrateFromLegacy();
 
+        // Migrate to groot
+        await get().migrateGrootWorkspace();
+
         // Migrate existing sessions to default workspace (idempotent)
         get().migrateExistingSessions();
 
@@ -671,6 +675,48 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         } catch {
           // Ignore errors during migration check
         }
+      },
+
+      migrateGrootWorkspace: async () => {
+        const state = get();
+
+        // Find /workspace workspace
+        const workspaceWorkspace = Array.from(state.workspaces.values())
+          .find(ws => ws.rootPath === '/workspace');
+
+        if (!workspaceWorkspace) {
+          log.debug('No /workspace found, skipping groot migration');
+          return;
+        }
+
+        // Check if already migrated
+        if (workspaceWorkspace.name === '🌴 groot' && workspaceWorkspace.isPinned) {
+          log.debug('Groot already migrated, skipping');
+          return;
+        }
+
+        log.info('Migrating workspace to 🌴 groot', {
+          workspaceId: workspaceWorkspace.id,
+          oldName: workspaceWorkspace.name,
+        });
+
+        // Update workspace name and pin it
+        set((state) => {
+          const newWorkspaces = new Map(state.workspaces);
+          const ws = newWorkspaces.get(workspaceWorkspace.id);
+
+          if (ws) {
+            newWorkspaces.set(workspaceWorkspace.id, {
+              ...ws,
+              name: '🌴 groot',
+              isPinned: true,
+            });
+          }
+
+          return { workspaces: newWorkspaces };
+        });
+
+        log.info('Groot migration complete');
       },
 
       migrateExistingSessions: () => {
