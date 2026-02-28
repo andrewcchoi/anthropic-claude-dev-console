@@ -787,6 +787,31 @@ Two distinct terminal components serve different purposes:
 ### Learnings
 <!-- Updated during multi-agent execution -->
 
+#### Workspace UI Redesign - Phase 1 Complete (2026-02-28)
+- **Implementation**: 6 tasks via subagent-driven development with two-stage review (spec compliance + code quality)
+- **Tasks Completed**:
+  1. Added isPinned field to Workspace interface
+  2. Added collapsedSections state management to ChatStore
+  3. Added metadataColorScheme setting ('semantic' | 'gradient')
+  4. Added formatISOWithRelative utility (ISO + relative dates)
+  5. Added migration for "🌴 groot" rename + isPinned persistence
+  6. Added protection against deletion/archiving of pinned workspaces
+- **Test Coverage**: 21 new tests across 6 files, all passing
+- **Adversarial Review Findings**: 4 CRITICAL gaps found and fixed:
+  * Migration idempotency: Changed check from name+isPinned to isPinned only (user can rename)
+  * Null safety: Added Array.isArray guards to prevent crashes from corrupted localStorage
+  * Explicit initialization: Set isPinned=false in addWorkspace (not undefined)
+  * Serialization guards: Added instanceof Set check before Array.from()
+- **Key Learnings**:
+  * Adversarial review caught real bugs that standard code review missed (migration idempotency, localStorage corruption)
+  * Testing happy path isn't enough - need corruption/edge case tests
+  * Explicit initialization (isPinned=false) better than relying on undefined semantics
+  * Two-stage review (spec compliance first, then code quality) prevents over/under-building
+  * Fresh subagent per task prevents context pollution and maintains focus
+- **Files Modified**: 4 source files, 6 test files, 8 commits
+- **Build Status**: ✅ All tests pass (328/328), TypeScript builds cleanly
+- **Next**: Phase 2 - Section Components (HomeSessionsSection, SystemSessionsSection, UnassignedSessionsSection)
+
 #### CommandPalette Deduplication & CLI Initialization Fix (2026-02-22)
 - **Problem 1**: ~130 React duplicate key warnings when opening CommandPalette
   * Root cause: CLI returns commands in both `skills` and `slash_commands` arrays (all skills are also valid slash commands)
