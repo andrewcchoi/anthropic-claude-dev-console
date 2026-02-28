@@ -7,6 +7,7 @@ import { useWorkspaceStore } from '@/lib/store/workspaces';
 import { useClaudeChat } from '@/hooks/useClaudeChat';
 import { SessionItem } from './SessionItem';
 import { UISessionItem } from './UISessionItem';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { createLogger } from '@/lib/logger';
 import { showToast } from '@/lib/utils/toast';
 import { encodeProjectPath } from '@/lib/utils/projectPath';
@@ -238,10 +239,27 @@ export function ProjectList() {
           return null;
         }
 
+        // Find workspace for this project to get last active session
+        const workspace = Array.from(workspaces.values()).find(w => w.projectId === project.id);
+        const lastActiveSession = workspace?.lastActiveSessionId
+          ? allProjectSessions.find(s =>
+              s.source === 'browser'
+                ? s.data.id === workspace.lastActiveSessionId
+                : s.data.id === workspace.lastActiveSessionId
+            )
+          : null;
+
+        const tooltipContent = lastActiveSession
+          ? `Last session: ${lastActiveSession.source === 'browser' ? lastActiveSession.data.name : lastActiveSession.data.name}`
+          : allProjectSessions.length > 0
+          ? `${allProjectSessions.length} session${allProjectSessions.length !== 1 ? 's' : ''}`
+          : 'No sessions in this workspace';
+
         return (
           <div key={project.id} className="space-y-1">
             {/* Project header */}
-            <button
+            <Tooltip content={tooltipContent}>
+              <button
               onClick={() => {
                 handleWorkspaceClick(project);
                 toggleProjectCollapse(project.id);
@@ -269,7 +287,8 @@ export function ProjectList() {
                   </div>
                 </div>
               </div>
-            </button>
+              </button>
+            </Tooltip>
 
             {/* Project sessions */}
             {isExpanded && allProjectSessions.length > 0 && (
