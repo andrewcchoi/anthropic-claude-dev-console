@@ -866,7 +866,9 @@ export const useChatStore = create<ChatStore>()(
         sidebarTab: state.sidebarTab,
         hiddenSessionIds: Array.from(state.hiddenSessionIds), // Convert Set to Array for JSON
         collapsedProjects: Array.from(state.collapsedProjects), // Convert Set to Array for JSON
-        collapsedSectionsArray: Array.from(state.collapsedSections), // Convert Set to Array for JSON
+        collapsedSectionsArray: state.collapsedSections instanceof Set
+          ? Array.from(state.collapsedSections)
+          : [], // Convert Set to Array for JSON
         // initializedSessionIds: NOT persisted - ephemeral runtime state only
         // pendingSessionId: NOT persisted - resets on refresh
       }),
@@ -884,7 +886,7 @@ export const useChatStore = create<ChatStore>()(
           state.collapsedProjects = new Set();
         }
 
-        if (state && (state as any).collapsedSectionsArray) {
+        if (state && Array.isArray((state as any).collapsedSectionsArray)) {
           state.collapsedSections = new Set((state as any).collapsedSectionsArray);
         } else if (state) {
           state.collapsedSections = new Set();

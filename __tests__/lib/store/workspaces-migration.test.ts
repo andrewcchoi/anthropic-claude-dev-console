@@ -76,7 +76,7 @@ describe('Workspace groot migration', () => {
     const otherWorkspace = workspaces.find(w => w.rootPath === '/other');
 
     expect(otherWorkspace?.name).toBe('Other Project');
-    expect(otherWorkspace?.isPinned).toBeUndefined();
+    expect(otherWorkspace?.isPinned).toBe(false); // Should be false (not pinned)
   });
 
   it('should persist isPinned across rehydration', async () => {
@@ -104,5 +104,24 @@ describe('Workspace groot migration', () => {
 
     const persistedWorkspace = partializedState.workspaceConfigs[0];
     expect(persistedWorkspace.isPinned).toBe(true);
+  });
+
+  it('should not re-migrate if user renames workspace after migration', async () => {
+    const workspaceId = await useWorkspaceStore.getState().addWorkspace(
+      { type: 'local', path: '/workspace' },
+      { name: 'Current Workspace' }
+    );
+
+    await useWorkspaceStore.getState().migrateGrootWorkspace();
+
+    // User renames workspace
+    useWorkspaceStore.getState().updateWorkspaceState(workspaceId, { name: 'My Custom Name' });
+
+    // Migration should NOT run again (should skip because isPinned=true)
+    await useWorkspaceStore.getState().migrateGrootWorkspace();
+
+    const workspace = useWorkspaceStore.getState().workspaces.get(workspaceId);
+    expect(workspace?.name).toBe('My Custom Name'); // NOT "🌴 groot"
+    expect(workspace?.isPinned).toBe(true); // Still pinned
   });
 });

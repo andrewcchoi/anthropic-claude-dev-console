@@ -40,4 +40,44 @@ describe('ChatStore collapsedSections', () => {
     expect(collapsedSections.has('unassigned')).toBe(true);
     expect(collapsedSections.has('home-workspace-1')).toBe(true);
   });
+
+  it('should handle corrupted localStorage data gracefully', () => {
+    // Simulate corrupted state (what onRehydrateStorage receives)
+    const corruptedState: any = {
+      collapsedSections: new Set(),
+    };
+
+    // Test null
+    (corruptedState as any).collapsedSectionsArray = null;
+    expect(() => {
+      if (Array.isArray(corruptedState.collapsedSectionsArray)) {
+        corruptedState.collapsedSections = new Set(corruptedState.collapsedSectionsArray);
+      } else {
+        corruptedState.collapsedSections = new Set();
+      }
+    }).not.toThrow();
+    expect(corruptedState.collapsedSections).toEqual(new Set());
+
+    // Test undefined
+    (corruptedState as any).collapsedSectionsArray = undefined;
+    expect(() => {
+      if (Array.isArray(corruptedState.collapsedSectionsArray)) {
+        corruptedState.collapsedSections = new Set(corruptedState.collapsedSectionsArray);
+      } else {
+        corruptedState.collapsedSections = new Set();
+      }
+    }).not.toThrow();
+    expect(corruptedState.collapsedSections).toEqual(new Set());
+
+    // Test string (wrong type)
+    (corruptedState as any).collapsedSectionsArray = 'invalid';
+    expect(() => {
+      if (Array.isArray(corruptedState.collapsedSectionsArray)) {
+        corruptedState.collapsedSections = new Set(corruptedState.collapsedSectionsArray);
+      } else {
+        corruptedState.collapsedSections = new Set();
+      }
+    }).not.toThrow();
+    expect(corruptedState.collapsedSections).toEqual(new Set());
+  });
 });

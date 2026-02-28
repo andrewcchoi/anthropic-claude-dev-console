@@ -77,4 +77,14 @@ describe('Pinned workspace protection', () => {
       'error'
     );
   });
+
+  it('should initialize new workspaces as not pinned', async () => {
+    const newWorkspaceId = await useWorkspaceStore.getState().addWorkspace(
+      { type: 'local', path: '/other' },
+      { name: 'New Workspace' }
+    );
+
+    const workspace = useWorkspaceStore.getState().workspaces.get(newWorkspaceId);
+    expect(workspace?.isPinned).toBe(false); // NOT undefined
+  });
 });

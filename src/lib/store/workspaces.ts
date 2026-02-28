@@ -240,6 +240,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           fileActivity: new Map(),
           createdAt: Date.now(),
           lastAccessedAt: Date.now(),
+          isPinned: false,  // Always initialize to false
         };
 
         set((state) => {
@@ -698,9 +699,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           return;
         }
 
-        // Check if already migrated
-        if (workspaceWorkspace.name === '🌴 groot' && workspaceWorkspace.isPinned) {
-          log.debug('Groot already migrated, skipping');
+        // Check if already migrated (check isPinned only - user may have renamed)
+        if (workspaceWorkspace.isPinned === true) {
+          log.debug('Workspace already pinned, skipping groot migration');
           return;
         }
 
