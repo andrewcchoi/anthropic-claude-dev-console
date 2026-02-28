@@ -9,20 +9,17 @@ import { createLogger } from '@/lib/logger';
 const log = createLogger('SystemSessionsSection');
 
 interface SystemSessionsSectionProps {
-  workspaceId: string;
   sessions: CLISession[];
   isCollapsed: boolean;
   onToggle: () => void;
 }
 
 export function SystemSessionsSection({
-  workspaceId,
   sessions,
   isCollapsed,
   onToggle,
 }: SystemSessionsSectionProps) {
   log.debug('SystemSessionsSection render', {
-    workspaceId,
     sessionCount: sessions.length,
     isCollapsed,
   });
@@ -30,7 +27,7 @@ export function SystemSessionsSection({
   return (
     <section
       className="mt-2"
-      aria-label="System sessions for workspace"
+      aria-label="System sessions"
       role="region"
     >
       {/* Section Header */}
@@ -43,7 +40,7 @@ export function SystemSessionsSection({
                    focus:ring-2 focus:ring-blue-500/50 focus:outline-none
                    transition-colors"
         aria-expanded={!isCollapsed}
-        aria-controls={`system-sessions-${workspaceId}`}
+        aria-controls="system-sessions"
       >
         <div className="flex items-center gap-2">
           <ChevronRight
@@ -58,7 +55,7 @@ export function SystemSessionsSection({
       {/* Session List */}
       {!isCollapsed && (
         <div
-          id={`system-sessions-${workspaceId}`}
+          id="system-sessions"
           className="ml-6 mt-1 space-y-1"
         >
           {sessions.length === 0 ? (

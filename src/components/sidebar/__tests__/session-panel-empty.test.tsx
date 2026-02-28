@@ -52,6 +52,10 @@ describe('SessionPanel empty state', () => {
       sessions: [],
       startNewSession: vi.fn(),
       isPrewarming: false,
+      collapsedProjects: new Set(),
+      collapsedSections: new Set(),
+      toggleProjectCollapse: vi.fn(),
+      toggleSectionCollapse: vi.fn(),
     });
 
     render(<SessionPanel />);
@@ -70,6 +74,10 @@ describe('SessionPanel empty state', () => {
       sessions: [],
       startNewSession: vi.fn(),
       isPrewarming: false,
+      collapsedProjects: new Set(),
+      collapsedSections: new Set(),
+      toggleProjectCollapse: vi.fn(),
+      toggleSectionCollapse: vi.fn(),
     });
 
     render(<SessionPanel />);
@@ -88,6 +96,10 @@ describe('SessionPanel empty state', () => {
       sessions: [],
       startNewSession: vi.fn(),
       isPrewarming: false,
+      collapsedProjects: new Set(),
+      collapsedSections: new Set(),
+      toggleProjectCollapse: vi.fn(),
+      toggleSectionCollapse: vi.fn(),
     });
 
     render(<SessionPanel />);

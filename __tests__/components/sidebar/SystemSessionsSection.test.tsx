@@ -37,7 +37,6 @@ describe('SystemSessionsSection', () => {
   it('should render section header with emoji and count', () => {
     render(
       <SystemSessionsSection
-        workspaceId="workspace-1"
         sessions={mockSessions}
         isCollapsed={false}
         onToggle={vi.fn()}
@@ -51,7 +50,6 @@ describe('SystemSessionsSection', () => {
   it('should apply blue color tint to header', () => {
     const { container } = render(
       <SystemSessionsSection
-        workspaceId="workspace-1"
         sessions={mockSessions}
         isCollapsed={false}
         onToggle={vi.fn()}
@@ -65,7 +63,6 @@ describe('SystemSessionsSection', () => {
   it('should show sessions when not collapsed', () => {
     render(
       <SystemSessionsSection
-        workspaceId="workspace-1"
         sessions={mockSessions}
         isCollapsed={false}
         onToggle={vi.fn()}
@@ -79,7 +76,6 @@ describe('SystemSessionsSection', () => {
   it('should hide sessions when collapsed', () => {
     render(
       <SystemSessionsSection
-        workspaceId="workspace-1"
         sessions={mockSessions}
         isCollapsed={true}
         onToggle={vi.fn()}
@@ -94,7 +90,6 @@ describe('SystemSessionsSection', () => {
     const mockToggle = vi.fn();
     render(
       <SystemSessionsSection
-        workspaceId="workspace-1"
         sessions={mockSessions}
         isCollapsed={false}
         onToggle={mockToggle}
@@ -110,7 +105,6 @@ describe('SystemSessionsSection', () => {
   it('should show empty state when no sessions', () => {
     render(
       <SystemSessionsSection
-        workspaceId="workspace-1"
         sessions={[]}
         isCollapsed={false}
         onToggle={vi.fn()}
@@ -123,7 +117,6 @@ describe('SystemSessionsSection', () => {
   it('should have accessible ARIA labels', () => {
     render(
       <SystemSessionsSection
-        workspaceId="workspace-1"
         sessions={mockSessions}
         isCollapsed={false}
         onToggle={vi.fn()}
@@ -131,6 +124,6 @@ describe('SystemSessionsSection', () => {
     );
 
     const section = screen.getByRole('region');
-    expect(section).toHaveAttribute('aria-label', 'System sessions for workspace');
+    expect(section).toHaveAttribute('aria-label', 'System sessions');
   });
 });

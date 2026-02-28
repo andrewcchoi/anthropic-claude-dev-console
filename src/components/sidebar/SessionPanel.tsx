@@ -155,7 +155,6 @@ export function SessionPanel() {
           {/* System Sessions */}
           {systemSessions.length > 0 && (
             <SystemSessionsSection
-              workspaceId="__global__"
               sessions={systemSessions}
               isCollapsed={collapsedSections.has('system')}
               onToggle={() => toggleSectionCollapse('system')}
@@ -165,7 +164,6 @@ export function SessionPanel() {
           {/* Unassigned Sessions */}
           {unassignedSessions.length > 0 && (
             <UnassignedSessionsSection
-              workspaceId="__global__"
               sessions={unassignedSessions}
               isCollapsed={collapsedSections.has('unassigned')}
               onToggle={() => toggleSectionCollapse('unassigned')}

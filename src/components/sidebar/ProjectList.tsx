@@ -115,11 +115,11 @@ export function ProjectList() {
 
       // Announce to screen readers
       const session = projectSessions.find(s => s.id === sessionToActivate);
-      const workspaceName = project.path === '/workspace' ? 'Current Workspace' : project.path;
+      const workspaceName = workspace?.isPinned ? workspace.name : (project.path === '/workspace' ? 'Current Workspace' : project.path);
       setAnnouncement(`Switched to ${workspaceName}, ${session?.name || 'session'} active`);
     } else {
       // No sessions to activate
-      const workspaceName = project.path === '/workspace' ? 'Current Workspace' : project.path;
+      const workspaceName = workspace?.isPinned ? workspace.name : (project.path === '/workspace' ? 'Current Workspace' : project.path);
       setAnnouncement(`Switched to ${workspaceName}, no sessions`);
     }
   }, [
@@ -265,7 +265,7 @@ export function ProjectList() {
                 handleWorkspaceClick(project);
                 toggleProjectCollapse(project.id);
               }}
-              aria-label={`Switch to ${project.path === '/workspace' ? 'Current Workspace' : project.path}, ${allProjectSessions.length} session${allProjectSessions.length !== 1 ? 's' : ''}`}
+              aria-label={`Switch to ${workspace?.isPinned ? workspace.name : (project.path === '/workspace' ? 'Current Workspace' : project.path)}, ${allProjectSessions.length} session${allProjectSessions.length !== 1 ? 's' : ''}`}
               className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-left focus:ring-2 focus:ring-blue-500/50 focus:outline-none"
             >
               <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -281,7 +281,7 @@ export function ProjectList() {
                 </svg>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                    {project.path === '/workspace' ? 'Current Workspace' : project.path}
+                    {workspace?.isPinned ? workspace.name : (project.path === '/workspace' ? 'Current Workspace' : project.path)}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
                     {allProjectSessions.length} session{allProjectSessions.length !== 1 ? 's' : ''}
@@ -321,53 +321,6 @@ export function ProjectList() {
           </div>
         );
       })}
-
-      {/* System Sessions - separate collapsible section */}
-      {systemSessions.length > 0 && (
-        <div className="space-y-1 mt-4">
-          {/* System Sessions header */}
-          <button
-            onClick={() => toggleProjectCollapse('__system__')}
-            className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-left"
-          >
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <svg
-                className={`w-4 h-4 flex-shrink-0 transition-transform ${
-                  !collapsedProjects.has('__system__') ? 'rotate-90' : ''
-                }`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                  System Sessions
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {systemSessions.length} session{systemSessions.length !== 1 ? 's' : ''}
-                </div>
-              </div>
-            </div>
-          </button>
-
-          {/* System sessions list */}
-          {!collapsedProjects.has('__system__') && (
-            <div className="ml-6 space-y-1">
-              {systemSessions
-                .filter((s) =>
-                  !sessionSearchQuery ||
-                  matchesSearch(s.name, sessionSearchQuery) ||
-                  matchesSearch(s.gitBranch, sessionSearchQuery)
-                )
-                .map((session) => (
-                  <SessionItem key={`system-${session.id}`} session={session} />
-                ))}
-            </div>
-          )}
-        </div>
-      )}
       </div>
     </>
   );

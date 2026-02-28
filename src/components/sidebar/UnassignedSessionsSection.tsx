@@ -9,20 +9,17 @@ import { createLogger } from '@/lib/logger';
 const log = createLogger('UnassignedSessionsSection');
 
 interface UnassignedSessionsSectionProps {
-  workspaceId: string;
   sessions: CLISession[];
   isCollapsed: boolean;
   onToggle: () => void;
 }
 
 export function UnassignedSessionsSection({
-  workspaceId,
   sessions,
   isCollapsed,
   onToggle,
 }: UnassignedSessionsSectionProps) {
   log.debug('UnassignedSessionsSection render', {
-    workspaceId,
     sessionCount: sessions.length,
     isCollapsed,
   });
@@ -30,7 +27,7 @@ export function UnassignedSessionsSection({
   return (
     <section
       className="mt-2"
-      aria-label="Unassigned sessions for workspace"
+      aria-label="Unassigned sessions"
       role="region"
     >
       {/* Section Header */}
@@ -43,7 +40,7 @@ export function UnassignedSessionsSection({
                    focus:ring-2 focus:ring-orange-500/50 focus:outline-none
                    transition-colors"
         aria-expanded={!isCollapsed}
-        aria-controls={`unassigned-sessions-${workspaceId}`}
+        aria-controls="unassigned-sessions"
       >
         <div className="flex items-center gap-2">
           <ChevronRight
@@ -58,7 +55,7 @@ export function UnassignedSessionsSection({
       {/* Session List */}
       {!isCollapsed && (
         <div
-          id={`unassigned-sessions-${workspaceId}`}
+          id="unassigned-sessions"
           className="ml-6 mt-1 space-y-1"
         >
           {sessions.length === 0 ? (
