@@ -6,6 +6,7 @@ import { useSessionDiscoveryStore } from '@/lib/store/sessions';
 import { formatISOWithRelative } from '@/lib/utils/time';
 import { cn } from '@/lib/utils';
 import { createLogger } from '@/lib/logger';
+import { Tooltip } from '@/components/ui/Tooltip';
 
 const log = createLogger('SessionItem');
 
@@ -52,8 +53,18 @@ export function SessionItem({ session, sectionType = 'home' }: SessionItemProps)
         modifiedDate: 'text-red-600 dark:text-red-400',
       };
 
+  // Build tooltip content
+  const tooltipContent = [
+    session.messageCount !== undefined ? `${session.messageCount} messages` : 'No messages yet',
+    session.gitBranch ? `Branch: ${session.gitBranch}` : null,
+    `Modified: ${new Date(session.modifiedAt).toLocaleString()}`,
+  ]
+    .filter(Boolean)
+    .join(' • ');
+
   return (
-    <div
+    <Tooltip content={tooltipContent}>
+      <div
       onClick={handleClick}
       className={cn(
         'p-2.5 rounded-lg cursor-pointer text-sm',
@@ -106,6 +117,7 @@ export function SessionItem({ session, sectionType = 'home' }: SessionItemProps)
           🕒 {formatISOWithRelative(session.modifiedAt)}
         </span>
       </div>
-    </div>
+      </div>
+    </Tooltip>
   );
 }
