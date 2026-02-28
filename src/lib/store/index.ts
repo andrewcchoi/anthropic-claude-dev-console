@@ -630,6 +630,9 @@ export const useChatStore = create<ChatStore>()(
       // NEW: Batch unlink for workspace deletion (performance optimization)
       unlinkMultipleSessionsFromWorkspace: (sessionIds: string[]) => {
         try {
+          // Convert to Set for O(1) lookup instead of O(m) includes()
+          const sessionIdsSet = new Set(sessionIds);
+
           set((state) => {
             log.debug('Batch unlinking sessions', {
               count: sessionIds.length,
@@ -637,13 +640,13 @@ export const useChatStore = create<ChatStore>()(
 
             // Check if current session needs unlinking (with null safety)
             const currentSessionUpdate =
-              state.sessionId && sessionIds.includes(state.sessionId) && state.currentSession
+              state.sessionId && sessionIdsSet.has(state.sessionId) && state.currentSession
                 ? { currentSession: { ...state.currentSession, workspaceId: undefined } }
                 : {};
 
             return {
               sessions: state.sessions.map(s =>
-                sessionIds.includes(s.id) ? { ...s, workspaceId: undefined } : s
+                sessionIdsSet.has(s.id) ? { ...s, workspaceId: undefined } : s
               ),
               ...currentSessionUpdate,
             };
