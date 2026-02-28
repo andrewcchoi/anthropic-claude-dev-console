@@ -96,6 +96,7 @@ interface WorkspaceStore {
   initialize: () => Promise<void>;
   migrateFromLegacy: () => Promise<void>;
   migrateExistingSessions: () => void;
+  migrateToWorkspaces: () => Promise<void>;
 }
 
 // ============================================================================
@@ -719,6 +720,82 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
         // Mark migration as complete
         set({ hasMigratedSessions: true });
+      },
+
+      migrateToWorkspaces: async () => {
+        const state = get();
+
+        // Idempotency: Skip if already migrated
+        if (state.workspaces.size > 0) {
+          log.info('Workspaces already exist, skipping migration');
+          return;
+        }
+
+        // Safety: Set migration flag before starting
+        localStorage.setItem('workspace-migration-started', Date.now().toString());
+
+        try {
+          // 1. Discover CLI projects
+          const response = await fetch('/api/sessions/discover');
+          if (!response.ok) {
+            throw new Error(`Discovery failed: ${response.status}`);
+          }
+
+          const { projects } = await response.json();
+          log.info('Discovered projects for migration', {
+            projectCount: projects.length,
+          });
+
+          // 2. Create workspace for each project
+          for (const project of projects) {
+            const workspaceId = await get().addWorkspace(
+              {
+                type: 'local',
+                path: project.path,
+              },
+              {
+                name: project.path.split('/').pop() || 'Workspace',
+              }
+            );
+
+            log.debug('Created workspace from project', {
+              workspaceId,
+              projectId: project.id,
+              path: project.path,
+            });
+          }
+
+          // 3. Set first workspace as active
+          if (projects.length > 0) {
+            const firstWorkspace = Array.from(get().workspaces.values())[0];
+            if (firstWorkspace) {
+              get().setActiveWorkspace(firstWorkspace.id);
+            }
+          }
+
+          // 4. Mark migration complete
+          localStorage.setItem('workspace-migration-complete', Date.now().toString());
+          localStorage.removeItem('workspace-migration-started');
+
+          log.info('Workspace migration complete', {
+            workspaceCount: projects.length,
+          });
+        } catch (error) {
+          // Rollback on error
+          log.error('Workspace migration failed, rolling back', { error });
+
+          // Clear partial state
+          set((state) => ({
+            workspaces: new Map(),
+            providers: new Map(),
+            workspaceOrder: [],
+            activeWorkspaceId: null,
+          }));
+
+          localStorage.removeItem('workspace-migration-started');
+
+          throw error;
+        }
       },
       };
     },

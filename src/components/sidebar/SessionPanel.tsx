@@ -16,7 +16,7 @@ const STALE_THRESHOLD = 60000; // 60 seconds
 
 export function SessionPanel() {
   const { startNewSession, isPrewarming } = useChatStore();
-  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const { activeWorkspaceId, workspaces, migrateToWorkspaces } = useWorkspaceStore();
   const {
     discoverSessions,
     lastDiscoveryTime,
@@ -50,11 +50,24 @@ export function SessionPanel() {
     // Auto-discover on mount if stale or never discovered
     const isStale = !lastDiscoveryTime || (Date.now() - lastDiscoveryTime > STALE_THRESHOLD);
     if (isStale && !isDiscovering) {
-      log.debug('Initiating session discovery');
+      log.debug('Initiating session discovery and workspace migration');
       hasDiscovered.current = true;
-      discoverSessions(true); // Quick scan
+
+      const init = async () => {
+        try {
+          // 1. Discover sessions
+          await discoverSessions(true);
+
+          // 2. Migrate to workspaces
+          await migrateToWorkspaces();
+        } catch (error) {
+          log.error('Initialization failed', { error });
+        }
+      };
+
+      init();
     }
-  }, [lastDiscoveryTime, isDiscovering, discoverSessions]);
+  }, [lastDiscoveryTime, isDiscovering, discoverSessions, migrateToWorkspaces]);
 
   const handleNewChat = () => {
     // Get active workspace context
