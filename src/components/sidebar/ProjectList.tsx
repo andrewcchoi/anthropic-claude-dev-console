@@ -50,9 +50,10 @@ export function ProjectList() {
       showToast('Stopped active conversation', 'info');
     }
 
+    // NOTE: React 18 automatically batches state updates, preventing UI flicker
+    // Multiple setState calls below are batched into a single render
+
     // Step 2: Update current workspace (sync)
-    // For now, we'll treat project.id as workspaceId
-    // In future, we may need explicit workspace mapping
     console.log('🔥 Attempting to set active workspace:', project.id);
     if (setActiveWorkspace) {
       setActiveWorkspace(project.id);
@@ -103,11 +104,12 @@ export function ProjectList() {
       }
     }
 
-    // Step 6: Activate session (sync state, async messages)
+    // Step 6: Update workspace tracking and load session (batched by React 18)
     if (sessionToActivate) {
-      // Note: project.id is already the encoded path (e.g., "-workspace-docs")
-      await switchSession(sessionToActivate, project.id);
       updateWorkspaceLastActiveSession(project.id, sessionToActivate);
+
+      // Async message loading
+      await switchSession(sessionToActivate, project.id);
 
       // Announce to screen readers
       const session = projectSessions.find(s => s.id === sessionToActivate);
