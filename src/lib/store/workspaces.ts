@@ -17,6 +17,7 @@ import {
 } from '../workspace/types';
 import { createLogger } from '../logger';
 import { storeSync } from './sync';
+import { encodeProjectPath } from '../utils/projectPath';
 
 const log = createLogger('WorkspaceStore');
 
@@ -49,10 +50,12 @@ function getChatStore() {
 
 interface PersistedWorkspaceConfig {
   id: string;
+  projectId: string;  // NEW
   name: string;
   config: ProviderConfig;
   color: string;
   sessionIds: string[];  // Include session links
+  isArchived?: boolean;  // NEW
 }
 
 interface WorkspaceStore {
@@ -156,6 +159,28 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           return id;
         }
 
+        // Derive projectId and rootPath from config
+        let projectId: string;
+        let rootPath: string;
+
+        switch (config.type) {
+          case 'local':
+            rootPath = (config as LocalProviderConfig).path;
+            projectId = encodeProjectPath(rootPath);
+            break;
+          case 'ssh':
+            rootPath = (config as SSHProviderConfig).remotePath;
+            projectId = encodeProjectPath(rootPath);
+            break;
+          case 'git':
+            rootPath = '/';  // TODO: Update when git clone location is implemented
+            projectId = encodeProjectPath(rootPath);
+            break;
+          default:
+            rootPath = '/';
+            projectId = '-';
+        }
+
         // Create provider state
         const providerState: ProviderState = {
           id,
@@ -188,18 +213,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         // Create workspace
         const workspace: Workspace = {
           id,
+          projectId,  // NEW
           name,
           providerId: id,
           providerType: config.type,
-          rootPath: config.type === 'local'
-            ? (config as LocalProviderConfig).path
-            : config.type === 'ssh'
-              ? (config as SSHProviderConfig).remotePath
-              : config.type === 'git'
-                ? '/'  // TODO: Update when git clone location is implemented
-                : '/',
+          rootPath,
           color: options.color ?? getNextColor(state.workspaces.size),
           sessionId: null,
+          activeSessionId: null,  // NEW
           sessionIds: [],  // Initialize empty array
           expandedFolders: new Set(),
           selectedFile: null,
@@ -708,10 +729,12 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       partialize: (state) => ({
         workspaceConfigs: Array.from(state.workspaces.values()).map(ws => ({
           id: ws.id,
+          projectId: ws.projectId,  // NEW
           name: ws.name,
           config: state.providers.get(ws.providerId)?.config,
           color: ws.color,
           sessionIds: ws.sessionIds,  // Persist session links
+          isArchived: ws.isArchived,  // NEW
         })) as PersistedWorkspaceConfig[],
         workspaceOrder: state.workspaceOrder,
         activeWorkspaceId: state.activeWorkspaceId,
@@ -742,27 +765,51 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               },
             });
 
+            // Derive rootPath and projectId from config
+            let rootPath: string;
+            let projectId: string;
+
+            if (wc.projectId) {
+              // Use persisted projectId if available
+              projectId = wc.projectId;
+            }
+
+            switch (wc.config.type) {
+              case 'local':
+                rootPath = (wc.config as LocalProviderConfig).path;
+                if (!projectId!) projectId = encodeProjectPath(rootPath);
+                break;
+              case 'ssh':
+                rootPath = (wc.config as SSHProviderConfig).remotePath;
+                if (!projectId!) projectId = encodeProjectPath(rootPath);
+                break;
+              case 'git':
+                rootPath = '/';
+                if (!projectId!) projectId = '-';
+                break;
+              default:
+                rootPath = '/';
+                if (!projectId!) projectId = '-';
+            }
+
             // Recreate workspace
             workspaces.set(wc.id, {
               id: wc.id,
+              projectId,  // NEW
               name: wc.name,
               providerId: wc.id,
               providerType: wc.config.type,
-              rootPath: wc.config.type === 'local'
-                ? (wc.config as LocalProviderConfig).path
-                : wc.config.type === 'ssh'
-                  ? (wc.config as SSHProviderConfig).remotePath
-                  : wc.config.type === 'git'
-                    ? '/'  // TODO: Update when git clone location is implemented
-                    : '/',
+              rootPath,
               color: wc.color,
               sessionId: null,
+              activeSessionId: null,  // NEW
               sessionIds: wc.sessionIds || [],  // Restore session links (type-safe)
               expandedFolders: new Set(),
               selectedFile: null,
               fileActivity: new Map(),
               createdAt: Date.now(),
               lastAccessedAt: Date.now(),
+              isArchived: wc.isArchived ?? false,  // NEW
             });
           }
         }
