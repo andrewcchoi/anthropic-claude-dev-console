@@ -42,4 +42,28 @@ describe('formatISOWithRelative', () => {
     const result = formatISOWithRelative(sixWeeksAgo);
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} \(6w ago\)$/);
   });
+
+  it('should format timestamp at 59 seconds boundary (just now)', () => {
+    const fiftyNineSecondsAgo = Date.now() - 59 * 1000;
+    const result = formatISOWithRelative(fiftyNineSecondsAgo);
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} \(just now\)$/);
+  });
+
+  it('should format timestamp at 60 seconds boundary (1m ago)', () => {
+    const sixtySecondsAgo = Date.now() - 60 * 1000;
+    const result = formatISOWithRelative(sixtySecondsAgo);
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} \(1m ago\)$/);
+  });
+
+  it('should format timestamp at exactly 7 days boundary (7d ago)', () => {
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const result = formatISOWithRelative(sevenDaysAgo);
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} \(1w ago\)$/);
+  });
+
+  it('should handle future timestamps gracefully', () => {
+    const fiveMinutesInFuture = Date.now() + 5 * 60 * 1000;
+    const result = formatISOWithRelative(fiveMinutesInFuture);
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} \(in the future\)$/);
+  });
 });

@@ -1,3 +1,7 @@
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('TimeFormatter');
+
 /**
  * Format timestamp as relative time from now
  * @param timestamp - Unix timestamp in milliseconds
@@ -66,8 +70,11 @@ export function formatSmartTime(timestamp: number): string {
 /**
  * Format timestamp as ISO date + relative time
  * Example: "2026-02-28 14:30 (2h ago)"
+ * Handles both past and future timestamps
  */
 export function formatISOWithRelative(timestamp: number): string {
+  log.debug('formatISOWithRelative called', { timestamp });
+
   const date = new Date(timestamp);
 
   // ISO format: YYYY-MM-DD HH:MM
@@ -79,27 +86,40 @@ export function formatISOWithRelative(timestamp: number): string {
 
   const isoDate = `${year}-${month}-${day} ${hours}:${minutes}`;
 
-  // Relative time
+  // Handle future timestamps
   const now = Date.now();
+  if (timestamp > now) {
+    const result = `${isoDate} (in the future)`;
+    log.debug('formatISOWithRelative result (future)', { isoDate, result });
+    return result;
+  }
+
+  // Relative time - reuse existing formatRelativeTime but with custom "just now" handling
   const diff = now - timestamp;
   const seconds = Math.floor(diff / 1000);
-  const minutes_count = Math.floor(seconds / 60);
-  const hours_count = Math.floor(minutes_count / 60);
-  const days = Math.floor(hours_count / 24);
-  const weeks = Math.floor(days / 7);
 
   let relative: string;
   if (seconds < 60) {
     relative = 'just now';
-  } else if (minutes_count < 60) {
-    relative = `${minutes_count}m ago`;
-  } else if (hours_count < 24) {
-    relative = `${hours_count}h ago`;
-  } else if (days < 7) {
-    relative = `${days}d ago`;
   } else {
-    relative = `${weeks}w ago`;
+    // Reuse existing logic from formatRelativeTime
+    const minutesCount = Math.floor(seconds / 60);
+    const hoursCount = Math.floor(minutesCount / 60);
+    const days = Math.floor(hoursCount / 24);
+    const weeks = Math.floor(days / 7);
+
+    if (minutesCount < 60) {
+      relative = `${minutesCount}m ago`;
+    } else if (hoursCount < 24) {
+      relative = `${hoursCount}h ago`;
+    } else if (days < 7) {
+      relative = `${days}d ago`;
+    } else {
+      relative = `${weeks}w ago`;
+    }
   }
 
-  return `${isoDate} (${relative})`;
+  const result = `${isoDate} (${relative})`;
+  log.debug('formatISOWithRelative result', { isoDate, relative, result });
+  return result;
 }
