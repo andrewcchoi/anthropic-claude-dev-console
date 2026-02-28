@@ -1112,6 +1112,53 @@ Two distinct terminal components serve different purposes:
   * Limitation: Same underlying model may have similar blind spots
 - **Key Lesson**: Self-evaluation cannot catch blind spots. Independent review (even by subagent) provides meaningful improvement. "Verified" must have concrete evidence, not just attestation.
 
+#### Workspace Isolation Redesign (2026-02-27)
+- **Problem**: Sessions intermixed between workspaces, unclear ownership, missing distinguishing metadata
+  * Users reported: sessions from different workspaces appearing together, messages mixing, can't tell workspace association
+  * Root cause: Complex cwd-based matching logic, optional workspaceId, no metadata display
+- **Solution**: Workspace as UI filter layer on CLI projects
+  * Filter by projectId equality: `s.projectId === workspace.projectId`
+  * Workspace.projectId links to CLI's encoded path (source of truth)
+  * Auto-create workspaces from discovered CLI projects
+  * Orphaned sessions → auto-create workspace per unique projectId
+- **Key Design Decision**: Original design failed adversarial review (15% confidence)
+  * Initial approach: Make workspaceId required, workspace owns sessions
+  * Critical flaw: Assumed app creates sessions, but CLI owns lifecycle
+  * Revised: Workspace filters sessions, doesn't own them
+- **Implementation**:
+  * Files: `types.ts`, `workspaces.ts`, `SessionList.tsx`, `SessionPanel.tsx`, `ProjectList.tsx`
+  * Added `projectId: string` field to Workspace
+  * Added `activeSessionId` and `isArchived` fields
+  * Migration: `migrateToWorkspaces()` creates workspaces from CLI projects
+  * Orphan handling: Groups by projectId, creates recovery workspaces
+  * Archive: Soft delete (isArchived flag) instead of cascade delete
+  * React 18 batching: Automatic batching for atomic workspace switch
+  * Strict Mode guard: useRef prevents discovery double-invoke
+- **Safety Features**:
+  * Idempotent migration (checks workspace count)
+  * Rollback on error (clears partial state)
+  * No data loss (CLI sessions untouched)
+  * Backwards compatible (show all when no workspace)
+- **Testing**: 20+ tests (unit + integration)
+  * projectId derivation
+  * Session filtering by projectId
+  * Migration idempotency and rollback
+  * Orphan handling and grouping
+  * Archive/restore functionality
+- **Cross-Reference**: Avoided 7 past issues from troubleshooting guide
+  * Session ID persistence (Problem 4)
+  * Message content parsing (Problem 5)
+  * CLI flag confusion (Problem 6)
+  * UI flicker (Problem 7)
+  * Circular imports (Task 0)
+  * React Strict Mode (Problem 9)
+  * Data locality (ADR 0001)
+- **Design Documents**:
+  * `docs/plans/2026-02-27-workspace-isolation-design.md`
+  * `.claude/workspace-design-v2-cross-reference.md`
+- **Ralph Loop Review**: 2 iterations, adversarial critique identified 8 CRITICAL flaws, complete redesign
+- **Key Lesson**: Design must work with existing architecture (CLI owns sessions), not against it. Adversarial review catches fundamental misunderstandings early. UI filter layer is simpler and safer than ownership model.
+
 ### Blockers
 - None
 
