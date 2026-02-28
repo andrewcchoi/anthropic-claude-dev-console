@@ -7,6 +7,7 @@ import { useWorkspaceStore } from '@/lib/store/workspaces';
 import { useClaudeChat } from '@/hooks/useClaudeChat';
 import { SessionItem } from './SessionItem';
 import { UISessionItem } from './UISessionItem';
+import { HomeSessionsSection } from './HomeSessionsSection';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { createLogger } from '@/lib/logger';
 import { showToast } from '@/lib/utils/toast';
@@ -18,7 +19,7 @@ export function ProjectList() {
   console.log('🔥🔥🔥 ProjectList COMPONENT RENDERING 🔥🔥🔥');
 
   const { projects, sessions, sessionSearchQuery } = useSessionDiscoveryStore();
-  const { sessions: uiSessions, sessionId, hiddenSessionIds, collapsedProjects, toggleProjectCollapse, switchSession, setCurrentSession, isStreaming } = useChatStore();
+  const { sessions: uiSessions, sessionId, hiddenSessionIds, collapsedProjects, collapsedSections, toggleProjectCollapse, toggleSectionCollapse, switchSession, setCurrentSession, isStreaming } = useChatStore();
   const { validateLastActiveSession, getMostRecentSessionForWorkspace, updateWorkspaceLastActiveSession, setActiveWorkspace, workspaces } = useWorkspaceStore();
   const { cleanupStream } = useClaudeChat();
   const [announcement, setAnnouncement] = useState('');
@@ -290,19 +291,28 @@ export function ProjectList() {
               </button>
             </Tooltip>
 
-            {/* Project sessions */}
-            {isExpanded && allProjectSessions.length > 0 && (
-              <div className="ml-6 space-y-1">
-                {allProjectSessions.map((session) =>
-                  session.source === 'browser' ? (
-                    <UISessionItem key={`browser-${session.data.id}`} session={session.data} />
-                  ) : (
-                    <SessionItem key={`cli-${session.data.id}`} session={session.data} />
-                  )
-                )}
+            {/* Home Sessions Section (CLI sessions only) */}
+            {isExpanded && cliSessions.length > 0 && (
+              <div className="ml-2">
+                <HomeSessionsSection
+                  workspaceId={project.id}
+                  sessions={cliSessions}
+                  isCollapsed={collapsedSections.has(`home-${project.id}`)}
+                  onToggle={() => toggleSectionCollapse(`home-${project.id}`)}
+                />
               </div>
             )}
 
+            {/* Browser Sessions (if workspace) */}
+            {isExpanded && browserSessions.length > 0 && (
+              <div className="ml-6 space-y-1">
+                {browserSessions.map((session) => (
+                  <UISessionItem key={`browser-${session.id}`} session={session} />
+                ))}
+              </div>
+            )}
+
+            {/* Empty State */}
             {isExpanded && allProjectSessions.length === 0 && (
               <div className="ml-6 text-sm text-gray-500 dark:text-gray-400 py-2">
                 No sessions in this project

@@ -48,6 +48,24 @@ export default function Home() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
 
+  // Wrapper for addWorkspace with auto-switch
+  const handleAddWorkspace = async (
+    config: any,
+    options?: { name?: string; color?: string }
+  ): Promise<string> => {
+    const workspaceId = await addWorkspace(config, options);
+
+    // Auto-switch to the new workspace
+    setActiveWorkspace(workspaceId);
+
+    // Auto-focus "New Chat" button after render
+    setTimeout(() => {
+      document.getElementById('new-chat-button')?.focus();
+    }, 100);
+
+    return workspaceId;
+  };
+
   // Convert workspace Map to array in order
   const orderedWorkspaces = workspaceOrder
     .map((id) => workspaces.get(id))
@@ -169,7 +187,7 @@ export default function Home() {
       <AddWorkspaceDialog
         isOpen={isAddDialogOpen}
         onClose={() => setIsAddDialogOpen(false)}
-        onAdd={addWorkspace}
+        onAdd={handleAddWorkspace}
       />
       <WorkspaceSwitcher
         isOpen={isSwitcherOpen}

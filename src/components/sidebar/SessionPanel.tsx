@@ -9,6 +9,8 @@ import { SessionSearch } from './SessionSearch';
 import { RefreshButton } from './RefreshButton';
 import { SessionList } from './SessionList';
 import { CollapseAllButton } from './CollapseAllButton';
+import { SystemSessionsSection } from './SystemSessionsSection';
+import { UnassignedSessionsSection } from './UnassignedSessionsSection';
 import { Loader2 } from 'lucide-react';
 import { createLogger } from '@/lib/logger';
 
@@ -16,10 +18,11 @@ const log = createLogger('SessionPanel');
 const STALE_THRESHOLD = 60000; // 60 seconds
 
 export function SessionPanel() {
-  const { startNewSession, isPrewarming } = useChatStore();
+  const { startNewSession, isPrewarming, collapsedSections, toggleSectionCollapse } = useChatStore();
   const { activeWorkspaceId, workspaces, migrateToWorkspaces } = useWorkspaceStore();
   const {
     discoverSessions,
+    sessions,
     lastDiscoveryTime,
     lastDiscoveryCount,
     systemSessionCount,
@@ -89,8 +92,13 @@ export function SessionPanel() {
     discoverSessions(true);
   };
 
+  // Split sessions into system and unassigned
+  const systemSessions = sessions.filter(s => s.isSystem);
+  const unassignedSessions = sessions.filter(s => !s.isSystem && !s.projectId);
+
   return (
-    <>
+    <div className="flex flex-col h-full">
+      {/* New Chat Button */}
       <div className="p-4 space-y-2">
         <button
           id="new-chat-button"
@@ -109,7 +117,8 @@ export function SessionPanel() {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
+      {/* Scrollable Project List Container */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Collapse/Expand All button */}
         <div className="mb-3">
           <CollapseAllButton />
@@ -132,7 +141,7 @@ export function SessionPanel() {
           </div>
         )}
 
-        {/* Sessions filtered by active workspace */}
+        {/* Project List (contains HomeSessionsSection per workspace) */}
         {isDiscovering && !lastDiscoveryTime ? (
           <div className="text-sm text-gray-400 dark:text-gray-500 py-4 text-center">
             Discovering sessions...
@@ -140,7 +149,30 @@ export function SessionPanel() {
         ) : (
           <SessionList />
         )}
+
+        {/* Global Sections */}
+        <div className="space-y-2 mt-4">
+          {/* System Sessions */}
+          {systemSessions.length > 0 && (
+            <SystemSessionsSection
+              workspaceId="__global__"
+              sessions={systemSessions}
+              isCollapsed={collapsedSections.has('system')}
+              onToggle={() => toggleSectionCollapse('system')}
+            />
+          )}
+
+          {/* Unassigned Sessions */}
+          {unassignedSessions.length > 0 && (
+            <UnassignedSessionsSection
+              workspaceId="__global__"
+              sessions={unassignedSessions}
+              isCollapsed={collapsedSections.has('unassigned')}
+              onToggle={() => toggleSectionCollapse('unassigned')}
+            />
+          )}
+        </div>
       </div>
-    </>
+    </div>
   );
 }
