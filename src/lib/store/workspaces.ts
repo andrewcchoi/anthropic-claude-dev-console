@@ -18,6 +18,7 @@ import {
 import { createLogger } from '../logger';
 import { storeSync } from './sync';
 import { encodeProjectPath, decodeProjectPath } from '../utils/projectPath';
+import { showToast } from '../utils/toast';
 import type { CLISession } from '@/types/sessions';
 
 const log = createLogger('WorkspaceStore');
@@ -264,6 +265,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         const workspace = state.workspaces.get(id);
 
         if (!workspace) return;
+
+        // Prevent deletion of pinned workspaces
+        if (workspace.isPinned) {
+          showToast('Cannot delete pinned workspace', 'error');
+          log.warn('Attempted to delete pinned workspace', { workspaceId: id, name: workspace.name });
+          return;
+        }
 
         // Unlink all sessions from this workspace (batch operation)
         log.debug('Unlinking sessions before workspace removal', {
@@ -922,6 +930,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
         if (!workspace) {
           log.warn('Workspace not found for archiving', { id });
+          return;
+        }
+
+        // Prevent archiving of pinned workspaces
+        if (workspace.isPinned) {
+          showToast('Cannot archive pinned workspace', 'error');
+          log.warn('Attempted to archive pinned workspace', { workspaceId: id, name: workspace.name });
           return;
         }
 
