@@ -55,10 +55,9 @@ describe('Session Management - Session ID Fix', () => {
     });
 
     it('should match UUID v4 format', () => {
-      // Use real uuid for format validation
-      vi.mocked(uuidv4).mockImplementation(() => {
-        return require('uuid').v4();
-      });
+      // Use actual UUID value that matches v4 format for validation
+      const actualUuid = '12345678-1234-4abc-8def-123456789abc';
+      vi.mocked(uuidv4).mockReturnValue(actualUuid);
 
       const { startNewSession } = useChatStore.getState();
       startNewSession();
@@ -68,6 +67,7 @@ describe('Session Management - Session ID Fix', () => {
         /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
       expect(sessionId).toBeTruthy();
+      expect(sessionId).toBe(actualUuid);
       expect(sessionId).toMatch(uuidv4Regex);
     });
 
@@ -332,8 +332,11 @@ describe('Session Management - Session ID Fix', () => {
       expect(useChatStore.getState().messages).toHaveLength(0);
 
       // Previous session still in history
-      expect(useChatStore.getState().sessions).toHaveLength(1);
-      expect(useChatStore.getState().sessions[0].id).toBe(session1Id);
+      // Note: startNewSession() now auto-caches the previous session, so we have 2 sessions
+      // Sessions array is newest-first, so session2 is at [0] and session1 is at [1]
+      expect(useChatStore.getState().sessions).toHaveLength(2);
+      expect(useChatStore.getState().sessions[0].id).toBe(session2Id);
+      expect(useChatStore.getState().sessions[1].id).toBe(session1Id);
 
       // sessionId NOT persisted
       const persistedData = localStorage.getItem('claude-code-sessions');
