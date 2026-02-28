@@ -64,6 +64,8 @@ interface ChatStore {
   hideSession: (sessionId: string) => void;
   toggleProjectCollapse: (projectId: string) => void;
   toggleSectionCollapse: (sectionId: string) => void;
+  collapseAll: () => void;
+  expandAll: () => void;
   saveCurrentSession: () => void;
 
   // NEW: Workspace-session linking
@@ -550,6 +552,52 @@ export const useChatStore = create<ChatStore>()(
           }
           return { collapsedSections: newCollapsed };
         }),
+
+      collapseAll: () => {
+        const useWorkspaceStore = getWorkspaceStore();
+        if (!useWorkspaceStore) {
+          log.warn('Cannot collapse all - workspace store not available');
+          return;
+        }
+
+        const { workspaces } = useWorkspaceStore.getState();
+        const allWorkspaceIds: string[] = Array.from(workspaces.keys()) as string[];
+        const allSectionIds: string[] = [
+          ...allWorkspaceIds.map(id => `home-${id}`),
+          'system',
+          'unassigned',
+        ];
+
+        log.debug('Collapsing all workspaces and sections', {
+          workspaces: allWorkspaceIds.length,
+          sections: allSectionIds.length,
+        });
+
+        set((state) => {
+          const newCollapsedProjects = new Set(state.collapsedProjects);
+          const newCollapsedSections = new Set(state.collapsedSections);
+
+          // Add all workspace IDs
+          allWorkspaceIds.forEach(id => newCollapsedProjects.add(id));
+
+          // Add all section IDs
+          allSectionIds.forEach(id => newCollapsedSections.add(id));
+
+          return {
+            collapsedProjects: newCollapsedProjects,
+            collapsedSections: newCollapsedSections,
+          };
+        });
+      },
+
+      expandAll: () => {
+        log.debug('Expanding all workspaces and sections');
+
+        set({
+          collapsedProjects: new Set(),
+          collapsedSections: new Set(),
+        });
+      },
 
       updateSessionName: (id, name) =>
         set((state) => ({
