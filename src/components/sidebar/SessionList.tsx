@@ -139,11 +139,29 @@ export function SessionList() {
       return allSessions;
     }
 
-    // Filter by workspace projectId (simple equality check)
-    // CLISession has projectId, Session has workspaceId
+    // Filter by workspace - handle both CLI and UI sessions
     return allSessions.filter(s => {
-      const sessionProjectId = 'projectId' in s ? s.projectId : s.workspaceId;
-      return sessionProjectId === activeWorkspace.projectId;
+      // CLISession has projectId (encoded path like "-workspace")
+      if ('projectId' in s && s.projectId) {
+        return s.projectId === activeWorkspace.projectId;
+      }
+
+      // UI Session has workspaceId - could be:
+      // 1. Workspace UUID (new sessions created in UI)
+      // 2. Encoded path (legacy or CLI-discovered)
+      if (s.workspaceId) {
+        // Match by workspace UUID (UI sessions store this)
+        if (s.workspaceId === activeWorkspace.id) {
+          return true;
+        }
+
+        // Match by projectId (encoded path)
+        if (s.workspaceId === activeWorkspace.projectId) {
+          return true;
+        }
+      }
+
+      return false;
     });
   }, [allSessions, activeWorkspace]);
 

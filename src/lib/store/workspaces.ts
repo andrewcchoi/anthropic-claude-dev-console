@@ -750,9 +750,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             throw new Error(`Discovery failed: ${response.status}`);
           }
 
-          const { projects } = await response.json();
-          log.info('Discovered projects for migration', {
+          const { projects, sessions } = await response.json();
+          log.info('Discovered projects and sessions for migration', {
             projectCount: projects.length,
+            sessionCount: sessions.length,
           });
 
           // 2. Create workspace for each project
@@ -774,7 +775,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             });
           }
 
-          // 3. Set first workspace as active
+          // 3. Handle orphaned sessions (sessions without matching workspace)
+          const orphans = get().getOrphanedSessions(sessions);
+          if (orphans.length > 0) {
+            log.info('Found orphaned sessions, handling', { count: orphans.length });
+            await get().handleOrphanedSessions(orphans);
+          }
+
+          // 4. Set first workspace as active
           if (projects.length > 0) {
             const firstWorkspace = Array.from(get().workspaces.values())[0];
             if (firstWorkspace) {
@@ -782,12 +790,12 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             }
           }
 
-          // 4. Mark migration complete
+          // 5. Mark migration complete
           localStorage.setItem('workspace-migration-complete', Date.now().toString());
           localStorage.removeItem('workspace-migration-started');
 
           log.info('Workspace migration complete', {
-            workspaceCount: projects.length,
+            workspaceCount: get().workspaces.size,
           });
         } catch (error) {
           // Rollback on error
