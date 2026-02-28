@@ -48,6 +48,7 @@ interface ChatStore {
   isLoadingHistory: boolean;
   hiddenSessionIds: Set<string>;
   collapsedProjects: Set<string>;
+  collapsedSections: Set<string>;
   pendingSessionId: string | null;
   initializedSessionIds: Set<string>;  // Track sessions that have sent at least one message
   setSessionId: (id: string) => void;
@@ -60,6 +61,7 @@ interface ChatStore {
   deleteSession: (sessionId: string) => void;
   hideSession: (sessionId: string) => void;
   toggleProjectCollapse: (projectId: string) => void;
+  toggleSectionCollapse: (sectionId: string) => void;
   saveCurrentSession: () => void;
 
   // NEW: Workspace-session linking
@@ -207,6 +209,7 @@ export const useChatStore = create<ChatStore>()(
       isLoadingHistory: false,
       hiddenSessionIds: new Set<string>(),
       collapsedProjects: new Set<string>(),
+      collapsedSections: new Set<string>(),
       pendingSessionId: null,
       initializedSessionIds: new Set<string>(),
       setSessionId: (id) => set({ sessionId: id }),
@@ -531,6 +534,17 @@ export const useChatStore = create<ChatStore>()(
           return { collapsedProjects: next };
         }),
 
+      toggleSectionCollapse: (sectionId) =>
+        set((state) => {
+          const newCollapsed = new Set(state.collapsedSections);
+          if (newCollapsed.has(sectionId)) {
+            newCollapsed.delete(sectionId);
+          } else {
+            newCollapsed.add(sectionId);
+          }
+          return { collapsedSections: newCollapsed };
+        }),
+
       updateSessionName: (id, name) =>
         set((state) => ({
           sessions: state.sessions.map((s) =>
@@ -841,6 +855,7 @@ export const useChatStore = create<ChatStore>()(
         sidebarTab: state.sidebarTab,
         hiddenSessionIds: Array.from(state.hiddenSessionIds), // Convert Set to Array for JSON
         collapsedProjects: Array.from(state.collapsedProjects), // Convert Set to Array for JSON
+        collapsedSectionsArray: Array.from(state.collapsedSections), // Convert Set to Array for JSON
         // initializedSessionIds: NOT persisted - ephemeral runtime state only
         // pendingSessionId: NOT persisted - resets on refresh
       }),
@@ -856,6 +871,12 @@ export const useChatStore = create<ChatStore>()(
           state.collapsedProjects = new Set(state.collapsedProjects);
         } else if (state && !state.collapsedProjects) {
           state.collapsedProjects = new Set();
+        }
+
+        if (state && (state as any).collapsedSectionsArray) {
+          state.collapsedSections = new Set((state as any).collapsedSectionsArray);
+        } else if (state) {
+          state.collapsedSections = new Set();
         }
 
         // Always initialize as empty Set (ephemeral, not persisted)
