@@ -57,6 +57,7 @@ interface PersistedWorkspaceConfig {
   color: string;
   sessionIds: string[];  // Include session links
   isArchived?: boolean;  // NEW
+  isPinned?: boolean;    // NEW
 }
 
 interface WorkspaceStore {
@@ -969,6 +970,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           color: ws.color,
           sessionIds: ws.sessionIds,  // Persist session links
           isArchived: ws.isArchived,  // NEW
+          isPinned: ws.isPinned,      // NEW
         })) as PersistedWorkspaceConfig[],
         workspaceOrder: state.workspaceOrder,
         activeWorkspaceId: state.activeWorkspaceId,
@@ -1044,6 +1046,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               createdAt: Date.now(),
               lastAccessedAt: Date.now(),
               isArchived: wc.isArchived ?? false,  // NEW
+              isPinned: wc.isPinned ?? false,      // NEW
             });
           }
         }

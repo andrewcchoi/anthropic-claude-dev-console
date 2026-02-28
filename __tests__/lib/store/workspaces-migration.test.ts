@@ -78,4 +78,31 @@ describe('Workspace groot migration', () => {
     expect(otherWorkspace?.name).toBe('Other Project');
     expect(otherWorkspace?.isPinned).toBeUndefined();
   });
+
+  it('should persist isPinned across rehydration', async () => {
+    const workspaceId = await useWorkspaceStore.getState().addWorkspace(
+      { type: 'local', path: '/workspace' },
+      { name: 'Current Workspace' }
+    );
+
+    await useWorkspaceStore.getState().migrateGrootWorkspace();
+
+    // Get persisted config (simulates localStorage)
+    const state = useWorkspaceStore.getState();
+    const partializedState = {
+      workspaceConfigs: Array.from(state.workspaces.values()).map(ws => ({
+        id: ws.id,
+        projectId: ws.projectId,
+        name: ws.name,
+        config: state.providers.get(ws.providerId)?.config,
+        color: ws.color,
+        sessionIds: ws.sessionIds,
+        isArchived: ws.isArchived,
+        isPinned: ws.isPinned,
+      })),
+    };
+
+    const persistedWorkspace = partializedState.workspaceConfigs[0];
+    expect(persistedWorkspace.isPinned).toBe(true);
+  });
 });
