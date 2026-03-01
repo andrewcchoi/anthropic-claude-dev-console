@@ -49,6 +49,8 @@ export {
   isRecoverableError,
 } from './errors';
 
+export type { TailscaleErrorWithSuggestion } from './errors';
+
 // Validation
 export {
   validateTailscaleIPv4,

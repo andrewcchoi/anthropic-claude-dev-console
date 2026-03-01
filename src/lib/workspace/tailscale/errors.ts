@@ -280,13 +280,21 @@ export class TailscaleInvalidHostnameError extends WorkspaceError {
 }
 
 /**
+ * Interface for errors with suggestion getter
+ */
+export interface TailscaleErrorWithSuggestion extends WorkspaceError {
+  readonly suggestion: string;
+}
+
+/**
  * Check if error is a Tailscale error
  */
-export function isTailscaleError(error: unknown): error is WorkspaceError {
+export function isTailscaleError(error: unknown): error is TailscaleErrorWithSuggestion {
   return (
     error instanceof WorkspaceError &&
     typeof error.code === 'string' &&
-    error.code.startsWith('TAILSCALE_')
+    (error.code.startsWith('TAILSCALE_') || error.code === 'SSH_NOT_AVAILABLE') &&
+    'suggestion' in error
   );
 }
 
