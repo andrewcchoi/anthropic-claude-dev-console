@@ -65,7 +65,7 @@ interface ChatStore {
   toggleProjectCollapse: (projectId: string) => void;
   toggleSectionCollapse: (sectionId: string) => void;
   collapseAll: () => void;
-  expandAll: () => void;
+  expandAll: (expandWorkspaces?: boolean) => void;
   saveCurrentSession: () => void;
 
   // NEW: Workspace-session linking
@@ -594,13 +594,15 @@ export const useChatStore = create<ChatStore>()(
         });
       },
 
-      expandAll: () => {
-        log.debug('Expanding all workspaces and sections');
+      expandAll: (expandWorkspaces = true) => {
+        log.debug('Expanding all', { expandWorkspaces });
 
-        set({
-          collapsedProjects: new Set(),
+        set((state) => ({
+          // Always expand sections
           collapsedSections: new Set(),
-        });
+          // Optionally expand workspaces (for two-level expansion)
+          collapsedProjects: expandWorkspaces ? new Set() : state.collapsedProjects,
+        }));
       },
 
       updateSessionName: (id, name) =>
