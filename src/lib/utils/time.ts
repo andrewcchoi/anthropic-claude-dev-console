@@ -73,8 +73,6 @@ export function formatSmartTime(timestamp: number): string {
  * Handles both past and future timestamps
  */
 export function formatISOWithRelative(timestamp: number): string {
-  log.debug('formatISOWithRelative called', { timestamp });
-
   const date = new Date(timestamp);
 
   // ISO format: YYYY-MM-DD HH:MM
@@ -89,9 +87,7 @@ export function formatISOWithRelative(timestamp: number): string {
   // Handle future timestamps
   const now = Date.now();
   if (timestamp > now) {
-    const result = `${isoDate} (in the future)`;
-    log.debug('formatISOWithRelative result (future)', { isoDate, result });
-    return result;
+    return `${isoDate} (in the future)`;
   }
 
   // Relative time - reuse existing formatRelativeTime but with custom "just now" handling
@@ -119,7 +115,5 @@ export function formatISOWithRelative(timestamp: number): string {
     }
   }
 
-  const result = `${isoDate} (${relative})`;
-  log.debug('formatISOWithRelative result', { isoDate, relative, result });
-  return result;
+  return `${isoDate} (${relative})`;
 }

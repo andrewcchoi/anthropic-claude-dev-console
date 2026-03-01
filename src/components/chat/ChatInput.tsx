@@ -79,8 +79,15 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
   const cycleMode = () => {
     const currentIndex = PERMISSION_MODES.findIndex(m => m.value === defaultMode);
     const nextIndex = (currentIndex + 1) % PERMISSION_MODES.length;
-    setDefaultMode(PERMISSION_MODES[nextIndex].value);
-    showToast(`Mode: ${PERMISSION_MODES[nextIndex].label}`, 'info');
+    const newMode = PERMISSION_MODES[nextIndex];
+
+    // Import logger at top of function since we can't modify imports in Edit
+    const { createLogger } = require('@/lib/logger');
+    const log = createLogger('ChatInput');
+    log.debug('Permission mode cycled', { from: defaultMode, to: newMode.value });
+
+    setDefaultMode(newMode.value);
+    showToast(`Mode: ${newMode.label}`, 'info');
   };
 
   // Show/hide command palette based on input
@@ -707,6 +714,10 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
                   <button
                     key={mode.value}
                     onClick={() => {
+                      const { createLogger } = require('@/lib/logger');
+                      const log = createLogger('ChatInput');
+                      log.debug('Permission mode selected from menu', { from: defaultMode, to: mode.value });
+
                       setDefaultMode(mode.value);
                       setShowModeMenu(false);
                       showToast(`Mode: ${mode.label}`, 'info');

@@ -35,7 +35,10 @@ export function HomeSessionsSection({
     >
       {/* Section Header */}
       <button
-        onClick={onToggle}
+        onClick={() => {
+          log.debug('Home Sessions section toggled', { workspaceId, wasCollapsed: isCollapsed });
+          onToggle();
+        }}
         className="w-full flex items-center justify-between px-3 py-2 rounded-lg
                    bg-green-50 dark:bg-green-950/20
                    text-green-900 dark:text-green-100

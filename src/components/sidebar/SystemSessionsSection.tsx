@@ -32,7 +32,10 @@ export function SystemSessionsSection({
     >
       {/* Section Header */}
       <button
-        onClick={onToggle}
+        onClick={() => {
+          log.debug('System Sessions section toggled', { wasCollapsed: isCollapsed });
+          onToggle();
+        }}
         className="w-full flex items-center justify-between px-3 py-2 rounded-lg
                    bg-blue-50 dark:bg-blue-950/20
                    text-blue-900 dark:text-blue-100

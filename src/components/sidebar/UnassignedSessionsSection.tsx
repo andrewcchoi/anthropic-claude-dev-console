@@ -32,7 +32,10 @@ export function UnassignedSessionsSection({
     >
       {/* Section Header */}
       <button
-        onClick={onToggle}
+        onClick={() => {
+          log.debug('Unassigned Sessions section toggled', { wasCollapsed: isCollapsed });
+          onToggle();
+        }}
         className="w-full flex items-center justify-between px-3 py-2 rounded-lg
                    bg-orange-50 dark:bg-orange-950/20
                    text-orange-900 dark:text-orange-100

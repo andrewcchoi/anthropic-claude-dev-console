@@ -81,6 +81,11 @@ export function SessionPanel() {
     // Get active workspace context
     const activeWorkspace = activeWorkspaceId ? workspaces.get(activeWorkspaceId) : null;
 
+    log.debug('New Chat button clicked', {
+      workspaceId: activeWorkspace?.id,
+      workspaceName: activeWorkspace?.name
+    });
+
     // Pass workspace context to session creation
     startNewSession(activeWorkspace?.id, activeWorkspace?.rootPath);
 
@@ -89,6 +94,7 @@ export function SessionPanel() {
   };
 
   const handleRefresh = () => {
+    log.debug('Refresh sessions button clicked');
     discoverSessions(true);
   };
 

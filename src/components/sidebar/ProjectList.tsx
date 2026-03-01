@@ -31,6 +31,8 @@ export function ProjectList() {
     setActiveWorkspace: typeof setActiveWorkspace,
   });
 
+  console.log('🔍 DEBUG: About to render displayProjects. Total projects:', projects.length);
+
   // Split sessions into user and system sessions
   const userSessions = sessions.filter(s => !s.isSystem);
   const systemSessions = sessions.filter(s => s.isSystem);
@@ -163,6 +165,11 @@ export function ProjectList() {
     );
   }
 
+  console.log('🔍 DEBUG: displayProjects array:', {
+    count: displayProjects.length,
+    projects: displayProjects.map(p => ({ id: p.id, path: p.path })),
+  });
+
   return (
     <>
       {/* Live region for announcements */}
@@ -177,6 +184,7 @@ export function ProjectList() {
 
       <div className="space-y-2">
         {displayProjects.map((project) => {
+        console.log('🔍 DEBUG: Processing project in map:', project.id, project.path);
         const isWorkspace = project.path === '/workspace';
 
         // Get CLI sessions for this project (excluding system sessions)

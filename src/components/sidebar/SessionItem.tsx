@@ -18,7 +18,7 @@ interface SessionItemProps {
 }
 
 export function SessionItem({ session, sectionType = 'home' }: SessionItemProps) {
-  const { sessionId, switchSession, metadataColorScheme } = useChatStore();
+  const { sessionId, switchSession, metadataColorScheme, sessionCache, messages } = useChatStore();
   const { loadSessionDetails } = useSessionDiscoveryStore();
   const isActive = sessionId === session.id;
 
@@ -53,17 +53,63 @@ export function SessionItem({ session, sectionType = 'home' }: SessionItemProps)
         modifiedDate: 'text-red-600 dark:text-red-400',
       };
 
-  // Build tooltip content
-  const tooltipContent = [
-    session.messageCount !== undefined ? `${session.messageCount} messages` : 'No messages yet',
-    session.gitBranch ? `Branch: ${session.gitBranch}` : null,
-    `Modified: ${new Date(session.modifiedAt).toLocaleString()}`,
-  ]
-    .filter(Boolean)
-    .join(' • ');
+  // Get message preview from session data or cache
+  const getMessagePreview = (): string | null => {
+    // Priority 1: Use firstPrompt from CLI session data (always available)
+    if (session.firstPrompt) {
+      const maxLength = 150;
+      if (session.firstPrompt.length > maxLength) {
+        return session.firstPrompt.substring(0, maxLength) + '...';
+      }
+      return session.firstPrompt;
+    }
+
+    // Priority 2: Try to get from message cache (for active or recently viewed sessions)
+    let sessionMessages = null;
+    if (isActive && messages.length > 0) {
+      sessionMessages = messages;
+    } else {
+      const cached = sessionCache.get(session.id);
+      if (cached && cached.messages.length > 0) {
+        sessionMessages = cached.messages;
+      }
+    }
+
+    if (sessionMessages && sessionMessages.length > 0) {
+      // Get the last message
+      const lastMessage = sessionMessages[sessionMessages.length - 1];
+
+      // Extract text content
+      const textContent = lastMessage.content
+        .filter(block => block.type === 'text' && block.text)
+        .map(block => block.text)
+        .join(' ');
+
+      if (textContent) {
+        const maxLength = 150;
+        if (textContent.length > maxLength) {
+          return textContent.substring(0, maxLength) + '...';
+        }
+        return textContent;
+      }
+
+      // If no text, check if it's a tool use message
+      const hasToolUse = lastMessage.content.some(block => block.type === 'tool_use');
+      if (hasToolUse) {
+        return '🔧 Tool execution';
+      }
+    }
+
+    return null;
+  };
+
+  const messagePreview = getMessagePreview();
+
+  // Build tooltip content - show ONLY the message
+  const tooltipContent = messagePreview || 'No messages yet';
 
   return (
-    <Tooltip content={tooltipContent}>
+    <Tooltip key={session.id} content={tooltipContent}>
       <div
       onClick={handleClick}
       className={cn(
