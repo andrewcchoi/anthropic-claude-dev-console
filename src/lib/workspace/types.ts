@@ -109,6 +109,7 @@ export type ProviderConfig =
 
 export interface Workspace {
   id: string;
+  projectId: string;  // NEW: CLI project ID (encoded path)
   name: string;
   providerId: string;
   providerType: ProviderType;
@@ -116,7 +117,8 @@ export interface Workspace {
   color: string;
 
   // Session association
-  sessionId: string | null;
+  sessionId: string | null;  // DEPRECATED: Use activeSessionId
+  activeSessionId: string | null;  // NEW: Currently active session
   sessionIds: string[];  // Track all sessions for this workspace
   lastActiveSessionId?: string;  // Last active session for auto-restore
 
@@ -128,6 +130,8 @@ export interface Workspace {
   // Metadata
   createdAt: number;
   lastAccessedAt: number;
+  isArchived?: boolean;  // NEW: Soft delete
+  isPinned?: boolean;
 }
 
 export interface WorkspaceConfig {

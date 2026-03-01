@@ -37,6 +37,10 @@ describe('Workspace switch accessibility', () => {
       sessions: [],
       startNewSession: vi.fn(),
       isPrewarming: false,
+      collapsedProjects: new Set(),
+      collapsedSections: new Set(),
+      toggleProjectCollapse: vi.fn(),
+      toggleSectionCollapse: vi.fn(),
     });
 
     (useSessionDiscoveryStore as any).mockReturnValue({
@@ -65,7 +69,9 @@ describe('Workspace switch accessibility', () => {
       isStreaming: false,
       hiddenSessionIds: new Set(),
       collapsedProjects: new Set(),
+      collapsedSections: new Set(),
       toggleProjectCollapse: vi.fn(),
+      toggleSectionCollapse: vi.fn(),
       switchSession: vi.fn(),
       setCurrentSession: vi.fn(),
     });

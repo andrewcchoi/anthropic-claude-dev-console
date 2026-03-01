@@ -4,6 +4,9 @@ import React from 'react';
 import { ChevronRight, ChevronDown, File, Folder, FolderOpen } from 'lucide-react';
 import { FileTreeItemProps } from './types';
 import { cn } from '@/lib/utils';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('FileTreeItem');
 
 export function FileTreeItem({
   item,
@@ -23,8 +26,10 @@ export function FileTreeItem({
 
   const handleClick = () => {
     if (isDirectory) {
+      log.debug('Folder toggled', { path: item.path, wasExpanded: isExpanded });
       onToggle();
     } else {
+      log.debug('File selected', { path: item.path });
       onSelect();
     }
   };

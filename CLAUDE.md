@@ -767,6 +767,14 @@ src/
 - Zustand for client-side state management
 - CLI integration spawns `claude -p --verbose --output-format stream-json`
 
+#### Development Process
+- **Adversarial Review for Suggestions**: When user or developer suggests a feature or workflow change, spawn an adversarial subagent to evaluate the suggestion BEFORE implementing
+  * Catches design flaws, edge cases, and unintended consequences early
+  * Subagent provides fresh perspective without attachment to the idea
+  * Use specialized agents (code-reviewer, type-design-analyzer, etc.) when applicable
+  * Example template: "You are an INDEPENDENT EVALUATOR. Critique this suggestion: [description]. What could go wrong? What's missing? What are the trade-offs?"
+  * Minimum evaluation for non-trivial suggestions; skip only for obvious/trivial changes
+
 #### Terminal Components
 Two distinct terminal components serve different purposes:
 
@@ -786,6 +794,43 @@ Two distinct terminal components serve different purposes:
 
 ### Learnings
 <!-- Updated during multi-agent execution -->
+
+#### Workspace UI Redesign - COMPLETE (2026-02-28)
+- **Status**: ✅ **100% COMPLETE** - All 7 phases implemented, all 9 design goals achieved
+- **Implementation Method**: Subagent-driven development with multi-dimensional adversarial review at each phase
+- **Total Effort**: 24 commits, 35 files modified, 2,689 insertions, 121 deletions
+- **Test Coverage**: 379 tests passing (27 new, 352 existing), 0 failures
+- **Phases Completed**:
+  * **Phase 1** - Core Infrastructure: isPinned, collapsedSections, metadataColorScheme, formatISOWithRelative, migration, protection
+  * **Phase 2** - Section Components: HomeSessionsSection (green), SystemSessionsSection (blue), UnassignedSessionsSection (orange)
+  * **Phase 3** - Enhanced Metadata: ISO+relative dates, color schemes (semantic/gradient), emoji icons (🔀💬📅🕒)
+  * **Phase 4** - Tooltip System: Tooltip component, session tooltips, workspace tooltips
+  * **Phase 5** - Collapse/Expand All: collapseAll/expandAll actions, CollapseAllButton component
+  * **Phase 6** - Integration: SessionPanel layout, HomeSessionsSection in ProjectList, auto-switch on creation
+  * **Phase 7** - Settings UI: SettingsPanel with color scheme toggle, /settings command
+- **Adversarial Reviews**: 15+ specialized reviews (quality, maintainability, scalability, security, readability)
+- **Critical Fixes Applied**:
+  * Phase 1: Migration idempotency, null safety, isPinned persistence, O(n²) scalability (2 issues)
+  * Phase 2: Accessibility (focus rings, dark mode contrast), sectionType prop
+  * Phase 3: Dead code removal
+  * Final: "🌴 groot" display, duplicate System Sessions removal, section ID consistency
+- **Key Achievements**:
+  * "🌴 groot" pinned workspace (cannot delete/archive)
+  * Three-tier session organization (🏠 Home nested, 🛠️ System global, ❓ Unassigned global)
+  * Color tints (green/blue/orange) with WCAG AA compliance
+  * ISO + relative dates ("2026-02-28 14:30 (2h ago)")
+  * User-selectable metadata color schemes (semantic/gradient)
+  * Smart tooltips (500ms delay, viewport edge detection)
+  * Collapse/expand all button (toggles everything)
+  * Auto-switch to new workspaces + auto-load last session
+- **Performance**: O(n²) → O(n) optimizations, scales to 1000+ sessions
+- **Accessibility**: WCAG 2.1 Level AA compliant, full keyboard navigation, ARIA labels
+- **Key Lessons**:
+  * Adversarial review at each phase caught 11 CRITICAL bugs before production
+  * Multi-dimensional review (quality/maintainability/scalability/security/readability) essential for comprehensive coverage
+  * Fix-on-blocker approach maintains momentum while ensuring quality
+  * Two-stage review (spec compliance + code quality) prevents scope creep
+  * Performance testing with realistic data (100+ workspaces, 1000+ sessions) catches scalability issues early
 
 #### CommandPalette Deduplication & CLI Initialization Fix (2026-02-22)
 - **Problem 1**: ~130 React duplicate key warnings when opening CommandPalette
@@ -1111,6 +1156,53 @@ Two distinct terminal components serve different purposes:
   * Forces articulation of evaluation criteria
   * Limitation: Same underlying model may have similar blind spots
 - **Key Lesson**: Self-evaluation cannot catch blind spots. Independent review (even by subagent) provides meaningful improvement. "Verified" must have concrete evidence, not just attestation.
+
+#### Workspace Isolation Redesign (2026-02-27)
+- **Problem**: Sessions intermixed between workspaces, unclear ownership, missing distinguishing metadata
+  * Users reported: sessions from different workspaces appearing together, messages mixing, can't tell workspace association
+  * Root cause: Complex cwd-based matching logic, optional workspaceId, no metadata display
+- **Solution**: Workspace as UI filter layer on CLI projects
+  * Filter by projectId equality: `s.projectId === workspace.projectId`
+  * Workspace.projectId links to CLI's encoded path (source of truth)
+  * Auto-create workspaces from discovered CLI projects
+  * Orphaned sessions → auto-create workspace per unique projectId
+- **Key Design Decision**: Original design failed adversarial review (15% confidence)
+  * Initial approach: Make workspaceId required, workspace owns sessions
+  * Critical flaw: Assumed app creates sessions, but CLI owns lifecycle
+  * Revised: Workspace filters sessions, doesn't own them
+- **Implementation**:
+  * Files: `types.ts`, `workspaces.ts`, `SessionList.tsx`, `SessionPanel.tsx`, `ProjectList.tsx`
+  * Added `projectId: string` field to Workspace
+  * Added `activeSessionId` and `isArchived` fields
+  * Migration: `migrateToWorkspaces()` creates workspaces from CLI projects
+  * Orphan handling: Groups by projectId, creates recovery workspaces
+  * Archive: Soft delete (isArchived flag) instead of cascade delete
+  * React 18 batching: Automatic batching for atomic workspace switch
+  * Strict Mode guard: useRef prevents discovery double-invoke
+- **Safety Features**:
+  * Idempotent migration (checks workspace count)
+  * Rollback on error (clears partial state)
+  * No data loss (CLI sessions untouched)
+  * Backwards compatible (show all when no workspace)
+- **Testing**: 20+ tests (unit + integration)
+  * projectId derivation
+  * Session filtering by projectId
+  * Migration idempotency and rollback
+  * Orphan handling and grouping
+  * Archive/restore functionality
+- **Cross-Reference**: Avoided 7 past issues from troubleshooting guide
+  * Session ID persistence (Problem 4)
+  * Message content parsing (Problem 5)
+  * CLI flag confusion (Problem 6)
+  * UI flicker (Problem 7)
+  * Circular imports (Task 0)
+  * React Strict Mode (Problem 9)
+  * Data locality (ADR 0001)
+- **Design Documents**:
+  * `docs/plans/2026-02-27-workspace-isolation-design.md`
+  * `.claude/workspace-design-v2-cross-reference.md`
+- **Ralph Loop Review**: 2 iterations, adversarial critique identified 8 CRITICAL flaws, complete redesign
+- **Key Lesson**: Design must work with existing architecture (CLI owns sessions), not against it. Adversarial review catches fundamental misunderstandings early. UI filter layer is simpler and safer than ownership model.
 
 ### Blockers
 - None

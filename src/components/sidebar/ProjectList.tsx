@@ -7,6 +7,8 @@ import { useWorkspaceStore } from '@/lib/store/workspaces';
 import { useClaudeChat } from '@/hooks/useClaudeChat';
 import { SessionItem } from './SessionItem';
 import { UISessionItem } from './UISessionItem';
+import { HomeSessionsSection } from './HomeSessionsSection';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { createLogger } from '@/lib/logger';
 import { showToast } from '@/lib/utils/toast';
 import { encodeProjectPath } from '@/lib/utils/projectPath';
@@ -17,7 +19,7 @@ export function ProjectList() {
   console.log('🔥🔥🔥 ProjectList COMPONENT RENDERING 🔥🔥🔥');
 
   const { projects, sessions, sessionSearchQuery } = useSessionDiscoveryStore();
-  const { sessions: uiSessions, sessionId, hiddenSessionIds, collapsedProjects, toggleProjectCollapse, switchSession, setCurrentSession, isStreaming } = useChatStore();
+  const { sessions: uiSessions, sessionId, hiddenSessionIds, collapsedProjects, collapsedSections, toggleProjectCollapse, toggleSectionCollapse, switchSession, setCurrentSession, isStreaming } = useChatStore();
   const { validateLastActiveSession, getMostRecentSessionForWorkspace, updateWorkspaceLastActiveSession, setActiveWorkspace, workspaces } = useWorkspaceStore();
   const { cleanupStream } = useClaudeChat();
   const [announcement, setAnnouncement] = useState('');
@@ -28,6 +30,8 @@ export function ProjectList() {
     uiSessions: uiSessions.length,
     setActiveWorkspace: typeof setActiveWorkspace,
   });
+
+  console.log('🔍 DEBUG: About to render displayProjects. Total projects:', projects.length);
 
   // Split sessions into user and system sessions
   const userSessions = sessions.filter(s => !s.isSystem);
@@ -50,9 +54,10 @@ export function ProjectList() {
       showToast('Stopped active conversation', 'info');
     }
 
+    // NOTE: React 18 automatically batches state updates, preventing UI flicker
+    // Multiple setState calls below are batched into a single render
+
     // Step 2: Update current workspace (sync)
-    // For now, we'll treat project.id as workspaceId
-    // In future, we may need explicit workspace mapping
     console.log('🔥 Attempting to set active workspace:', project.id);
     if (setActiveWorkspace) {
       setActiveWorkspace(project.id);
@@ -103,19 +108,20 @@ export function ProjectList() {
       }
     }
 
-    // Step 6: Activate session (sync state, async messages)
+    // Step 6: Update workspace tracking and load session (batched by React 18)
     if (sessionToActivate) {
-      // Note: project.id is already the encoded path (e.g., "-workspace-docs")
-      await switchSession(sessionToActivate, project.id);
       updateWorkspaceLastActiveSession(project.id, sessionToActivate);
+
+      // Async message loading
+      await switchSession(sessionToActivate, project.id);
 
       // Announce to screen readers
       const session = projectSessions.find(s => s.id === sessionToActivate);
-      const workspaceName = project.path === '/workspace' ? 'Current Workspace' : project.path;
+      const workspaceName = workspace?.isPinned ? workspace.name : (project.path === '/workspace' ? 'Current Workspace' : project.path);
       setAnnouncement(`Switched to ${workspaceName}, ${session?.name || 'session'} active`);
     } else {
       // No sessions to activate
-      const workspaceName = project.path === '/workspace' ? 'Current Workspace' : project.path;
+      const workspaceName = workspace?.isPinned ? workspace.name : (project.path === '/workspace' ? 'Current Workspace' : project.path);
       setAnnouncement(`Switched to ${workspaceName}, no sessions`);
     }
   }, [
@@ -159,13 +165,13 @@ export function ProjectList() {
     );
   }
 
+  console.log('🔍 DEBUG: displayProjects array:', {
+    count: displayProjects.length,
+    projects: displayProjects.map(p => ({ id: p.id, path: p.path })),
+  });
+
   return (
     <>
-      {/* DEBUG: Visible test that code is loading */}
-      <div style={{ background: 'red', color: 'white', padding: '10px', fontWeight: 'bold' }}>
-        🔥 CODE UPDATED - Projects: {projects.length} - Sessions: {sessions.length}
-      </div>
-
       {/* Live region for announcements */}
       <div
         role="status"
@@ -178,22 +184,21 @@ export function ProjectList() {
 
       <div className="space-y-2">
         {displayProjects.map((project) => {
+        console.log('🔍 DEBUG: Processing project in map:', project.id, project.path);
         const isWorkspace = project.path === '/workspace';
 
         // Get CLI sessions for this project (excluding system sessions)
         let cliSessions = userSessions.filter((s) => s.projectId === project.id);
 
-        // Debug logging for Current Workspace
-        if (project.id === '-workspace') {
-          console.log('🔥 Current Workspace Debug:', {
-            projectId: project.id,
-            projectPath: project.path,
-            totalUserSessions: userSessions.length,
-            cliSessionsFound: cliSessions.length,
-            firstFewProjectIds: userSessions.slice(0, 5).map(s => s.projectId),
-            uiSessionsCount: uiSessions.length,
-          });
-        }
+        // Debug logging for session filtering
+        console.log('🔍 Session filtering debug:', {
+          projectId: project.id,
+          projectPath: project.path,
+          totalUserSessions: userSessions.length,
+          cliSessionsFound: cliSessions.length,
+          allSessionProjectIds: userSessions.slice(0, 10).map(s => ({ id: s.id, projectId: s.projectId, name: s.name })),
+          uiSessionsCount: uiSessions.length,
+        });
 
         // For workspace: mix in browser sessions (excluding current and hidden)
         let browserSessions = isWorkspace
@@ -236,15 +241,32 @@ export function ProjectList() {
           return null;
         }
 
+        // Find workspace for this project to get last active session
+        const workspace = Array.from(workspaces.values()).find(w => w.projectId === project.id);
+        const lastActiveSession = workspace?.lastActiveSessionId
+          ? allProjectSessions.find(s =>
+              s.source === 'browser'
+                ? s.data.id === workspace.lastActiveSessionId
+                : s.data.id === workspace.lastActiveSessionId
+            )
+          : null;
+
+        const tooltipContent = lastActiveSession
+          ? `Last session: ${lastActiveSession.source === 'browser' ? lastActiveSession.data.name : lastActiveSession.data.name}`
+          : allProjectSessions.length > 0
+          ? `${allProjectSessions.length} session${allProjectSessions.length !== 1 ? 's' : ''}`
+          : 'No sessions in this workspace';
+
         return (
           <div key={project.id} className="space-y-1">
             {/* Project header */}
-            <button
+            <Tooltip content={tooltipContent}>
+              <button
               onClick={() => {
                 handleWorkspaceClick(project);
                 toggleProjectCollapse(project.id);
               }}
-              aria-label={`Switch to ${project.path === '/workspace' ? 'Current Workspace' : project.path}, ${allProjectSessions.length} session${allProjectSessions.length !== 1 ? 's' : ''}`}
+              aria-label={`Switch to ${workspace?.isPinned ? workspace.name : (project.path === '/workspace' ? 'Current Workspace' : project.path)}, ${allProjectSessions.length} session${allProjectSessions.length !== 1 ? 's' : ''}`}
               className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-left focus:ring-2 focus:ring-blue-500/50 focus:outline-none"
             >
               <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -260,28 +282,38 @@ export function ProjectList() {
                 </svg>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                    {project.path === '/workspace' ? 'Current Workspace' : project.path}
+                    {workspace?.isPinned ? workspace.name : (project.path === '/workspace' ? 'Current Workspace' : project.path)}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
                     {allProjectSessions.length} session{allProjectSessions.length !== 1 ? 's' : ''}
                   </div>
                 </div>
               </div>
-            </button>
+              </button>
+            </Tooltip>
 
-            {/* Project sessions */}
-            {isExpanded && allProjectSessions.length > 0 && (
-              <div className="ml-6 space-y-1">
-                {allProjectSessions.map((session) =>
-                  session.source === 'browser' ? (
-                    <UISessionItem key={`browser-${session.data.id}`} session={session.data} />
-                  ) : (
-                    <SessionItem key={`cli-${session.data.id}`} session={session.data} />
-                  )
-                )}
+            {/* Home Sessions Section (CLI sessions only) */}
+            {isExpanded && cliSessions.length > 0 && (
+              <div className="ml-2">
+                <HomeSessionsSection
+                  workspaceId={project.id}
+                  sessions={cliSessions}
+                  isCollapsed={collapsedSections.has(`home-${project.id}`)}
+                  onToggle={() => toggleSectionCollapse(`home-${project.id}`)}
+                />
               </div>
             )}
 
+            {/* Browser Sessions (if workspace) */}
+            {isExpanded && browserSessions.length > 0 && (
+              <div className="ml-6 space-y-1">
+                {browserSessions.map((session) => (
+                  <UISessionItem key={`browser-${session.id}`} session={session} />
+                ))}
+              </div>
+            )}
+
+            {/* Empty State */}
             {isExpanded && allProjectSessions.length === 0 && (
               <div className="ml-6 text-sm text-gray-500 dark:text-gray-400 py-2">
                 No sessions in this project
@@ -290,53 +322,6 @@ export function ProjectList() {
           </div>
         );
       })}
-
-      {/* System Sessions - separate collapsible section */}
-      {systemSessions.length > 0 && (
-        <div className="space-y-1 mt-4">
-          {/* System Sessions header */}
-          <button
-            onClick={() => toggleProjectCollapse('__system__')}
-            className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-left"
-          >
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <svg
-                className={`w-4 h-4 flex-shrink-0 transition-transform ${
-                  !collapsedProjects.has('__system__') ? 'rotate-90' : ''
-                }`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                  System Sessions
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {systemSessions.length} session{systemSessions.length !== 1 ? 's' : ''}
-                </div>
-              </div>
-            </div>
-          </button>
-
-          {/* System sessions list */}
-          {!collapsedProjects.has('__system__') && (
-            <div className="ml-6 space-y-1">
-              {systemSessions
-                .filter((s) =>
-                  !sessionSearchQuery ||
-                  matchesSearch(s.name, sessionSearchQuery) ||
-                  matchesSearch(s.gitBranch, sessionSearchQuery)
-                )
-                .map((session) => (
-                  <SessionItem key={`system-${session.id}`} session={session} />
-                ))}
-            </div>
-          )}
-        </div>
-      )}
       </div>
     </>
   );

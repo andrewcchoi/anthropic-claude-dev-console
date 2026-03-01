@@ -73,15 +73,37 @@ export function UISessionItem({ session }: UISessionItemProps) {
         ]
       )}
     >
-      <div className="flex items-center gap-2 truncate">
-        {/* Chat icon */}
+      {/* Line 1: Chat icon + session name */}
+      <div className="flex items-center gap-2">
         <svg className="w-4 h-4 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
         <span className="truncate font-medium">{session.name}</span>
       </div>
-      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex justify-between">
-        <span>{formatSmartTime(session.updated_at)}</span>
+
+      {/* Line 2: Git branch (if exists) */}
+      {session.gitBranch && (
+        <div className="mt-1 ml-6 flex items-center gap-1.5">
+          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3v12M18 9a3 3 0 01-3 3h-6" />
+          </svg>
+          <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
+            {session.gitBranch}
+          </span>
+        </div>
+      )}
+
+      {/* Line 3: Metadata */}
+      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6 flex justify-between">
+        <span>
+          {session.messageCount !== undefined && (
+            <>
+              {session.messageCount} msg{session.messageCount !== 1 ? 's' : ''}
+              <span className="mx-1">·</span>
+            </>
+          )}
+          {formatSmartTime(session.updated_at)}
+        </span>
         <button
           onClick={handleHide}
           className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"

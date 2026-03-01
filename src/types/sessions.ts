@@ -22,6 +22,8 @@ export interface CLISession {
   cwd?: string;
   isLoading?: boolean;
   isSystem?: boolean;  // True for automated/helper sessions
+  firstPrompt?: string;  // First user message in session
+  lastMessage?: string;  // Last message in session (user or assistant)
 }
 
 export interface SessionIndexEntry {

@@ -2,6 +2,9 @@
 
 import { useAppTheme } from '@/hooks/useAppTheme';
 import { Sun, Moon, Monitor } from 'lucide-react';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('ThemeToggle');
 
 export function ThemeToggle() {
   const { theme, setTheme, resolvedTheme, mounted } = useAppTheme();
@@ -14,6 +17,9 @@ export function ThemeToggle() {
   }
 
   const cycleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light';
+    log.debug('Theme toggled', { from: theme, to: newTheme });
+
     if (theme === 'light') {
       setTheme('dark');
     } else if (theme === 'dark') {

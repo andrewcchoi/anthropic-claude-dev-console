@@ -18,6 +18,7 @@ import {
 } from './types';
 import { LimitError, NotFoundError, ConnectionError, wrapError } from './errors';
 import { LocalProvider } from './providers/LocalProvider';
+import { encodeProjectPath } from '../utils/projectPath';
 import { GitProvider } from './providers/GitProvider';
 import { SSHProvider } from './providers/SSHProvider';
 
@@ -265,12 +266,14 @@ export class WorkspaceManager {
 
     const workspace: Workspace = {
       id,
+      projectId: encodeProjectPath(provider.rootPath),  // NEW
       name: config.name ?? provider.name,
       providerId,
       providerType: provider.type,
       rootPath: provider.rootPath,
       color: config.color ?? WORKSPACE_COLORS[colorIndex],
       sessionId: null,
+      activeSessionId: null,  // NEW
       sessionIds: [],
       expandedFolders: new Set(),
       selectedFile: null,

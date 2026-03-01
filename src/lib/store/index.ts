@@ -7,6 +7,8 @@ import { storeSync } from './sync';
 
 const log = createLogger('ChatStore');
 
+type MetadataColorScheme = 'semantic' | 'gradient';
+
 // Lazy getter for useWorkspaceStore to avoid circular dependency
 let _useWorkspaceStore: any = null;
 function getWorkspaceStore() {
@@ -48,6 +50,7 @@ interface ChatStore {
   isLoadingHistory: boolean;
   hiddenSessionIds: Set<string>;
   collapsedProjects: Set<string>;
+  collapsedSections: Set<string>;
   pendingSessionId: string | null;
   initializedSessionIds: Set<string>;  // Track sessions that have sent at least one message
   setSessionId: (id: string) => void;
@@ -60,6 +63,9 @@ interface ChatStore {
   deleteSession: (sessionId: string) => void;
   hideSession: (sessionId: string) => void;
   toggleProjectCollapse: (projectId: string) => void;
+  toggleSectionCollapse: (sectionId: string) => void;
+  collapseAll: () => void;
+  expandAll: (expandWorkspaces?: boolean) => void;
   saveCurrentSession: () => void;
 
   // NEW: Workspace-session linking
@@ -93,11 +99,15 @@ interface ChatStore {
   isModelPanelOpen: boolean;
   isTodosPanelOpen: boolean;
   isRenameDialogOpen: boolean;
+  isWorkspaceDialogOpen: boolean;
+  isSettingsPanelOpen: boolean;
   setStatusPanelOpen: (open: boolean) => void;
   setHelpPanelOpen: (open: boolean) => void;
   setModelPanelOpen: (open: boolean) => void;
   setTodosPanelOpen: (open: boolean) => void;
   setRenameDialogOpen: (open: boolean) => void;
+  setWorkspaceDialogOpen: (open: boolean) => void;
+  setSettingsPanelOpen: (open: boolean) => void;
   clearChat: () => void;
 
   // Session cache for preserving messages when switching
@@ -124,6 +134,10 @@ interface ChatStore {
   // Default mode selection
   defaultMode: DefaultMode;
   setDefaultMode: (mode: DefaultMode) => void;
+
+  // Metadata color scheme
+  metadataColorScheme: MetadataColorScheme;
+  setMetadataColorScheme: (scheme: MetadataColorScheme) => void;
 
   // Tool executions
   toolExecutions: ToolExecution[];
@@ -207,6 +221,7 @@ export const useChatStore = create<ChatStore>()(
       isLoadingHistory: false,
       hiddenSessionIds: new Set<string>(),
       collapsedProjects: new Set<string>(),
+      collapsedSections: new Set<string>(),
       pendingSessionId: null,
       initializedSessionIds: new Set<string>(),
       setSessionId: (id) => set({ sessionId: id }),
@@ -531,6 +546,67 @@ export const useChatStore = create<ChatStore>()(
           return { collapsedProjects: next };
         }),
 
+      toggleSectionCollapse: (sectionId) =>
+        set((state) => {
+          const newCollapsed = new Set(state.collapsedSections);
+          if (newCollapsed.has(sectionId)) {
+            newCollapsed.delete(sectionId);
+          } else {
+            newCollapsed.add(sectionId);
+          }
+          return { collapsedSections: newCollapsed };
+        }),
+
+      collapseAll: () => {
+        const useWorkspaceStore = getWorkspaceStore();
+        if (!useWorkspaceStore) {
+          log.warn('Cannot collapse all - workspace store not available');
+          return;
+        }
+
+        const { workspaces } = useWorkspaceStore.getState();
+        const allWorkspaceIds: string[] = Array.from(workspaces.keys()) as string[];
+
+        // Sections to collapse: workspaces (parent), system, unassigned
+        const allSectionIds: string[] = [
+          'workspaces',
+          'system',
+          'unassigned',
+        ];
+
+        log.debug('Collapsing all workspaces and sections', {
+          workspaces: allWorkspaceIds.length,
+          sections: allSectionIds.length,
+        });
+
+        set((state) => {
+          const newCollapsedProjects = new Set(state.collapsedProjects);
+          const newCollapsedSections = new Set(state.collapsedSections);
+
+          // Collapse all individual workspaces
+          allWorkspaceIds.forEach(id => newCollapsedProjects.add(id));
+
+          // Collapse all sections (workspaces, system, unassigned)
+          allSectionIds.forEach(id => newCollapsedSections.add(id));
+
+          return {
+            collapsedProjects: newCollapsedProjects,
+            collapsedSections: newCollapsedSections,
+          };
+        });
+      },
+
+      expandAll: (expandWorkspaces = true) => {
+        log.debug('Expanding all', { expandWorkspaces });
+
+        set((state) => ({
+          // Always expand sections
+          collapsedSections: new Set(),
+          // Optionally expand workspaces (for two-level expansion)
+          collapsedProjects: expandWorkspaces ? new Set() : state.collapsedProjects,
+        }));
+      },
+
       updateSessionName: (id, name) =>
         set((state) => ({
           sessions: state.sessions.map((s) =>
@@ -610,6 +686,9 @@ export const useChatStore = create<ChatStore>()(
       // NEW: Batch unlink for workspace deletion (performance optimization)
       unlinkMultipleSessionsFromWorkspace: (sessionIds: string[]) => {
         try {
+          // Convert to Set for O(1) lookup instead of O(m) includes()
+          const sessionIdsSet = new Set(sessionIds);
+
           set((state) => {
             log.debug('Batch unlinking sessions', {
               count: sessionIds.length,
@@ -617,13 +696,13 @@ export const useChatStore = create<ChatStore>()(
 
             // Check if current session needs unlinking (with null safety)
             const currentSessionUpdate =
-              state.sessionId && sessionIds.includes(state.sessionId) && state.currentSession
+              state.sessionId && sessionIdsSet.has(state.sessionId) && state.currentSession
                 ? { currentSession: { ...state.currentSession, workspaceId: undefined } }
                 : {};
 
             return {
               sessions: state.sessions.map(s =>
-                sessionIds.includes(s.id) ? { ...s, workspaceId: undefined } : s
+                sessionIdsSet.has(s.id) ? { ...s, workspaceId: undefined } : s
               ),
               ...currentSessionUpdate,
             };
@@ -733,6 +812,10 @@ export const useChatStore = create<ChatStore>()(
       defaultMode: 'plan',
       setDefaultMode: (mode) => set({ defaultMode: mode }),
 
+      // Metadata color scheme
+      metadataColorScheme: 'semantic',
+      setMetadataColorScheme: (scheme) => set({ metadataColorScheme: scheme }),
+
       // Init data from CLI
       availableCommands: [],
       availableTools: [],
@@ -759,11 +842,15 @@ export const useChatStore = create<ChatStore>()(
       isModelPanelOpen: false,
       isTodosPanelOpen: false,
       isRenameDialogOpen: false,
+      isWorkspaceDialogOpen: false,
+      isSettingsPanelOpen: false,
       setStatusPanelOpen: (open) => set({ isStatusPanelOpen: open }),
       setHelpPanelOpen: (open) => set({ isHelpPanelOpen: open }),
       setModelPanelOpen: (open) => set({ isModelPanelOpen: open }),
       setTodosPanelOpen: (open) => set({ isTodosPanelOpen: open }),
       setRenameDialogOpen: (open) => set({ isRenameDialogOpen: open }),
+      setWorkspaceDialogOpen: (open) => set({ isWorkspaceDialogOpen: open }),
+      setSettingsPanelOpen: (open) => set({ isSettingsPanelOpen: open }),
       clearChat: () => set({ messages: [], toolExecutions: [], sessionUsage: null }),
 
       // Session cache
@@ -838,9 +925,13 @@ export const useChatStore = create<ChatStore>()(
         provider: state.provider,
         providerConfig: state.providerConfig,
         defaultMode: state.defaultMode,
+        metadataColorScheme: state.metadataColorScheme,
         sidebarTab: state.sidebarTab,
         hiddenSessionIds: Array.from(state.hiddenSessionIds), // Convert Set to Array for JSON
         collapsedProjects: Array.from(state.collapsedProjects), // Convert Set to Array for JSON
+        collapsedSectionsArray: state.collapsedSections instanceof Set
+          ? Array.from(state.collapsedSections)
+          : [], // Convert Set to Array for JSON
         // initializedSessionIds: NOT persisted - ephemeral runtime state only
         // pendingSessionId: NOT persisted - resets on refresh
       }),
@@ -856,6 +947,12 @@ export const useChatStore = create<ChatStore>()(
           state.collapsedProjects = new Set(state.collapsedProjects);
         } else if (state && !state.collapsedProjects) {
           state.collapsedProjects = new Set();
+        }
+
+        if (state && Array.isArray((state as any).collapsedSectionsArray)) {
+          state.collapsedSections = new Set((state as any).collapsedSectionsArray);
+        } else if (state) {
+          state.collapsedSections = new Set();
         }
 
         // Always initialize as empty Set (ephemeral, not persisted)

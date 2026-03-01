@@ -1,22 +1,28 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useChatStore } from '@/lib/store';
 import { useSessionDiscoveryStore } from '@/lib/store/sessions';
 import { useWorkspaceStore } from '@/lib/store/workspaces';
 import { useCliPrewarm } from '@/hooks/useCliPrewarm';
 import { SessionSearch } from './SessionSearch';
 import { RefreshButton } from './RefreshButton';
-import { SessionList } from './SessionList';
-import { Loader2 } from 'lucide-react';
+import { CollapseAllButton } from './CollapseAllButton';
+import { WorkspacesSection } from './WorkspacesSection';
+import { SystemSessionsSection } from './SystemSessionsSection';
+import { UnassignedSessionsSection } from './UnassignedSessionsSection';
+import { Loader2, Plus } from 'lucide-react';
+import { createLogger } from '@/lib/logger';
 
+const log = createLogger('SessionPanel');
 const STALE_THRESHOLD = 60000; // 60 seconds
 
 export function SessionPanel() {
-  const { startNewSession, isPrewarming } = useChatStore();
-  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const { startNewSession, isPrewarming, collapsedSections, toggleSectionCollapse, setWorkspaceDialogOpen } = useChatStore();
+  const { activeWorkspaceId, workspaces, migrateToWorkspaces } = useWorkspaceStore();
   const {
     discoverSessions,
+    sessions,
     lastDiscoveryTime,
     lastDiscoveryCount,
     systemSessionCount,
@@ -24,6 +30,7 @@ export function SessionPanel() {
     isDiscovering,
   } = useSessionDiscoveryStore();
   const { prewarmCli } = useCliPrewarm();
+  const hasDiscovered = useRef(false);
 
   // Helper to format relative time
   const formatRelativeTime = (timestamp: number): string => {
@@ -38,16 +45,46 @@ export function SessionPanel() {
   };
 
   useEffect(() => {
+    // Guard against React Strict Mode double-invoke
+    if (hasDiscovered.current) {
+      log.debug('Discovery already initiated, skipping');
+      return;
+    }
+
     // Auto-discover on mount if stale or never discovered
     const isStale = !lastDiscoveryTime || (Date.now() - lastDiscoveryTime > STALE_THRESHOLD);
     if (isStale && !isDiscovering) {
-      discoverSessions(true); // Quick scan
+      log.debug('Initiating session discovery and workspace migration');
+      hasDiscovered.current = true;
+
+      const init = async () => {
+        try {
+          log.debug('Starting initialization');
+
+          // 1. Discover sessions
+          await discoverSessions(true);
+
+          // 2. Migrate to workspaces (includes orphan handling)
+          await migrateToWorkspaces();
+
+          log.debug('Initialization complete');
+        } catch (error) {
+          log.error('Initialization failed', { error });
+        }
+      };
+
+      init();
     }
-  }, [lastDiscoveryTime, isDiscovering, discoverSessions]);
+  }, [lastDiscoveryTime, isDiscovering, discoverSessions, migrateToWorkspaces]);
 
   const handleNewChat = () => {
     // Get active workspace context
     const activeWorkspace = activeWorkspaceId ? workspaces.get(activeWorkspaceId) : null;
+
+    log.debug('New Chat button clicked', {
+      workspaceId: activeWorkspace?.id,
+      workspaceName: activeWorkspace?.name
+    });
 
     // Pass workspace context to session creation
     startNewSession(activeWorkspace?.id, activeWorkspace?.rootPath);
@@ -57,11 +94,17 @@ export function SessionPanel() {
   };
 
   const handleRefresh = () => {
+    log.debug('Refresh sessions button clicked');
     discoverSessions(true);
   };
 
+  // Split sessions into system and unassigned
+  const systemSessions = sessions.filter(s => s.isSystem);
+  const unassignedSessions = sessions.filter(s => !s.isSystem && !s.projectId);
+
   return (
-    <>
+    <div className="flex flex-col h-full">
+      {/* New Chat and New Workspace Buttons */}
       <div className="p-4 space-y-2">
         <button
           id="new-chat-button"
@@ -78,14 +121,38 @@ export function SessionPanel() {
             '+ New Chat'
           )}
         </button>
+        <button
+          onClick={() => {
+            log.debug('New workspace button clicked');
+            setWorkspaceDialogOpen(true);
+          }}
+          className="w-full rounded-lg bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium
+                     text-gray-700 dark:text-gray-300
+                     border border-gray-300 dark:border-gray-600
+                     hover:bg-gray-100 dark:hover:bg-gray-700
+                     active:scale-[0.98] active:bg-gray-200 dark:active:bg-gray-600
+                     disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
+                     flex items-center justify-center gap-2
+                     transition-all duration-150"
+        >
+          <Plus className="w-4 h-4" />
+          New Workspace
+        </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
-        {/* Search and refresh controls */}
-        <div className="flex items-center gap-2 mb-3" suppressHydrationWarning>
-          <SessionSearch />
-          <RefreshButton onRefresh={handleRefresh} isRefreshing={isDiscovering} error={discoveryError} />
+      {/* Scrollable Project List Container */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Sticky Controls Bar - must be inside scroll container for position:sticky to work */}
+        <div className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 p-4">
+          <div className="flex items-center gap-2" suppressHydrationWarning>
+            <SessionSearch />
+            <RefreshButton onRefresh={handleRefresh} isRefreshing={isDiscovering} error={discoveryError} />
+            <CollapseAllButton />
+          </div>
         </div>
+
+        {/* Session sections content */}
+        <div className="p-4 space-y-4">
 
         {/* Last refresh indicator */}
         {lastDiscoveryTime && lastDiscoveryCount !== null && (
@@ -98,15 +165,40 @@ export function SessionPanel() {
           </div>
         )}
 
-        {/* Sessions filtered by active workspace */}
+        {/* Sections: Workspaces, System, Unassigned */}
         {isDiscovering && !lastDiscoveryTime ? (
           <div className="text-sm text-gray-400 dark:text-gray-500 py-4 text-center">
             Discovering sessions...
           </div>
         ) : (
-          <SessionList />
+          <div className="space-y-2">
+            {/* Workspaces Section */}
+            <WorkspacesSection
+              isCollapsed={collapsedSections.has('workspaces')}
+              onToggle={() => toggleSectionCollapse('workspaces')}
+            />
+
+            {/* System Sessions */}
+            {systemSessions.length > 0 && (
+              <SystemSessionsSection
+                sessions={systemSessions}
+                isCollapsed={collapsedSections.has('system')}
+                onToggle={() => toggleSectionCollapse('system')}
+              />
+            )}
+
+            {/* Unassigned Sessions */}
+            {unassignedSessions.length > 0 && (
+              <UnassignedSessionsSection
+                sessions={unassignedSessions}
+                isCollapsed={collapsedSections.has('unassigned')}
+                onToggle={() => toggleSectionCollapse('unassigned')}
+              />
+            )}
+          </div>
         )}
+        </div>
       </div>
-    </>
+    </div>
   );
 }

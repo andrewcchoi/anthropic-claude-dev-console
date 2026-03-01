@@ -30,7 +30,7 @@ describe('ProjectList workspace switching', () => {
   it('should switch to last active session on workspace click', async () => {
     const mockSwitchSession = vi.fn();
     const mockValidate = vi.fn(() => 'session-123');
-    const mockSetCurrentWorkspace = vi.fn();
+    const mockSetActiveWorkspace = vi.fn();
 
     (useWorkspaceStore as any).mockReturnValue({
       workspaces: new Map([
@@ -44,7 +44,7 @@ describe('ProjectList workspace switching', () => {
         }],
       ]),
       validateLastActiveSession: mockValidate,
-      setCurrentWorkspace: mockSetCurrentWorkspace,
+      setActiveWorkspace: mockSetActiveWorkspace,
       getMostRecentSessionForWorkspace: vi.fn(),
       updateWorkspaceLastActiveSession: vi.fn(),
     });
@@ -83,7 +83,7 @@ describe('ProjectList workspace switching', () => {
 
     await waitFor(() => {
       expect(mockValidate).toHaveBeenCalledWith('workspace-1', 'session-123');
-      expect(mockSwitchSession).toHaveBeenCalledWith('session-123');
+      expect(mockSwitchSession).toHaveBeenCalledWith('session-123', 'workspace-1');
     });
   });
 
@@ -105,7 +105,7 @@ describe('ProjectList workspace switching', () => {
       ]),
       validateLastActiveSession: mockValidate,
       getMostRecentSessionForWorkspace: mockGetMostRecent,
-      setCurrentWorkspace: vi.fn(),
+      setActiveWorkspace: vi.fn(),
       updateWorkspaceLastActiveSession: vi.fn(),
     });
 
@@ -143,7 +143,7 @@ describe('ProjectList workspace switching', () => {
 
     await waitFor(() => {
       expect(mockGetMostRecent).toHaveBeenCalledWith('workspace-1');
-      expect(mockSwitchSession).toHaveBeenCalledWith('session-456');
+      expect(mockSwitchSession).toHaveBeenCalledWith('session-456', 'workspace-1');
     });
   });
 
@@ -160,7 +160,7 @@ describe('ProjectList workspace switching', () => {
           lastAccessedAt: Date.now(),
         }],
       ]),
-      setCurrentWorkspace: vi.fn(),
+      setActiveWorkspace: vi.fn(),
       validateLastActiveSession: vi.fn(),
       getMostRecentSessionForWorkspace: vi.fn(),
       updateWorkspaceLastActiveSession: vi.fn(),
@@ -220,7 +220,7 @@ describe('ProjectList workspace switching', () => {
           lastAccessedAt: Date.now(),
         }],
       ]),
-      setCurrentWorkspace: vi.fn(),
+      setActiveWorkspace: vi.fn(),
       validateLastActiveSession: vi.fn(),
       getMostRecentSessionForWorkspace: vi.fn(),
       updateWorkspaceLastActiveSession: vi.fn(),
@@ -247,7 +247,7 @@ describe('ProjectList workspace switching', () => {
     // The actual cleanup happens in handleWorkspaceClick
     await waitFor(() => {
       // Verify workspace was set (indirect proof handler ran)
-      expect(useWorkspaceStore().setCurrentWorkspace).toHaveBeenCalledWith('workspace-1');
+      expect(useWorkspaceStore().setActiveWorkspace).toHaveBeenCalledWith('workspace-1');
     });
   });
 });
