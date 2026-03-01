@@ -165,11 +165,6 @@ export function ProjectList() {
 
   return (
     <>
-      {/* DEBUG: Visible test that code is loading */}
-      <div style={{ background: 'red', color: 'white', padding: '10px', fontWeight: 'bold' }}>
-        🔥 CODE UPDATED - Projects: {projects.length} - Sessions: {sessions.length}
-      </div>
-
       {/* Live region for announcements */}
       <div
         role="status"
@@ -187,17 +182,15 @@ export function ProjectList() {
         // Get CLI sessions for this project (excluding system sessions)
         let cliSessions = userSessions.filter((s) => s.projectId === project.id);
 
-        // Debug logging for Current Workspace
-        if (project.id === '-workspace') {
-          console.log('🔥 Current Workspace Debug:', {
-            projectId: project.id,
-            projectPath: project.path,
-            totalUserSessions: userSessions.length,
-            cliSessionsFound: cliSessions.length,
-            firstFewProjectIds: userSessions.slice(0, 5).map(s => s.projectId),
-            uiSessionsCount: uiSessions.length,
-          });
-        }
+        // Debug logging for session filtering
+        console.log('🔍 Session filtering debug:', {
+          projectId: project.id,
+          projectPath: project.path,
+          totalUserSessions: userSessions.length,
+          cliSessionsFound: cliSessions.length,
+          allSessionProjectIds: userSessions.slice(0, 10).map(s => ({ id: s.id, projectId: s.projectId, name: s.name })),
+          uiSessionsCount: uiSessions.length,
+        });
 
         // For workspace: mix in browser sessions (excluding current and hidden)
         let browserSessions = isWorkspace
