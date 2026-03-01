@@ -18,9 +18,13 @@ import {
 import { createLogger } from '../logger';
 import { storeSync } from './sync';
 import { encodeProjectPath, decodeProjectPath } from '../utils/projectPath';
+import { showToast } from '../utils/toast';
 import type { CLISession } from '@/types/sessions';
 
 const log = createLogger('WorkspaceStore');
+
+// Migration version - increment when migration logic changes
+const MIGRATION_VERSION = 2;
 
 // Lazy getter for useChatStore to avoid circular dependency
 // Will be initialized on first use after both stores are created
@@ -57,6 +61,7 @@ interface PersistedWorkspaceConfig {
   color: string;
   sessionIds: string[];  // Include session links
   isArchived?: boolean;  // NEW
+  isPinned?: boolean;    // NEW
 }
 
 interface WorkspaceStore {
@@ -67,6 +72,7 @@ interface WorkspaceStore {
   workspaceOrder: string[];
   isInitialized: boolean;
   hasMigratedSessions: boolean;
+  migrationVersion: number;
 
   // Actions
   addWorkspace: (config: ProviderConfig, options?: { name?: string; color?: string }) => Promise<string>;
@@ -96,6 +102,7 @@ interface WorkspaceStore {
   // Initialization
   initialize: () => Promise<void>;
   migrateFromLegacy: () => Promise<void>;
+  migrateGrootWorkspace: () => Promise<void>;
   migrateExistingSessions: () => void;
   migrateToWorkspaces: () => Promise<void>;
 
@@ -155,6 +162,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         workspaceOrder: [],
         isInitialized: false,
         hasMigratedSessions: false,
+        migrationVersion: 0,
 
       // ========================================================================
       // Workspace Actions
@@ -237,6 +245,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           fileActivity: new Map(),
           createdAt: Date.now(),
           lastAccessedAt: Date.now(),
+          isPinned: false,  // Always initialize to false
         };
 
         set((state) => {
@@ -262,6 +271,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         const workspace = state.workspaces.get(id);
 
         if (!workspace) return;
+
+        // Prevent deletion of pinned workspaces
+        if (workspace.isPinned) {
+          showToast('Cannot delete pinned workspace', 'error');
+          log.warn('Attempted to delete pinned workspace', { workspaceId: id, name: workspace.name });
+          return;
+        }
 
         // Unlink all sessions from this workspace (batch operation)
         log.debug('Unlinking sessions before workspace removal', {
@@ -638,6 +654,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         // Check for legacy workspace and migrate
         await get().migrateFromLegacy();
 
+        // Migrate to groot
+        await get().migrateGrootWorkspace();
+
         // Migrate existing sessions to default workspace (idempotent)
         get().migrateExistingSessions();
 
@@ -671,6 +690,48 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         } catch {
           // Ignore errors during migration check
         }
+      },
+
+      migrateGrootWorkspace: async () => {
+        const state = get();
+
+        // Find /workspace workspace
+        const workspaceWorkspace = Array.from(state.workspaces.values())
+          .find(ws => ws.rootPath === '/workspace');
+
+        if (!workspaceWorkspace) {
+          log.debug('No /workspace found, skipping groot migration');
+          return;
+        }
+
+        // Check if already migrated (check isPinned only - user may have renamed)
+        if (workspaceWorkspace.isPinned === true) {
+          log.debug('Workspace already pinned, skipping groot migration');
+          return;
+        }
+
+        log.info('Migrating workspace to 🌴 groot', {
+          workspaceId: workspaceWorkspace.id,
+          oldName: workspaceWorkspace.name,
+        });
+
+        // Update workspace name and pin it
+        set((state) => {
+          const newWorkspaces = new Map(state.workspaces);
+          const ws = newWorkspaces.get(workspaceWorkspace.id);
+
+          if (ws) {
+            newWorkspaces.set(workspaceWorkspace.id, {
+              ...ws,
+              name: '🌴 groot',
+              isPinned: true,
+            });
+          }
+
+          return { workspaces: newWorkspaces };
+        });
+
+        log.info('Groot migration complete');
       },
 
       migrateExistingSessions: () => {
@@ -734,9 +795,16 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       migrateToWorkspaces: async () => {
         const state = get();
 
-        // Idempotency: Skip if already migrated
-        if (state.workspaces.size > 0) {
-          log.info('Workspaces already exist, skipping migration');
+        // Check migration version and completeness
+        const needsMigration =
+          state.migrationVersion < MIGRATION_VERSION || // Version changed
+          !state.hasMigratedSessions; // Never migrated
+
+        if (!needsMigration) {
+          log.info('Migration up to date, skipping', {
+            currentVersion: state.migrationVersion,
+            requiredVersion: MIGRATION_VERSION,
+          });
           return;
         }
 
@@ -754,10 +822,24 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           log.info('Discovered projects and sessions for migration', {
             projectCount: projects.length,
             sessionCount: sessions.length,
+            migrationVersion: MIGRATION_VERSION,
           });
 
-          // 2. Create workspace for each project
+          // 2. Create workspace for each project (skip if already exists)
+          const existingProjectIds = new Set(
+            Array.from(get().workspaces.values()).map(w => w.projectId)
+          );
+
           for (const project of projects) {
+            // Skip if workspace already exists for this project
+            if (existingProjectIds.has(project.id)) {
+              log.debug('Workspace already exists for project, skipping', {
+                projectId: project.id,
+                path: project.path,
+              });
+              continue;
+            }
+
             const workspaceId = await get().addWorkspace(
               {
                 type: 'local',
@@ -791,11 +873,16 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           }
 
           // 5. Mark migration complete
+          set({
+            hasMigratedSessions: true,
+            migrationVersion: MIGRATION_VERSION,
+          });
           localStorage.setItem('workspace-migration-complete', Date.now().toString());
           localStorage.removeItem('workspace-migration-started');
 
           log.info('Workspace migration complete', {
             workspaceCount: get().workspaces.size,
+            migrationVersion: MIGRATION_VERSION,
           });
         } catch (error) {
           // Rollback on error
@@ -878,6 +965,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           return;
         }
 
+        // Prevent archiving of pinned workspaces
+        if (workspace.isPinned) {
+          showToast('Cannot archive pinned workspace', 'error');
+          log.warn('Attempted to archive pinned workspace', { workspaceId: id, name: workspace.name });
+          return;
+        }
+
         log.info('Archiving workspace', {
           workspaceId: id,
           name: workspace.name,
@@ -923,10 +1017,12 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           color: ws.color,
           sessionIds: ws.sessionIds,  // Persist session links
           isArchived: ws.isArchived,  // NEW
+          isPinned: ws.isPinned,      // NEW
         })) as PersistedWorkspaceConfig[],
         workspaceOrder: state.workspaceOrder,
         activeWorkspaceId: state.activeWorkspaceId,
         hasMigratedSessions: state.hasMigratedSessions,
+        migrationVersion: state.migrationVersion,
       }),
 
       // Deserialize on rehydration
@@ -998,6 +1094,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               createdAt: Date.now(),
               lastAccessedAt: Date.now(),
               isArchived: wc.isArchived ?? false,  // NEW
+              isPinned: wc.isPinned ?? false,      // NEW
             });
           }
         }

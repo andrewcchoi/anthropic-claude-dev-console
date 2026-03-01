@@ -20,6 +20,8 @@ const LOCAL_COMMANDS: Record<string, string> = {
   '/export': 'exportConversation',
   '/todos': 'openTodosPanel',
   '/rename': 'openRenameDialog',
+  '/settings': 'openSettingsPanel',
+  '/new-workspace': 'openWorkspaceDialog',
 };
 
 // Command descriptions for autocomplete
@@ -36,6 +38,8 @@ export const LOCAL_COMMAND_INFO: CommandInfo[] = [
   { command: '/export', handler: 'exportConversation', description: 'Export as HTML (Word-ready), or use "/export json" or "/export markdown"' },
   { command: '/todos', handler: 'openTodosPanel', description: 'Show tasks and todos panel' },
   { command: '/rename', handler: 'openRenameDialog', description: 'Rename the current session' },
+  { command: '/settings', handler: 'openSettingsPanel', description: 'Open settings panel' },
+  { command: '/new-workspace', handler: 'openWorkspaceDialog', description: 'Create a new workspace' },
 ];
 
 export type CommandRouteType = 'local' | 'passthrough';

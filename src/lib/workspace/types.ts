@@ -131,6 +131,7 @@ export interface Workspace {
   createdAt: number;
   lastAccessedAt: number;
   isArchived?: boolean;  // NEW: Soft delete
+  isPinned?: boolean;
 }
 
 export interface WorkspaceConfig {

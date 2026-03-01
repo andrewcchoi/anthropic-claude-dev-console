@@ -1,28 +1,26 @@
 'use client';
 
-import { useState } from 'react';
 import { CLISession } from '@/types/sessions';
 import { useChatStore } from '@/lib/store';
 import { useSessionDiscoveryStore } from '@/lib/store/sessions';
-import { formatSmartTime, formatDuration } from '@/lib/utils/time';
+import { formatISOWithRelative } from '@/lib/utils/time';
 import { cn } from '@/lib/utils';
 import { createLogger } from '@/lib/logger';
+import { Tooltip } from '@/components/ui/Tooltip';
 
 const log = createLogger('SessionItem');
 
+type SectionType = 'home' | 'system' | 'unassigned';
+
 interface SessionItemProps {
   session: CLISession;
+  sectionType?: SectionType;
 }
 
-export function SessionItem({ session }: SessionItemProps) {
-  const { sessionId, switchSession } = useChatStore();
+export function SessionItem({ session, sectionType = 'home' }: SessionItemProps) {
+  const { sessionId, switchSession, metadataColorScheme, sessionCache, messages } = useChatStore();
   const { loadSessionDetails } = useSessionDiscoveryStore();
-  const [isHovered, setIsHovered] = useState(false);
   const isActive = sessionId === session.id;
-
-  const handleHover = () => {
-    setIsHovered(true);
-  };
 
   const handleClick = async () => {
     log.debug('Session clicked', {
@@ -34,23 +32,97 @@ export function SessionItem({ session }: SessionItemProps) {
     await switchSession(session.id, session.projectId);
   };
 
-  const relativeTime = formatSmartTime(session.modifiedAt);
+  // Border colors based on section type
+  const borderColorClass = {
+    home: 'border-l-green-500 dark:border-l-green-400',
+    system: 'border-l-blue-500 dark:border-l-blue-400',
+    unassigned: 'border-l-orange-500 dark:border-l-orange-400',
+  }[sectionType];
+
+  // Color classes based on metadata color scheme
+  const metadataColors = metadataColorScheme === 'semantic'
+    ? {
+        branch: 'text-purple-600 dark:text-purple-400',
+        messageCount: 'text-blue-600 dark:text-blue-400',
+        dates: 'text-gray-600 dark:text-gray-400',
+      }
+    : {
+        branch: 'text-cyan-600 dark:text-cyan-400',
+        messageCount: 'text-purple-600 dark:text-purple-400',
+        createdDate: 'text-amber-600 dark:text-amber-400',
+        modifiedDate: 'text-red-600 dark:text-red-400',
+      };
+
+  // Get message preview from session data or cache
+  const getMessagePreview = (): string | null => {
+    // Priority 1: Use firstPrompt from CLI session data (always available)
+    if (session.firstPrompt) {
+      const maxLength = 150;
+      if (session.firstPrompt.length > maxLength) {
+        return session.firstPrompt.substring(0, maxLength) + '...';
+      }
+      return session.firstPrompt;
+    }
+
+    // Priority 2: Try to get from message cache (for active or recently viewed sessions)
+    let sessionMessages = null;
+    if (isActive && messages.length > 0) {
+      sessionMessages = messages;
+    } else {
+      const cached = sessionCache.get(session.id);
+      if (cached && cached.messages.length > 0) {
+        sessionMessages = cached.messages;
+      }
+    }
+
+    if (sessionMessages && sessionMessages.length > 0) {
+      // Get the last message
+      const lastMessage = sessionMessages[sessionMessages.length - 1];
+
+      // Extract text content
+      const textContent = lastMessage.content
+        .filter(block => block.type === 'text' && block.text)
+        .map(block => block.text)
+        .join(' ');
+
+      if (textContent) {
+        const maxLength = 150;
+        if (textContent.length > maxLength) {
+          return textContent.substring(0, maxLength) + '...';
+        }
+        return textContent;
+      }
+
+      // If no text, check if it's a tool use message
+      const hasToolUse = lastMessage.content.some(block => block.type === 'tool_use');
+      if (hasToolUse) {
+        return '🔧 Tool execution';
+      }
+    }
+
+    return null;
+  };
+
+  const messagePreview = getMessagePreview();
+
+  // Build tooltip content - show ONLY the message
+  const tooltipContent = messagePreview || 'No messages yet';
 
   return (
-    <div
+    <Tooltip key={session.id} content={tooltipContent}>
+      <div
       onClick={handleClick}
-      onMouseEnter={handleHover}
-      onMouseLeave={() => setIsHovered(false)}
       className={cn(
         'p-2.5 rounded-lg cursor-pointer text-sm',
-        'border-l-4 border-transparent',
+        'border-l-4',
         'mb-1.5 transition-colors',
         isActive && [
           'bg-blue-50 dark:bg-blue-950',
-          'border-l-blue-500 dark:border-l-blue-400',
+          borderColorClass,
           'text-blue-900 dark:text-blue-100',
         ],
         !isActive && [
+          'border-transparent',
           'hover:bg-gray-50 dark:hover:bg-gray-800/50',
           'hover:border-l-gray-300 dark:hover:border-l-gray-600',
           'text-gray-700 dark:text-gray-300',
@@ -67,26 +139,31 @@ export function SessionItem({ session }: SessionItemProps) {
 
       {/* Line 2: Git branch (if exists) */}
       {session.gitBranch && (
-        <div className="mt-1 ml-6 flex items-center gap-1.5">
-          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3v12M18 9a3 3 0 01-3 3h-6" />
-          </svg>
-          <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
+        <div className={cn("mt-1 ml-6 flex items-center gap-1.5", metadataColors.branch)}>
+          <span className="text-xs">🔀</span>
+          <span className="text-xs truncate">
             {session.gitBranch}
           </span>
         </div>
       )}
 
-      {/* Line 3: Metadata */}
-      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6">
+      {/* Line 3: Metadata with ISO dates and color coding */}
+      <div className="text-xs mt-1 ml-6 flex flex-wrap gap-2">
         {session.messageCount !== undefined && (
-          <>
-            {session.messageCount} msg{session.messageCount !== 1 ? 's' : ''}
-            <span className="mx-1">·</span>
-          </>
+          <span className={metadataColors.messageCount}>
+            💬 {session.messageCount} msg{session.messageCount !== 1 ? 's' : ''}
+          </span>
         )}
-        {relativeTime}
+        {session.createdAt && (
+          <span className={metadataColorScheme === 'semantic' ? metadataColors.dates : metadataColors.createdDate}>
+            📅 {formatISOWithRelative(session.createdAt)}
+          </span>
+        )}
+        <span className={metadataColorScheme === 'semantic' ? metadataColors.dates : metadataColors.modifiedDate}>
+          🕒 {formatISOWithRelative(session.modifiedAt)}
+        </span>
       </div>
-    </div>
+      </div>
+    </Tooltip>
   );
 }

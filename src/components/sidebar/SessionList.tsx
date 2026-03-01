@@ -64,33 +64,62 @@ export function SessionList() {
   // Get active workspace to check path matching
   const activeWorkspace = activeWorkspaceId ? workspaces.get(activeWorkspaceId) : null;
 
-  // Helper function to get sessions for a specific workspace
-  const getSessionsForWorkspace = (workspaceId: string) => {
-    const workspace = workspaces.get(workspaceId);
-    if (!workspace) return [];
+  // Build session index once per render (O(n) complexity instead of O(n²))
+  // Maps workspace ID → array of sessions matching that workspace
+  const sessionsByWorkspace = useMemo(() => {
+    const map = new Map<string, Session[]>();
+    const workspaceArray = Array.from(workspaces.values());
 
-    // Get encoded project path for this workspace (e.g., "/workspace" → "-workspace")
-    const projectId = encodeProjectPath(workspace.rootPath);
+    // For each session, determine which workspace(s) it belongs to
+    for (const session of allSessions) {
+      for (const workspace of workspaceArray) {
+        if (!workspace.rootPath) continue;
 
-    return allSessions.filter(s => {
-      // Match by encoded project path (CLI uses this format)
-      if (s.workspaceId === projectId) return true;
+        // Get encoded project path for this workspace (e.g., "/workspace" → "-workspace")
+        const projectId = encodeProjectPath(workspace.rootPath);
 
-      // Also match if session's workspaceId starts with workspace's project path
-      // e.g., "-workspace-docs" matches "-workspace" (subdirectory sessions)
-      if (s.workspaceId && s.workspaceId.startsWith(projectId + '-')) return true;
-      if (s.workspaceId && s.workspaceId.startsWith(projectId)) return true;
+        // Check if session matches this workspace using same logic as before
+        let matches = false;
 
-      // Path-based matching for old sessions without workspaceId
-      if (!s.workspaceId && s.cwd && workspace.rootPath) {
-        const normalizedCwd = s.cwd.replace(/\/$/, '');
-        const normalizedRoot = workspace.rootPath.replace(/\/$/, '');
-        return normalizedCwd === normalizedRoot ||
-               normalizedCwd.startsWith(normalizedRoot + '/');
+        // Match by encoded project path (CLI uses this format)
+        if (session.workspaceId === projectId) {
+          matches = true;
+        }
+
+        // Also match if session's workspaceId starts with workspace's project path
+        // e.g., "-workspace-docs" matches "-workspace" (subdirectory sessions)
+        if (!matches && session.workspaceId) {
+          if (session.workspaceId.startsWith(projectId + '-') ||
+              session.workspaceId.startsWith(projectId)) {
+            matches = true;
+          }
+        }
+
+        // Path-based matching for old sessions without workspaceId
+        if (!matches && !session.workspaceId && session.cwd && workspace.rootPath) {
+          const normalizedCwd = session.cwd.replace(/\/$/, '');
+          const normalizedRoot = workspace.rootPath.replace(/\/$/, '');
+          if (normalizedCwd === normalizedRoot ||
+              normalizedCwd.startsWith(normalizedRoot + '/')) {
+            matches = true;
+          }
+        }
+
+        if (matches) {
+          if (!map.has(workspace.id)) {
+            map.set(workspace.id, []);
+          }
+          map.get(workspace.id)!.push(session);
+        }
       }
+    }
 
-      return false;
-    });
+    return map;
+  }, [allSessions, workspaces]);
+
+  // Helper function to get sessions for a specific workspace (now O(1) lookup)
+  const getSessionsForWorkspace = (workspaceId: string) => {
+    return sessionsByWorkspace.get(workspaceId) || [];
   };
 
   // Handle session click in overview mode (opens workspace tab)

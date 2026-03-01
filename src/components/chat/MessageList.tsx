@@ -14,14 +14,20 @@ interface MessageListProps {
 
 export function MessageList({ messages, isLoadingHistory }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const { isPrewarming, prewarmError } = useChatStore();
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Only auto-scroll if we have a scroll container and messages
+    if (!scrollContainerRef.current || messages.length === 0) return;
+
+    // Scroll to bottom using scrollTop instead of scrollIntoView
+    // to avoid scrolling parent containers
+    scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
   }, [messages]);
 
   return (
-    <div className="flex-1 min-w-0 overflow-y-auto scrollbar-stable p-4 space-y-4">
+    <div ref={scrollContainerRef} className="flex-1 min-w-0 overflow-y-auto scrollbar-stable p-4 space-y-4">
       {isLoadingHistory && (
         <div className="flex h-full items-center justify-center text-gray-500 dark:text-gray-400">
           <div className="text-center">

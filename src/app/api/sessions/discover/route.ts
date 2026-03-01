@@ -108,6 +108,7 @@ async function scanSessionFiles(projectPath: string, projectId: string): Promise
         name,
         messageCount: messageCount > 0 ? messageCount : undefined,
         gitBranch,
+        firstPrompt: firstPrompt || undefined,
         modifiedAt: stats.mtimeMs,
         createdAt: stats.birthtimeMs || stats.mtimeMs,
         isSystem,
@@ -175,6 +176,7 @@ async function discoverSessions(quick: boolean = true): Promise<DiscoverResponse
             fileSize: 0, // Not needed with index
             name: entry.summary || entry.firstPrompt?.slice(0, 100) || 'Untitled Session',
             messageCount: entry.messageCount,
+            firstPrompt: entry.firstPrompt || undefined,
             modifiedAt: new Date(entry.modified).getTime(),
             createdAt: new Date(entry.created).getTime(),
             gitBranch: entry.gitBranch || undefined,

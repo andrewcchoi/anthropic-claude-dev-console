@@ -16,8 +16,8 @@ import { StatusPanel } from '@/components/panels/StatusPanel';
 import { ModelPanel } from '@/components/panels/ModelPanel';
 import { TodosPanel } from '@/components/panels/TodosPanel';
 import { RenameDialog } from '@/components/panels/RenameDialog';
+import { SettingsPanel } from '@/components/panels/SettingsPanel';
 import { ToastContainer } from '@/components/ui/ToastContainer';
-import { WorkspaceTabBar } from '@/components/workspace/WorkspaceTabBar';
 import { AddWorkspaceDialog } from '@/components/workspace/AddWorkspaceDialog';
 import { WorkspaceSwitcher } from '@/components/workspace/WorkspaceSwitcher';
 import { WorkspaceEmptyState } from '@/components/workspace/WorkspaceEmptyState';
@@ -45,8 +45,26 @@ export default function Home() {
     initialize: initializeWorkspaces,
   } = useWorkspaceStore();
 
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const { isWorkspaceDialogOpen, setWorkspaceDialogOpen } = useChatStore();
   const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
+
+  // Wrapper for addWorkspace with auto-switch
+  const handleAddWorkspace = async (
+    config: any,
+    options?: { name?: string; color?: string }
+  ): Promise<string> => {
+    const workspaceId = await addWorkspace(config, options);
+
+    // Auto-switch to the new workspace
+    setActiveWorkspace(workspaceId);
+
+    // Auto-focus "New Chat" button after render
+    setTimeout(() => {
+      document.getElementById('new-chat-button')?.focus();
+    }, 100);
+
+    return workspaceId;
+  };
 
   // Convert workspace Map to array in order
   const orderedWorkspaces = workspaceOrder
@@ -102,7 +120,7 @@ export default function Home() {
     activeWorkspaceId,
     onWorkspaceSelect: setActiveWorkspace,
     onWorkspaceSwitcher: () => setIsSwitcherOpen(true),
-    enabled: !isAddDialogOpen && !isSwitcherOpen,
+    enabled: !isWorkspaceDialogOpen && !isSwitcherOpen,
   });
 
   const handleSend = (message: string, attachments?: any) => {
@@ -111,22 +129,13 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-w-0 h-screen overflow-hidden bg-white dark:bg-gray-900">
-      {/* Workspace Tab Bar */}
-      <WorkspaceTabBar
-        workspaces={orderedWorkspaces}
-        activeWorkspaceId={activeWorkspaceId}
-        onWorkspaceSelect={setActiveWorkspace}
-        onWorkspaceClose={removeWorkspace}
-        onAddWorkspace={() => setIsAddDialogOpen(true)}
-      />
-
       {/* Main Content Area */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <Sidebar />
         {orderedWorkspaces.length === 0 ? (
           // Empty state: No workspaces
           <div className="flex-1 flex items-center justify-center">
-            <WorkspaceEmptyState onAddWorkspace={() => setIsAddDialogOpen(true)} />
+            <WorkspaceEmptyState onAddWorkspace={() => setWorkspaceDialogOpen(true)} />
           </div>
         ) : previewOpen ? (
         <div className={`flex-1 flex min-w-0 isolate transition-[margin] duration-300 ease-in-out will-change-[margin] ${sidebarOpen ? '' : 'ml-10'} ${rightPanelOpen ? 'mr-64' : 'mr-10'}`}>
@@ -165,11 +174,12 @@ export default function Home() {
       <ModelPanel />
       <TodosPanel />
       <RenameDialog />
+      <SettingsPanel />
       <ToastContainer />
       <AddWorkspaceDialog
-        isOpen={isAddDialogOpen}
-        onClose={() => setIsAddDialogOpen(false)}
-        onAdd={addWorkspace}
+        isOpen={isWorkspaceDialogOpen}
+        onClose={() => setWorkspaceDialogOpen(false)}
+        onAdd={handleAddWorkspace}
       />
       <WorkspaceSwitcher
         isOpen={isSwitcherOpen}
