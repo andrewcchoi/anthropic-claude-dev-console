@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
 import { useChatStore } from '@/lib/store';
 import { useWorkspaceStore } from '@/lib/store/workspaces';
 import { createLogger } from '@/lib/logger';
@@ -12,10 +12,11 @@ export function CollapseAllButton() {
   const { workspaces } = useWorkspaceStore();
 
   // Compute if all are collapsed
+  // Check: all workspaces collapsed AND all sections (workspaces, system, unassigned) collapsed
   const allWorkspaceIds = Array.from(workspaces.keys());
   const allCollapsed = allWorkspaceIds.length > 0 &&
     allWorkspaceIds.every(id => collapsedProjects.has(id)) &&
-    allWorkspaceIds.every(id => collapsedSections.has(`home-${id}`)) &&
+    collapsedSections.has('workspaces') &&
     collapsedSections.has('system') &&
     collapsedSections.has('unassigned');
 
@@ -29,17 +30,20 @@ export function CollapseAllButton() {
     }
   };
 
+  const iconClass = "w-4 h-4";
+
   return (
     <button
       onClick={handleClick}
-      className="w-full px-3 py-2 text-sm font-medium flex items-center justify-between
-                 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg
-                 focus:ring-2 focus:ring-blue-500/50 focus:outline-none
-                 transition-colors"
+      className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 active:scale-[0.98] active:bg-gray-300 dark:active:bg-gray-600 transition-all duration-150 text-gray-500 dark:text-gray-400"
+      title={allCollapsed ? 'Expand all sections and workspaces' : 'Collapse all sections and workspaces'}
       aria-label={allCollapsed ? 'Expand all sections and workspaces' : 'Collapse all sections and workspaces'}
     >
-      <span>{allCollapsed ? 'Expand All' : 'Collapse All'}</span>
-      {allCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+      {allCollapsed ? (
+        <ChevronsDownUp className={iconClass} />
+      ) : (
+        <ChevronsUpDown className={iconClass} />
+      )}
     </button>
   );
 }

@@ -564,8 +564,10 @@ export const useChatStore = create<ChatStore>()(
 
         const { workspaces } = useWorkspaceStore.getState();
         const allWorkspaceIds: string[] = Array.from(workspaces.keys()) as string[];
+
+        // Sections to collapse: workspaces (parent), system, unassigned
         const allSectionIds: string[] = [
-          ...allWorkspaceIds.map(id => `home-${id}`),
+          'workspaces',
           'system',
           'unassigned',
         ];
@@ -579,10 +581,10 @@ export const useChatStore = create<ChatStore>()(
           const newCollapsedProjects = new Set(state.collapsedProjects);
           const newCollapsedSections = new Set(state.collapsedSections);
 
-          // Add all workspace IDs
+          // Collapse all individual workspaces
           allWorkspaceIds.forEach(id => newCollapsedProjects.add(id));
 
-          // Add all section IDs
+          // Collapse all sections (workspaces, system, unassigned)
           allSectionIds.forEach(id => newCollapsedSections.add(id));
 
           return {

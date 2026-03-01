@@ -7,8 +7,8 @@ import { useWorkspaceStore } from '@/lib/store/workspaces';
 import { useCliPrewarm } from '@/hooks/useCliPrewarm';
 import { SessionSearch } from './SessionSearch';
 import { RefreshButton } from './RefreshButton';
-import { ProjectList } from './ProjectList';
 import { CollapseAllButton } from './CollapseAllButton';
+import { WorkspacesSection } from './WorkspacesSection';
 import { SystemSessionsSection } from './SystemSessionsSection';
 import { UnassignedSessionsSection } from './UnassignedSessionsSection';
 import { Loader2 } from 'lucide-react';
@@ -147,35 +147,38 @@ export function SessionPanel() {
           </div>
         )}
 
-        {/* Project List (contains HomeSessionsSection per workspace) */}
+        {/* Sections: Workspaces, System, Unassigned */}
         {isDiscovering && !lastDiscoveryTime ? (
           <div className="text-sm text-gray-400 dark:text-gray-500 py-4 text-center">
             Discovering sessions...
           </div>
         ) : (
-          <ProjectList />
+          <div className="space-y-2">
+            {/* Workspaces Section */}
+            <WorkspacesSection
+              isCollapsed={collapsedSections.has('workspaces')}
+              onToggle={() => toggleSectionCollapse('workspaces')}
+            />
+
+            {/* System Sessions */}
+            {systemSessions.length > 0 && (
+              <SystemSessionsSection
+                sessions={systemSessions}
+                isCollapsed={collapsedSections.has('system')}
+                onToggle={() => toggleSectionCollapse('system')}
+              />
+            )}
+
+            {/* Unassigned Sessions */}
+            {unassignedSessions.length > 0 && (
+              <UnassignedSessionsSection
+                sessions={unassignedSessions}
+                isCollapsed={collapsedSections.has('unassigned')}
+                onToggle={() => toggleSectionCollapse('unassigned')}
+              />
+            )}
+          </div>
         )}
-
-        {/* Global Sections */}
-        <div className="space-y-2 mt-4">
-          {/* System Sessions */}
-          {systemSessions.length > 0 && (
-            <SystemSessionsSection
-              sessions={systemSessions}
-              isCollapsed={collapsedSections.has('system')}
-              onToggle={() => toggleSectionCollapse('system')}
-            />
-          )}
-
-          {/* Unassigned Sessions */}
-          {unassignedSessions.length > 0 && (
-            <UnassignedSessionsSection
-              sessions={unassignedSessions}
-              isCollapsed={collapsedSections.has('unassigned')}
-              onToggle={() => toggleSectionCollapse('unassigned')}
-            />
-          )}
-        </div>
       </div>
     </div>
   );
