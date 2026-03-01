@@ -55,6 +55,18 @@ async function handler(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // Validate deviceId format (alphanumeric, reasonable length)
+    // Tailscale node IDs are typically hex strings or short identifiers
+    if (deviceId.length > 64 || !/^[\w-]+$/.test(deviceId)) {
+      return NextResponse.json(
+        {
+          error: 'Invalid deviceId format',
+          code: 'INVALID_REQUEST',
+        },
+        { status: 400 }
+      );
+    }
+
     // Use deviceId for unambiguous lookup (not hostname which may collide)
     const manager = getTailscaleManager();
     const device = await manager.getDeviceById(deviceId);
