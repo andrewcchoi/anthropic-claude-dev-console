@@ -7,7 +7,7 @@ import { useWorkspaceStore } from '@/lib/store/workspaces';
 import { useCliPrewarm } from '@/hooks/useCliPrewarm';
 import { SessionSearch } from './SessionSearch';
 import { RefreshButton } from './RefreshButton';
-import { SessionList } from './SessionList';
+import { ProjectList } from './ProjectList';
 import { CollapseAllButton } from './CollapseAllButton';
 import { SystemSessionsSection } from './SystemSessionsSection';
 import { UnassignedSessionsSection } from './UnassignedSessionsSection';
@@ -153,7 +153,7 @@ export function SessionPanel() {
             Discovering sessions...
           </div>
         ) : (
-          <SessionList />
+          <ProjectList />
         )}
 
         {/* Global Sections */}
