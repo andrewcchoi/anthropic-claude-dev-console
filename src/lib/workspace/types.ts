@@ -96,6 +96,18 @@ export interface SSHProviderConfig extends BaseProviderConfig {
   hostKeyVerification?: 'strict' | 'tofu' | 'ask';
   persistConnection?: boolean;
   reconnectOnFailure?: boolean;
+
+  // Tailscale integration
+  tailscale?: {
+    /** Enable Tailscale for this connection */
+    enabled: boolean;
+    /** Tailscale device ID (required - unique identifier) */
+    deviceId: string;
+    /** Use Magic DNS instead of IP (default: false) */
+    useMagicDNS?: boolean;
+    /** Fail if connection would use DERP relay (default: false) */
+    requireDirect?: boolean;
+  };
 }
 
 export type ProviderConfig =
