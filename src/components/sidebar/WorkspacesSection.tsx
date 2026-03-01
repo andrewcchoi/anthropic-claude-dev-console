@@ -20,9 +20,17 @@ export function WorkspacesSection({
   isCollapsed,
   onToggle,
 }: WorkspacesSectionProps) {
+  console.log('🔥🔥🔥 WorkspacesSection LOADED 🔥🔥🔥');
+
   const { workspaces } = useWorkspaceStore();
   const { collapsedProjects, toggleProjectCollapse } = useChatStore();
   const { sessions: cliSessions } = useSessionDiscoveryStore();
+
+  console.log('🔥 WorkspacesSection hooks loaded:', {
+    workspacesCount: workspaces.size,
+    collapsedProjectsSize: collapsedProjects.size,
+    cliSessionsCount: cliSessions.length,
+  });
 
   // Convert workspaces Map to array and sort: pinned (groot) first, then by name
   const sortedWorkspaces = Array.from(workspaces.values()).sort((a, b) => {
@@ -33,6 +41,8 @@ export function WorkspacesSection({
     // Otherwise sort by name
     return a.name.localeCompare(b.name);
   });
+
+  console.log('🔥 Sorted workspaces:', sortedWorkspaces.map(w => ({ id: w.id, name: w.name, isPinned: w.isPinned })));
 
   // Count total sessions across all workspaces
   const totalSessions = cliSessions.filter(s => !s.isSystem && s.projectId).length;
