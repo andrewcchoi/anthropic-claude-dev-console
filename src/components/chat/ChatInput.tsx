@@ -127,6 +127,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
         setModelPanelOpen,
         setTodosPanelOpen,
         setRenameDialogOpen,
+        setWorkspaceDialogOpen,
         setSettingsPanelOpen,
         messages,
         currentSession,
@@ -509,6 +510,9 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
           } else {
             setRenameDialogOpen(true);
           }
+          break;
+        case 'openWorkspaceDialog':
+          setWorkspaceDialogOpen(true);
           break;
         case 'openSettingsPanel':
           setSettingsPanelOpen(true);

@@ -11,14 +11,14 @@ import { CollapseAllButton } from './CollapseAllButton';
 import { WorkspacesSection } from './WorkspacesSection';
 import { SystemSessionsSection } from './SystemSessionsSection';
 import { UnassignedSessionsSection } from './UnassignedSessionsSection';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('SessionPanel');
 const STALE_THRESHOLD = 60000; // 60 seconds
 
 export function SessionPanel() {
-  const { startNewSession, isPrewarming, collapsedSections, toggleSectionCollapse } = useChatStore();
+  const { startNewSession, isPrewarming, collapsedSections, toggleSectionCollapse, setWorkspaceDialogOpen } = useChatStore();
   const { activeWorkspaceId, workspaces, migrateToWorkspaces } = useWorkspaceStore();
   const {
     discoverSessions,
@@ -104,7 +104,7 @@ export function SessionPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* New Chat Button */}
+      {/* New Chat and New Workspace Buttons */}
       <div className="p-4 space-y-2">
         <button
           id="new-chat-button"
@@ -121,16 +121,38 @@ export function SessionPanel() {
             '+ New Chat'
           )}
         </button>
+        <button
+          onClick={() => {
+            log.debug('New workspace button clicked');
+            setWorkspaceDialogOpen(true);
+          }}
+          className="w-full rounded-lg bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium
+                     text-gray-700 dark:text-gray-300
+                     border border-gray-300 dark:border-gray-600
+                     hover:bg-gray-100 dark:hover:bg-gray-700
+                     active:scale-[0.98] active:bg-gray-200 dark:active:bg-gray-600
+                     disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
+                     flex items-center justify-center gap-2
+                     transition-all duration-150"
+        >
+          <Plus className="w-4 h-4" />
+          New Workspace
+        </button>
       </div>
 
       {/* Scrollable Project List Container */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Search, refresh, and collapse/expand controls */}
-        <div className="flex items-center gap-2 mb-3" suppressHydrationWarning>
-          <SessionSearch />
-          <RefreshButton onRefresh={handleRefresh} isRefreshing={isDiscovering} error={discoveryError} />
-          <CollapseAllButton />
+      <div className="flex-1 overflow-y-auto">
+        {/* Sticky Controls Bar - must be inside scroll container for position:sticky to work */}
+        <div className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 p-4">
+          <div className="flex items-center gap-2" suppressHydrationWarning>
+            <SessionSearch />
+            <RefreshButton onRefresh={handleRefresh} isRefreshing={isDiscovering} error={discoveryError} />
+            <CollapseAllButton />
+          </div>
         </div>
+
+        {/* Session sections content */}
+        <div className="p-4 space-y-4">
 
         {/* Last refresh indicator */}
         {lastDiscoveryTime && lastDiscoveryCount !== null && (
@@ -175,6 +197,7 @@ export function SessionPanel() {
             )}
           </div>
         )}
+        </div>
       </div>
     </div>
   );

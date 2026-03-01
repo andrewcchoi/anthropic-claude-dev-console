@@ -99,12 +99,14 @@ interface ChatStore {
   isModelPanelOpen: boolean;
   isTodosPanelOpen: boolean;
   isRenameDialogOpen: boolean;
+  isWorkspaceDialogOpen: boolean;
   isSettingsPanelOpen: boolean;
   setStatusPanelOpen: (open: boolean) => void;
   setHelpPanelOpen: (open: boolean) => void;
   setModelPanelOpen: (open: boolean) => void;
   setTodosPanelOpen: (open: boolean) => void;
   setRenameDialogOpen: (open: boolean) => void;
+  setWorkspaceDialogOpen: (open: boolean) => void;
   setSettingsPanelOpen: (open: boolean) => void;
   clearChat: () => void;
 
@@ -840,12 +842,14 @@ export const useChatStore = create<ChatStore>()(
       isModelPanelOpen: false,
       isTodosPanelOpen: false,
       isRenameDialogOpen: false,
+      isWorkspaceDialogOpen: false,
       isSettingsPanelOpen: false,
       setStatusPanelOpen: (open) => set({ isStatusPanelOpen: open }),
       setHelpPanelOpen: (open) => set({ isHelpPanelOpen: open }),
       setModelPanelOpen: (open) => set({ isModelPanelOpen: open }),
       setTodosPanelOpen: (open) => set({ isTodosPanelOpen: open }),
       setRenameDialogOpen: (open) => set({ isRenameDialogOpen: open }),
+      setWorkspaceDialogOpen: (open) => set({ isWorkspaceDialogOpen: open }),
       setSettingsPanelOpen: (open) => set({ isSettingsPanelOpen: open }),
       clearChat: () => set({ messages: [], toolExecutions: [], sessionUsage: null }),
 

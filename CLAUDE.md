@@ -767,6 +767,14 @@ src/
 - Zustand for client-side state management
 - CLI integration spawns `claude -p --verbose --output-format stream-json`
 
+#### Development Process
+- **Adversarial Review for Suggestions**: When user or developer suggests a feature or workflow change, spawn an adversarial subagent to evaluate the suggestion BEFORE implementing
+  * Catches design flaws, edge cases, and unintended consequences early
+  * Subagent provides fresh perspective without attachment to the idea
+  * Use specialized agents (code-reviewer, type-design-analyzer, etc.) when applicable
+  * Example template: "You are an INDEPENDENT EVALUATOR. Critique this suggestion: [description]. What could go wrong? What's missing? What are the trade-offs?"
+  * Minimum evaluation for non-trivial suggestions; skip only for obvious/trivial changes
+
 #### Terminal Components
 Two distinct terminal components serve different purposes:
 

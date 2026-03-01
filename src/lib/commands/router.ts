@@ -21,6 +21,7 @@ const LOCAL_COMMANDS: Record<string, string> = {
   '/todos': 'openTodosPanel',
   '/rename': 'openRenameDialog',
   '/settings': 'openSettingsPanel',
+  '/new-workspace': 'openWorkspaceDialog',
 };
 
 // Command descriptions for autocomplete
@@ -38,6 +39,7 @@ export const LOCAL_COMMAND_INFO: CommandInfo[] = [
   { command: '/todos', handler: 'openTodosPanel', description: 'Show tasks and todos panel' },
   { command: '/rename', handler: 'openRenameDialog', description: 'Rename the current session' },
   { command: '/settings', handler: 'openSettingsPanel', description: 'Open settings panel' },
+  { command: '/new-workspace', handler: 'openWorkspaceDialog', description: 'Create a new workspace' },
 ];
 
 export type CommandRouteType = 'local' | 'passthrough';

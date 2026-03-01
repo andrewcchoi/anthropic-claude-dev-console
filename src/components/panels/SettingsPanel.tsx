@@ -1,12 +1,15 @@
 'use client';
 
 import { useChatStore } from '@/lib/store';
+import { useAppTheme } from '@/hooks/useAppTheme';
 import { createLogger } from '@/lib/logger';
+import { Sun, Moon, Monitor } from 'lucide-react';
 
 const log = createLogger('SettingsPanel');
 
 export function SettingsPanel() {
   const { isSettingsPanelOpen, setSettingsPanelOpen, metadataColorScheme, setMetadataColorScheme } = useChatStore();
+  const { theme, setTheme, resolvedTheme, mounted } = useAppTheme();
 
   if (!isSettingsPanelOpen) {
     return null;
@@ -20,6 +23,11 @@ export function SettingsPanel() {
   const handleSchemeChange = (scheme: 'semantic' | 'gradient') => {
     log.info('Metadata color scheme changed', { scheme });
     setMetadataColorScheme(scheme);
+  };
+
+  const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
+    log.info('App theme changed', { from: theme, to: newTheme });
+    setTheme(newTheme);
   };
 
   return (
@@ -47,6 +55,90 @@ export function SettingsPanel() {
 
         {/* Content */}
         <div className="p-6 space-y-6">
+          {/* App Theme */}
+          <div>
+            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
+              App Theme
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              Choose your preferred color scheme for the entire application
+            </p>
+
+            <div className="space-y-2">
+              <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                theme === 'light'
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                  : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}>
+                <input
+                  type="radio"
+                  name="appTheme"
+                  value="light"
+                  checked={theme === 'light'}
+                  onChange={() => handleThemeChange('light')}
+                  className="mt-0.5 w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <Sun className="w-4 h-4" />
+                    <span className="font-medium text-gray-900 dark:text-gray-100">Light</span>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Use light mode at all times
+                  </div>
+                </div>
+              </label>
+
+              <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                theme === 'dark'
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                  : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}>
+                <input
+                  type="radio"
+                  name="appTheme"
+                  value="dark"
+                  checked={theme === 'dark'}
+                  onChange={() => handleThemeChange('dark')}
+                  className="mt-0.5 w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <Moon className="w-4 h-4" />
+                    <span className="font-medium text-gray-900 dark:text-gray-100">Dark</span>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Use dark mode at all times
+                  </div>
+                </div>
+              </label>
+
+              <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                theme === 'system'
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                  : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}>
+                <input
+                  type="radio"
+                  name="appTheme"
+                  value="system"
+                  checked={theme === 'system'}
+                  onChange={() => handleThemeChange('system')}
+                  className="mt-0.5 w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <Monitor className="w-4 h-4" />
+                    <span className="font-medium text-gray-900 dark:text-gray-100">System</span>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Follow system preferences {mounted && theme === 'system' && `(currently ${resolvedTheme})`}
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
           {/* Metadata Color Scheme */}
           <div>
             <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">

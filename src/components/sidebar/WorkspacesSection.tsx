@@ -1,6 +1,7 @@
 // src/components/sidebar/WorkspacesSection.tsx
 'use client';
 
+import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { SessionItem } from './SessionItem';
 import type { CLISession } from '@/types/sessions';
@@ -8,6 +9,8 @@ import { createLogger } from '@/lib/logger';
 import { useChatStore } from '@/lib/store';
 import { useWorkspaceStore } from '@/lib/store/workspaces';
 import { useSessionDiscoveryStore } from '@/lib/store/sessions';
+import { WorkspaceContextMenu, WORKSPACE_CONTEXT_ITEMS, type ContextMenuItem } from '@/components/ui/WorkspaceContextMenu';
+import { showToast } from '@/lib/utils/toast';
 
 const log = createLogger('WorkspacesSection');
 
@@ -20,17 +23,16 @@ export function WorkspacesSection({
   isCollapsed,
   onToggle,
 }: WorkspacesSectionProps) {
-  console.log('🔥🔥🔥 WorkspacesSection LOADED 🔥🔥🔥');
-
-  const { workspaces } = useWorkspaceStore();
-  const { collapsedProjects, toggleProjectCollapse } = useChatStore();
+  const { workspaces, archiveWorkspace, removeWorkspace } = useWorkspaceStore();
+  const { collapsedProjects, toggleProjectCollapse, setWorkspaceDialogOpen } = useChatStore();
   const { sessions: cliSessions } = useSessionDiscoveryStore();
 
-  console.log('🔥 WorkspacesSection hooks loaded:', {
-    workspacesCount: workspaces.size,
-    collapsedProjectsSize: collapsedProjects.size,
-    cliSessionsCount: cliSessions.length,
-  });
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    items: ContextMenuItem[];
+  } | null>(null);
 
   // Convert workspaces Map to array and sort: pinned (groot) first, then by name
   const sortedWorkspaces = Array.from(workspaces.values()).sort((a, b) => {
@@ -41,8 +43,6 @@ export function WorkspacesSection({
     // Otherwise sort by name
     return a.name.localeCompare(b.name);
   });
-
-  console.log('🔥 Sorted workspaces:', sortedWorkspaces.map(w => ({ id: w.id, name: w.name, isPinned: w.isPinned })));
 
   // Count total sessions across all workspaces
   const totalSessions = cliSessions.filter(s => !s.isSystem && s.projectId).length;
@@ -113,6 +113,36 @@ export function WorkspacesSection({
                       });
                       toggleProjectCollapse(workspace.id);
                     }}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      log.debug('Workspace context menu opened', {
+                        workspaceId: workspace.id,
+                        workspaceName: workspace.name,
+                        isPinned: workspace.isPinned,
+                      });
+
+                      setContextMenu({
+                        x: e.clientX,
+                        y: e.clientY,
+                        items: [
+                          WORKSPACE_CONTEXT_ITEMS.newWorkspace(() => {
+                            log.debug('New workspace from context menu');
+                            setWorkspaceDialogOpen(true);
+                          }),
+                          WORKSPACE_CONTEXT_ITEMS.archive(() => {
+                            log.debug('Archive workspace', { workspaceId: workspace.id });
+                            archiveWorkspace(workspace.id);
+                          }, workspace.isPinned), // Disable if pinned
+                          WORKSPACE_CONTEXT_ITEMS.delete(() => {
+                            log.debug('Delete workspace', { workspaceId: workspace.id });
+                            if (confirm(`Delete workspace "${workspace.name}"? This cannot be undone.`)) {
+                              removeWorkspace(workspace.id);
+                              showToast('Workspace deleted', 'success');
+                            }
+                          }, workspace.isPinned), // Disable if pinned
+                        ],
+                      });
+                    }}
                     className="w-full flex items-center justify-between px-3 py-1.5 rounded
                                text-sm
                                hover:bg-gray-100 dark:hover:bg-gray-800
@@ -121,18 +151,18 @@ export function WorkspacesSection({
                     aria-expanded={!isWorkspaceCollapsed}
                     aria-controls={`workspace-${workspace.id}`}
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
                       <ChevronRight
-                        className={`w-3 h-3 transition-transform ${isWorkspaceCollapsed ? '' : 'rotate-90'}`}
+                        className={`w-3 h-3 flex-shrink-0 transition-transform ${isWorkspaceCollapsed ? '' : 'rotate-90'}`}
                       />
                       <span className="font-medium truncate">
                         {workspace.name}
                       </span>
                       {workspace.isPinned && (
-                        <span className="text-xs" title="Pinned workspace">📌</span>
+                        <span className="text-xs flex-shrink-0" title="Pinned workspace">📌</span>
                       )}
                     </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                    <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
                       {workspaceSessions.length}
                     </span>
                   </button>
@@ -163,6 +193,16 @@ export function WorkspacesSection({
             })
           )}
         </div>
+      )}
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <WorkspaceContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenu.items}
+          onClose={() => setContextMenu(null)}
+        />
       )}
     </section>
   );
