@@ -23,6 +23,9 @@ import type { CLISession } from '@/types/sessions';
 
 const log = createLogger('WorkspaceStore');
 
+// Migration version - increment when migration logic changes
+const MIGRATION_VERSION = 2;
+
 // Lazy getter for useChatStore to avoid circular dependency
 // Will be initialized on first use after both stores are created
 let _useChatStore: any = null;
@@ -69,6 +72,7 @@ interface WorkspaceStore {
   workspaceOrder: string[];
   isInitialized: boolean;
   hasMigratedSessions: boolean;
+  migrationVersion: number;
 
   // Actions
   addWorkspace: (config: ProviderConfig, options?: { name?: string; color?: string }) => Promise<string>;
@@ -158,6 +162,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         workspaceOrder: [],
         isInitialized: false,
         hasMigratedSessions: false,
+        migrationVersion: 0,
 
       // ========================================================================
       // Workspace Actions
@@ -790,9 +795,16 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       migrateToWorkspaces: async () => {
         const state = get();
 
-        // Idempotency: Skip if already migrated
-        if (state.workspaces.size > 0) {
-          log.info('Workspaces already exist, skipping migration');
+        // Check migration version and completeness
+        const needsMigration =
+          state.migrationVersion < MIGRATION_VERSION || // Version changed
+          !state.hasMigratedSessions; // Never migrated
+
+        if (!needsMigration) {
+          log.info('Migration up to date, skipping', {
+            currentVersion: state.migrationVersion,
+            requiredVersion: MIGRATION_VERSION,
+          });
           return;
         }
 
@@ -810,10 +822,24 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           log.info('Discovered projects and sessions for migration', {
             projectCount: projects.length,
             sessionCount: sessions.length,
+            migrationVersion: MIGRATION_VERSION,
           });
 
-          // 2. Create workspace for each project
+          // 2. Create workspace for each project (skip if already exists)
+          const existingProjectIds = new Set(
+            Array.from(get().workspaces.values()).map(w => w.projectId)
+          );
+
           for (const project of projects) {
+            // Skip if workspace already exists for this project
+            if (existingProjectIds.has(project.id)) {
+              log.debug('Workspace already exists for project, skipping', {
+                projectId: project.id,
+                path: project.path,
+              });
+              continue;
+            }
+
             const workspaceId = await get().addWorkspace(
               {
                 type: 'local',
@@ -847,11 +873,16 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           }
 
           // 5. Mark migration complete
+          set({
+            hasMigratedSessions: true,
+            migrationVersion: MIGRATION_VERSION,
+          });
           localStorage.setItem('workspace-migration-complete', Date.now().toString());
           localStorage.removeItem('workspace-migration-started');
 
           log.info('Workspace migration complete', {
             workspaceCount: get().workspaces.size,
+            migrationVersion: MIGRATION_VERSION,
           });
         } catch (error) {
           // Rollback on error
@@ -991,6 +1022,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         workspaceOrder: state.workspaceOrder,
         activeWorkspaceId: state.activeWorkspaceId,
         hasMigratedSessions: state.hasMigratedSessions,
+        migrationVersion: state.migrationVersion,
       }),
 
       // Deserialize on rehydration
