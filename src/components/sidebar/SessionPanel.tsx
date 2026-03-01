@@ -125,15 +125,11 @@ export function SessionPanel() {
 
       {/* Scrollable Project List Container */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Collapse/Expand All button */}
-        <div className="mb-3">
-          <CollapseAllButton />
-        </div>
-
-        {/* Search and refresh controls */}
+        {/* Search, refresh, and collapse/expand controls */}
         <div className="flex items-center gap-2 mb-3" suppressHydrationWarning>
           <SessionSearch />
           <RefreshButton onRefresh={handleRefresh} isRefreshing={isDiscovering} error={discoveryError} />
+          <CollapseAllButton />
         </div>
 
         {/* Last refresh indicator */}
