@@ -39,25 +39,62 @@ async function scanSessionFiles(projectPath: string, projectId: string): Promise
       const stats = await fs.stat(filePath);
       const sessionId = file.replace('.jsonl', '');
 
-      // Read first line for session name
+      // Read session file to extract metadata
       let name = 'Untitled Session';
       let firstPrompt = '';
+      let messageCount = 0;
+      let gitBranch: string | undefined = undefined;
+
       try {
+        // Read more of the file to get metadata (8KB should cover initial messages)
         const handle = await fs.open(filePath, 'r');
-        const buffer = Buffer.alloc(1024);
-        await handle.read(buffer, 0, 1024, 0);
+        const buffer = Buffer.alloc(8192);
+        const { bytesRead } = await handle.read(buffer, 0, 8192, 0);
         await handle.close();
 
-        const firstLine = buffer.toString('utf-8').split('\n')[0];
-        if (firstLine) {
-          const parsed = JSON.parse(firstLine);
-          // Extract name from first user message
-          if (parsed.type === 'user' && parsed.message?.content) {
-            firstPrompt = parsed.message.content;
-            name = firstPrompt.slice(0, 100);
-          }
+        const content = buffer.toString('utf-8', 0, bytesRead);
+        const lines = content.split('\n').filter(l => l.trim());
+
+        for (const line of lines) {
+          try {
+            const parsed = JSON.parse(line);
+
+            // Extract git branch from any message that has it
+            if (!gitBranch && parsed.gitBranch) {
+              gitBranch = parsed.gitBranch;
+            }
+
+            // Extract name from first user message
+            if (!firstPrompt && parsed.type === 'user' && parsed.message?.content) {
+              const content = parsed.message.content;
+              // Handle both string and array content
+              if (typeof content === 'string') {
+                // Skip meta messages and commands
+                if (!parsed.isMeta && !content.includes('<command-name>') && !content.includes('<local-command-')) {
+                  firstPrompt = content;
+                  name = firstPrompt.slice(0, 100);
+                }
+              } else if (Array.isArray(content) && content[0]?.text) {
+                firstPrompt = content[0].text;
+                name = firstPrompt.slice(0, 100);
+              }
+            }
+
+            // Count user/assistant messages (exclude tool results and meta)
+            if ((parsed.type === 'user' || parsed.type === 'assistant') &&
+                !parsed.toolUseResult &&
+                !parsed.isMeta) {
+              // Additional filter: skip command messages
+              const content = parsed.message?.content;
+              const isCommand = typeof content === 'string' &&
+                (content.includes('<command-name>') || content.includes('<local-command-'));
+              if (!isCommand) {
+                messageCount++;
+              }
+            }
+          } catch { /* Skip malformed lines */ }
         }
-      } catch { /* Use default name */ }
+      } catch { /* Use defaults */ }
 
       // Detect system sessions
       const isSystem = firstPrompt.startsWith('Context: This summary will be shown');
@@ -69,6 +106,9 @@ async function scanSessionFiles(projectPath: string, projectId: string): Promise
         filePath,
         fileSize: stats.size,
         name,
+        messageCount: messageCount > 0 ? messageCount : undefined,
+        gitBranch,
+        firstPrompt: firstPrompt || undefined,
         modifiedAt: stats.mtimeMs,
         createdAt: stats.birthtimeMs || stats.mtimeMs,
         isSystem,
@@ -136,6 +176,7 @@ async function discoverSessions(quick: boolean = true): Promise<DiscoverResponse
             fileSize: 0, // Not needed with index
             name: entry.summary || entry.firstPrompt?.slice(0, 100) || 'Untitled Session',
             messageCount: entry.messageCount,
+            firstPrompt: entry.firstPrompt || undefined,
             modifiedAt: new Date(entry.modified).getTime(),
             createdAt: new Date(entry.created).getTime(),
             gitBranch: entry.gitBranch || undefined,

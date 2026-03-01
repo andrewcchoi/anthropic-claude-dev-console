@@ -17,8 +17,14 @@ import {
 } from '../workspace/types';
 import { createLogger } from '../logger';
 import { storeSync } from './sync';
+import { encodeProjectPath, decodeProjectPath } from '../utils/projectPath';
+import { showToast } from '../utils/toast';
+import type { CLISession } from '@/types/sessions';
 
 const log = createLogger('WorkspaceStore');
+
+// Migration version - increment when migration logic changes
+const MIGRATION_VERSION = 2;
 
 // Lazy getter for useChatStore to avoid circular dependency
 // Will be initialized on first use after both stores are created
@@ -49,10 +55,13 @@ function getChatStore() {
 
 interface PersistedWorkspaceConfig {
   id: string;
+  projectId: string;  // NEW
   name: string;
   config: ProviderConfig;
   color: string;
   sessionIds: string[];  // Include session links
+  isArchived?: boolean;  // NEW
+  isPinned?: boolean;    // NEW
 }
 
 interface WorkspaceStore {
@@ -63,6 +72,7 @@ interface WorkspaceStore {
   workspaceOrder: string[];
   isInitialized: boolean;
   hasMigratedSessions: boolean;
+  migrationVersion: number;
 
   // Actions
   addWorkspace: (config: ProviderConfig, options?: { name?: string; color?: string }) => Promise<string>;
@@ -92,7 +102,17 @@ interface WorkspaceStore {
   // Initialization
   initialize: () => Promise<void>;
   migrateFromLegacy: () => Promise<void>;
+  migrateGrootWorkspace: () => Promise<void>;
   migrateExistingSessions: () => void;
+  migrateToWorkspaces: () => Promise<void>;
+
+  // Orphaned sessions
+  getOrphanedSessions: (sessions: CLISession[]) => CLISession[];
+  handleOrphanedSessions: (orphans: CLISession[]) => Promise<void>;
+
+  // Archive
+  archiveWorkspace: (id: string) => void;
+  restoreWorkspace: (id: string) => void;
 }
 
 // ============================================================================
@@ -142,6 +162,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         workspaceOrder: [],
         isInitialized: false,
         hasMigratedSessions: false,
+        migrationVersion: 0,
 
       // ========================================================================
       // Workspace Actions
@@ -154,6 +175,28 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         // Check if already exists
         if (state.workspaces.has(id)) {
           return id;
+        }
+
+        // Derive projectId and rootPath from config
+        let projectId: string;
+        let rootPath: string;
+
+        switch (config.type) {
+          case 'local':
+            rootPath = (config as LocalProviderConfig).path;
+            projectId = encodeProjectPath(rootPath);
+            break;
+          case 'ssh':
+            rootPath = (config as SSHProviderConfig).remotePath;
+            projectId = encodeProjectPath(rootPath);
+            break;
+          case 'git':
+            rootPath = '/';  // TODO: Update when git clone location is implemented
+            projectId = encodeProjectPath(rootPath);
+            break;
+          default:
+            rootPath = '/';
+            projectId = '-';
         }
 
         // Create provider state
@@ -188,24 +231,21 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         // Create workspace
         const workspace: Workspace = {
           id,
+          projectId,  // NEW
           name,
           providerId: id,
           providerType: config.type,
-          rootPath: config.type === 'local'
-            ? (config as LocalProviderConfig).path
-            : config.type === 'ssh'
-              ? (config as SSHProviderConfig).remotePath
-              : config.type === 'git'
-                ? '/'  // TODO: Update when git clone location is implemented
-                : '/',
+          rootPath,
           color: options.color ?? getNextColor(state.workspaces.size),
           sessionId: null,
+          activeSessionId: null,  // NEW
           sessionIds: [],  // Initialize empty array
           expandedFolders: new Set(),
           selectedFile: null,
           fileActivity: new Map(),
           createdAt: Date.now(),
           lastAccessedAt: Date.now(),
+          isPinned: false,  // Always initialize to false
         };
 
         set((state) => {
@@ -231,6 +271,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         const workspace = state.workspaces.get(id);
 
         if (!workspace) return;
+
+        // Prevent deletion of pinned workspaces
+        if (workspace.isPinned) {
+          showToast('Cannot delete pinned workspace', 'error');
+          log.warn('Attempted to delete pinned workspace', { workspaceId: id, name: workspace.name });
+          return;
+        }
 
         // Unlink all sessions from this workspace (batch operation)
         log.debug('Unlinking sessions before workspace removal', {
@@ -607,6 +654,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         // Check for legacy workspace and migrate
         await get().migrateFromLegacy();
 
+        // Migrate to groot
+        await get().migrateGrootWorkspace();
+
         // Migrate existing sessions to default workspace (idempotent)
         get().migrateExistingSessions();
 
@@ -640,6 +690,48 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         } catch {
           // Ignore errors during migration check
         }
+      },
+
+      migrateGrootWorkspace: async () => {
+        const state = get();
+
+        // Find /workspace workspace
+        const workspaceWorkspace = Array.from(state.workspaces.values())
+          .find(ws => ws.rootPath === '/workspace');
+
+        if (!workspaceWorkspace) {
+          log.debug('No /workspace found, skipping groot migration');
+          return;
+        }
+
+        // Check if already migrated (check isPinned only - user may have renamed)
+        if (workspaceWorkspace.isPinned === true) {
+          log.debug('Workspace already pinned, skipping groot migration');
+          return;
+        }
+
+        log.info('Migrating workspace to 🌴 groot', {
+          workspaceId: workspaceWorkspace.id,
+          oldName: workspaceWorkspace.name,
+        });
+
+        // Update workspace name and pin it
+        set((state) => {
+          const newWorkspaces = new Map(state.workspaces);
+          const ws = newWorkspaces.get(workspaceWorkspace.id);
+
+          if (ws) {
+            newWorkspaces.set(workspaceWorkspace.id, {
+              ...ws,
+              name: '🌴 groot',
+              isPinned: true,
+            });
+          }
+
+          return { workspaces: newWorkspaces };
+        });
+
+        log.info('Groot migration complete');
       },
 
       migrateExistingSessions: () => {
@@ -699,6 +791,217 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         // Mark migration as complete
         set({ hasMigratedSessions: true });
       },
+
+      migrateToWorkspaces: async () => {
+        const state = get();
+
+        // Check migration version and completeness
+        const needsMigration =
+          state.migrationVersion < MIGRATION_VERSION || // Version changed
+          !state.hasMigratedSessions; // Never migrated
+
+        if (!needsMigration) {
+          log.info('Migration up to date, skipping', {
+            currentVersion: state.migrationVersion,
+            requiredVersion: MIGRATION_VERSION,
+          });
+          return;
+        }
+
+        // Safety: Set migration flag before starting
+        localStorage.setItem('workspace-migration-started', Date.now().toString());
+
+        try {
+          // 1. Discover CLI projects
+          const response = await fetch('/api/sessions/discover');
+          if (!response.ok) {
+            throw new Error(`Discovery failed: ${response.status}`);
+          }
+
+          const { projects, sessions } = await response.json();
+          log.info('Discovered projects and sessions for migration', {
+            projectCount: projects.length,
+            sessionCount: sessions.length,
+            migrationVersion: MIGRATION_VERSION,
+          });
+
+          // 2. Create workspace for each project (skip if already exists)
+          const existingProjectIds = new Set(
+            Array.from(get().workspaces.values()).map(w => w.projectId)
+          );
+
+          for (const project of projects) {
+            // Skip if workspace already exists for this project
+            if (existingProjectIds.has(project.id)) {
+              log.debug('Workspace already exists for project, skipping', {
+                projectId: project.id,
+                path: project.path,
+              });
+              continue;
+            }
+
+            const workspaceId = await get().addWorkspace(
+              {
+                type: 'local',
+                path: project.path,
+              },
+              {
+                name: project.path.split('/').pop() || 'Workspace',
+              }
+            );
+
+            log.debug('Created workspace from project', {
+              workspaceId,
+              projectId: project.id,
+              path: project.path,
+            });
+          }
+
+          // 3. Handle orphaned sessions (sessions without matching workspace)
+          const orphans = get().getOrphanedSessions(sessions);
+          if (orphans.length > 0) {
+            log.info('Found orphaned sessions, handling', { count: orphans.length });
+            await get().handleOrphanedSessions(orphans);
+          }
+
+          // 4. Set first workspace as active
+          if (projects.length > 0) {
+            const firstWorkspace = Array.from(get().workspaces.values())[0];
+            if (firstWorkspace) {
+              get().setActiveWorkspace(firstWorkspace.id);
+            }
+          }
+
+          // 5. Mark migration complete
+          set({
+            hasMigratedSessions: true,
+            migrationVersion: MIGRATION_VERSION,
+          });
+          localStorage.setItem('workspace-migration-complete', Date.now().toString());
+          localStorage.removeItem('workspace-migration-started');
+
+          log.info('Workspace migration complete', {
+            workspaceCount: get().workspaces.size,
+            migrationVersion: MIGRATION_VERSION,
+          });
+        } catch (error) {
+          // Rollback on error
+          log.error('Workspace migration failed, rolling back', { error });
+
+          // Clear partial state
+          set((state) => ({
+            workspaces: new Map(),
+            providers: new Map(),
+            workspaceOrder: [],
+            activeWorkspaceId: null,
+          }));
+
+          localStorage.removeItem('workspace-migration-started');
+
+          throw error;
+        }
+      },
+
+      getOrphanedSessions: (sessions: CLISession[]) => {
+        const state = get();
+        const projectIds = new Set(
+          Array.from(state.workspaces.values()).map(w => w.projectId)
+        );
+
+        return sessions.filter(s => !projectIds.has(s.projectId));
+      },
+
+      handleOrphanedSessions: async (orphans: CLISession[]) => {
+        if (orphans.length === 0) {
+          log.debug('No orphaned sessions to handle');
+          return;
+        }
+
+        log.info('Handling orphaned sessions', {
+          orphanCount: orphans.length,
+        });
+
+        // Group by projectId
+        const orphansByProject = new Map<string, CLISession[]>();
+        for (const session of orphans) {
+          const group = orphansByProject.get(session.projectId) || [];
+          group.push(session);
+          orphansByProject.set(session.projectId, group);
+        }
+
+        // Create workspace for each unique projectId
+        for (const [projectId, sessionGroup] of orphansByProject) {
+          const decodedPath = decodeProjectPath(projectId);
+          const name = decodedPath.split('/').pop() || projectId;
+
+          log.info('Creating workspace for orphaned sessions', {
+            projectId,
+            path: decodedPath,
+            sessionCount: sessionGroup.length,
+          });
+
+          await get().addWorkspace(
+            {
+              type: 'local',
+              path: decodedPath,
+            },
+            {
+              name: `${name} (Recovered)`,
+            }
+          );
+        }
+
+        log.info('Orphaned session handling complete', {
+          workspacesCreated: orphansByProject.size,
+        });
+      },
+
+      archiveWorkspace: (id: string) => {
+        const state = get();
+        const workspace = state.workspaces.get(id);
+
+        if (!workspace) {
+          log.warn('Workspace not found for archiving', { id });
+          return;
+        }
+
+        // Prevent archiving of pinned workspaces
+        if (workspace.isPinned) {
+          showToast('Cannot archive pinned workspace', 'error');
+          log.warn('Attempted to archive pinned workspace', { workspaceId: id, name: workspace.name });
+          return;
+        }
+
+        log.info('Archiving workspace', {
+          workspaceId: id,
+          name: workspace.name,
+        });
+
+        // Mark as archived
+        get().updateWorkspaceState(id, { isArchived: true });
+
+        // If was active, switch to another
+        if (state.activeWorkspaceId === id) {
+          const nextWorkspace = Array.from(state.workspaces.values()).find(
+            (w) => !w.isArchived && w.id !== id
+          );
+
+          if (nextWorkspace) {
+            get().setActiveWorkspace(nextWorkspace.id);
+            log.debug('Switched to next workspace', {
+              newActiveId: nextWorkspace.id,
+            });
+          } else {
+            // No other workspaces - clear active
+            set({ activeWorkspaceId: null });
+          }
+        }
+      },
+
+      restoreWorkspace: (id: string) => {
+        log.info('Restoring workspace', { workspaceId: id });
+        get().updateWorkspaceState(id, { isArchived: false });
+      },
       };
     },
     {
@@ -708,14 +1011,18 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       partialize: (state) => ({
         workspaceConfigs: Array.from(state.workspaces.values()).map(ws => ({
           id: ws.id,
+          projectId: ws.projectId,  // NEW
           name: ws.name,
           config: state.providers.get(ws.providerId)?.config,
           color: ws.color,
           sessionIds: ws.sessionIds,  // Persist session links
+          isArchived: ws.isArchived,  // NEW
+          isPinned: ws.isPinned,      // NEW
         })) as PersistedWorkspaceConfig[],
         workspaceOrder: state.workspaceOrder,
         activeWorkspaceId: state.activeWorkspaceId,
         hasMigratedSessions: state.hasMigratedSessions,
+        migrationVersion: state.migrationVersion,
       }),
 
       // Deserialize on rehydration
@@ -742,27 +1049,52 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               },
             });
 
+            // Derive rootPath and projectId from config
+            let rootPath: string;
+            let projectId: string;
+
+            if (wc.projectId) {
+              // Use persisted projectId if available
+              projectId = wc.projectId;
+            }
+
+            switch (wc.config.type) {
+              case 'local':
+                rootPath = (wc.config as LocalProviderConfig).path;
+                if (!projectId!) projectId = encodeProjectPath(rootPath);
+                break;
+              case 'ssh':
+                rootPath = (wc.config as SSHProviderConfig).remotePath;
+                if (!projectId!) projectId = encodeProjectPath(rootPath);
+                break;
+              case 'git':
+                rootPath = '/';
+                if (!projectId!) projectId = '-';
+                break;
+              default:
+                rootPath = '/';
+                if (!projectId!) projectId = '-';
+            }
+
             // Recreate workspace
             workspaces.set(wc.id, {
               id: wc.id,
+              projectId,  // NEW
               name: wc.name,
               providerId: wc.id,
               providerType: wc.config.type,
-              rootPath: wc.config.type === 'local'
-                ? (wc.config as LocalProviderConfig).path
-                : wc.config.type === 'ssh'
-                  ? (wc.config as SSHProviderConfig).remotePath
-                  : wc.config.type === 'git'
-                    ? '/'  // TODO: Update when git clone location is implemented
-                    : '/',
+              rootPath,
               color: wc.color,
               sessionId: null,
+              activeSessionId: null,  // NEW
               sessionIds: wc.sessionIds || [],  // Restore session links (type-safe)
               expandedFolders: new Set(),
               selectedFile: null,
               fileActivity: new Map(),
               createdAt: Date.now(),
               lastAccessedAt: Date.now(),
+              isArchived: wc.isArchived ?? false,  // NEW
+              isPinned: wc.isPinned ?? false,      // NEW
             });
           }
         }

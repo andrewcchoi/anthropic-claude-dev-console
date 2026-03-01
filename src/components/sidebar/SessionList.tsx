@@ -43,6 +43,8 @@ export function SessionList() {
           updated_at: cli.modifiedAt,
           cwd: cli.cwd || '',
           workspaceId: cli.projectId, // Map projectId to workspaceId
+          messageCount: cli.messageCount, // Preserve message count
+          gitBranch: cli.gitBranch,       // Preserve git branch
         })),
     ];
 
@@ -62,33 +64,62 @@ export function SessionList() {
   // Get active workspace to check path matching
   const activeWorkspace = activeWorkspaceId ? workspaces.get(activeWorkspaceId) : null;
 
-  // Helper function to get sessions for a specific workspace
-  const getSessionsForWorkspace = (workspaceId: string) => {
-    const workspace = workspaces.get(workspaceId);
-    if (!workspace) return [];
+  // Build session index once per render (O(n) complexity instead of O(n²))
+  // Maps workspace ID → array of sessions matching that workspace
+  const sessionsByWorkspace = useMemo(() => {
+    const map = new Map<string, Session[]>();
+    const workspaceArray = Array.from(workspaces.values());
 
-    // Get encoded project path for this workspace (e.g., "/workspace" → "-workspace")
-    const projectId = encodeProjectPath(workspace.rootPath);
+    // For each session, determine which workspace(s) it belongs to
+    for (const session of allSessions) {
+      for (const workspace of workspaceArray) {
+        if (!workspace.rootPath) continue;
 
-    return allSessions.filter(s => {
-      // Match by encoded project path (CLI uses this format)
-      if (s.workspaceId === projectId) return true;
+        // Get encoded project path for this workspace (e.g., "/workspace" → "-workspace")
+        const projectId = encodeProjectPath(workspace.rootPath);
 
-      // Also match if session's workspaceId starts with workspace's project path
-      // e.g., "-workspace-docs" matches "-workspace" (subdirectory sessions)
-      if (s.workspaceId && s.workspaceId.startsWith(projectId + '-')) return true;
-      if (s.workspaceId && s.workspaceId.startsWith(projectId)) return true;
+        // Check if session matches this workspace using same logic as before
+        let matches = false;
 
-      // Path-based matching for old sessions without workspaceId
-      if (!s.workspaceId && s.cwd && workspace.rootPath) {
-        const normalizedCwd = s.cwd.replace(/\/$/, '');
-        const normalizedRoot = workspace.rootPath.replace(/\/$/, '');
-        return normalizedCwd === normalizedRoot ||
-               normalizedCwd.startsWith(normalizedRoot + '/');
+        // Match by encoded project path (CLI uses this format)
+        if (session.workspaceId === projectId) {
+          matches = true;
+        }
+
+        // Also match if session's workspaceId starts with workspace's project path
+        // e.g., "-workspace-docs" matches "-workspace" (subdirectory sessions)
+        if (!matches && session.workspaceId) {
+          if (session.workspaceId.startsWith(projectId + '-') ||
+              session.workspaceId.startsWith(projectId)) {
+            matches = true;
+          }
+        }
+
+        // Path-based matching for old sessions without workspaceId
+        if (!matches && !session.workspaceId && session.cwd && workspace.rootPath) {
+          const normalizedCwd = session.cwd.replace(/\/$/, '');
+          const normalizedRoot = workspace.rootPath.replace(/\/$/, '');
+          if (normalizedCwd === normalizedRoot ||
+              normalizedCwd.startsWith(normalizedRoot + '/')) {
+            matches = true;
+          }
+        }
+
+        if (matches) {
+          if (!map.has(workspace.id)) {
+            map.set(workspace.id, []);
+          }
+          map.get(workspace.id)!.push(session);
+        }
       }
+    }
 
-      return false;
-    });
+    return map;
+  }, [allSessions, workspaces]);
+
+  // Helper function to get sessions for a specific workspace (now O(1) lookup)
+  const getSessionsForWorkspace = (workspaceId: string) => {
+    return sessionsByWorkspace.get(workspaceId) || [];
   };
 
   // Handle session click in overview mode (opens workspace tab)
@@ -133,38 +164,37 @@ export function SessionList() {
   };
 
   // Filter sessions by active workspace (memoized for performance)
-  // Include sessions with matching workspaceId (encoded project path) OR matching cwd path
   const workspaceSessions = useMemo(() => {
-    if (!activeWorkspace) return [];
+    // No workspace selected - show all (backwards compat)
+    if (!activeWorkspace) {
+      return allSessions;
+    }
 
-    // Get encoded project path for the active workspace (e.g., "/workspace" → "-workspace")
-    const activeProjectId = encodeProjectPath(activeWorkspace.rootPath);
-
+    // Filter by workspace - handle both CLI and UI sessions
     return allSessions.filter(s => {
-      // Match by encoded project path (CLI uses this format)
-      // e.g., session.workspaceId === "-workspace" matches workspace.rootPath === "/workspace"
-      if (s.workspaceId === activeProjectId) return true;
+      // CLISession has projectId (encoded path like "-workspace")
+      if ('projectId' in s && s.projectId) {
+        return s.projectId === activeWorkspace.projectId;
+      }
 
-      // Also match if session's workspaceId starts with workspace's project path
-      // e.g., "-workspace-docs" matches "-workspace" (subdirectory sessions)
-      if (s.workspaceId && s.workspaceId.startsWith(activeProjectId + '-')) return true;
-      if (s.workspaceId && s.workspaceId.startsWith(activeProjectId)) return true;
+      // UI Session has workspaceId - could be:
+      // 1. Workspace UUID (new sessions created in UI)
+      // 2. Encoded path (legacy or CLI-discovered)
+      if (s.workspaceId) {
+        // Match by workspace UUID (UI sessions store this)
+        if (s.workspaceId === activeWorkspace.id) {
+          return true;
+        }
 
-      // Path-based matching for old sessions without workspaceId
-      // Match if session's cwd is within workspace's rootPath
-      if (!s.workspaceId && s.cwd && activeWorkspace.rootPath) {
-        // Normalize paths for comparison (remove trailing slashes)
-        const normalizedCwd = s.cwd.replace(/\/$/, '');
-        const normalizedRoot = activeWorkspace.rootPath.replace(/\/$/, '');
-
-        // Exact match or subdirectory
-        return normalizedCwd === normalizedRoot ||
-               normalizedCwd.startsWith(normalizedRoot + '/');
+        // Match by projectId (encoded path)
+        if (s.workspaceId === activeWorkspace.projectId) {
+          return true;
+        }
       }
 
       return false;
     });
-  }, [allSessions, activeWorkspaceId, activeWorkspace]);
+  }, [allSessions, activeWorkspace]);
 
   // Unassigned sessions: don't match any workspace's encoded project path
   const unassignedSessions = useMemo(() => {
@@ -252,8 +282,24 @@ export function SessionList() {
                   }`}
                 >
                   <div className="truncate">{session.name}</div>
+                  {session.gitBranch && (
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3v12M18 9a3 3 0 01-3 3h-6" />
+                      </svg>
+                      <span className="truncate">{session.gitBranch}</span>
+                    </div>
+                  )}
                   <div className="text-xs text-gray-500 dark:text-gray-400 flex justify-between mt-1">
-                    <span>{formatRelativeTime(session.updated_at)}</span>
+                    <span>
+                      {session.messageCount !== undefined && (
+                        <>
+                          {session.messageCount} msg{session.messageCount !== 1 ? 's' : ''}
+                          <span className="mx-1">·</span>
+                        </>
+                      )}
+                      {formatRelativeTime(session.updated_at)}
+                    </span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -291,8 +337,24 @@ export function SessionList() {
                   }`}
                 >
                   <div className="truncate">{session.name}</div>
+                  {session.gitBranch && (
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3v12M18 9a3 3 0 01-3 3h-6" />
+                      </svg>
+                      <span className="truncate">{session.gitBranch}</span>
+                    </div>
+                  )}
                   <div className="text-xs text-gray-500 dark:text-gray-400 flex justify-between mt-1">
-                    <span>{formatRelativeTime(session.updated_at)}</span>
+                    <span>
+                      {session.messageCount !== undefined && (
+                        <>
+                          {session.messageCount} msg{session.messageCount !== 1 ? 's' : ''}
+                          <span className="mx-1">·</span>
+                        </>
+                      )}
+                      {formatRelativeTime(session.updated_at)}
+                    </span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -364,8 +426,24 @@ export function SessionList() {
           }`}
         >
           <div className="truncate">{session.name}</div>
+          {session.gitBranch && (
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3v12M18 9a3 3 0 01-3 3h-6" />
+              </svg>
+              <span className="truncate">{session.gitBranch}</span>
+            </div>
+          )}
           <div className="text-xs text-gray-500 dark:text-gray-400 flex justify-between mt-1">
-            <span>{formatRelativeTime(session.updated_at)}</span>
+            <span>
+              {session.messageCount !== undefined && (
+                <>
+                  {session.messageCount} msg{session.messageCount !== 1 ? 's' : ''}
+                  <span className="mx-1">·</span>
+                </>
+              )}
+              {formatRelativeTime(session.updated_at)}
+            </span>
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -378,43 +456,6 @@ export function SessionList() {
           </div>
         </div>
       ))}
-
-      {/* Unassigned sessions (show only if not empty) */}
-      {sortedUnassigned.length > 0 && (
-        <>
-          <div className="text-xs text-gray-500 dark:text-gray-400 px-3 py-2 mt-4 border-t border-gray-200 dark:border-gray-700">
-            Unassigned
-          </div>
-          {sortedUnassigned.map((session) => (
-            <div
-              key={session.id}
-              onClick={() => {
-                const projectId = getProjectIdFromWorkspace(session.workspaceId, workspaces);
-                switchSession(session.id, projectId);
-              }}
-              className={`p-2 rounded cursor-pointer text-sm truncate ${
-                session.id === sessionId
-                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100'
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
-              }`}
-            >
-              <div className="truncate">{session.name}</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 flex justify-between mt-1">
-                <span>{formatRelativeTime(session.updated_at)}</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteSession(session.id);
-                  }}
-                  className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-          ))}
-        </>
-      )}
     </div>
   );
 }
