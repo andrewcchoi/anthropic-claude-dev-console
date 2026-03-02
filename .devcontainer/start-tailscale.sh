@@ -14,7 +14,7 @@ if pgrep -x tailscaled > /dev/null; then
 fi
 
 # Start tailscaled in userspace networking mode (background, no output)
-sudo tailscaled \
+sudo setsid tailscaled \
     --tun=userspace-networking \
     --state=/var/lib/tailscale/tailscaled.state \
     --socket=/var/run/tailscale/tailscaled.sock \
@@ -24,6 +24,8 @@ sudo tailscaled \
 for i in {1..10}; do
     if [ -S /var/run/tailscale/tailscaled.sock ]; then
         echo "✓ Tailscale daemon started"
+        # Set operator so subsequent commands don't need sudo
+        sudo tailscale set --operator="$USER" 2>/dev/null || true
         exit 0
     fi
     sleep 0.5

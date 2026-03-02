@@ -6,6 +6,7 @@
  * - Login/connection state
  * - Tailnet name
  * - Self device info
+ * - Available devices list
  * - Device count
  *
  * Uses caching headers to reduce client polling.
@@ -43,6 +44,19 @@ async function handler(request: NextRequest): Promise<NextResponse> {
             os: status.selfDevice.os,
           }
         : null,
+      devices: status.devices.map((d) => ({
+        id: d.id,
+        hostname: d.hostname,
+        dnsName: d.dnsName,
+        tailscaleIP: d.tailscaleIP,
+        os: d.os,
+        online: d.online,
+        lastSeen: d.lastSeen.toISOString(),
+        sshEnabled: d.sshEnabled,
+        tags: d.tags,
+        user: d.user,
+        isSelf: d.isSelf,
+      })),
       deviceCount: status.devices.length,
       error: status.error,
     };

@@ -293,7 +293,7 @@ RUN if [ "$ENABLE_FIREWALL" = "true" ]; then \
   chmod 0440 /etc/sudoers.d/node-python && \
   echo "node ALL=(root) NOPASSWD: SETENV: /usr/local/bin/init-firewall.sh" > /etc/sudoers.d/node-firewall && \
   chmod 0440 /etc/sudoers.d/node-firewall && \
-  echo "node ALL=(root) NOPASSWD: /usr/sbin/tailscaled, /bin/mkdir" > /etc/sudoers.d/node-tailscale && \
+  echo "node ALL=(root) NOPASSWD: /usr/sbin/tailscaled, /usr/bin/tailscale, /bin/mkdir" > /etc/sudoers.d/node-tailscale && \
   chmod 0440 /etc/sudoers.d/node-tailscale && \
   rm -rf /tmp/firewall
 USER node
