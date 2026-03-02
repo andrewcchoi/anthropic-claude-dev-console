@@ -18,6 +18,9 @@ Thumbs.db
 .git
 .gitignore
 
+# Ignore Claude Code directories (worktrees contain full repo copies)
+.claude/worktrees
+
 # Ignore IDE and editor files
 .vscode
 .idea

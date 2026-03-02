@@ -5,6 +5,7 @@ node_modules/
 
 # Git worktrees
 .worktrees/
+.claude/worktrees/
 !.worktrees/.gitkeep
 
 # Testing
