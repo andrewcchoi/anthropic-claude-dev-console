@@ -7,11 +7,10 @@
  * - Review iterations
  * - Token usage
  *
- * Environment variables (CC_ prefix for Claude Code):
- * - CC_LANGSMITH_API_KEY: API key for authentication
- * - CC_LANGSMITH_PROJECT: Project name for traces
- * - CC_LANGSMITH_DEBUG: Enable debug logging
- * - TRACE_TO_LANGSMITH: Enable/disable tracing
+ * Environment variables (standard LangSmith variables):
+ * - LANGSMITH_API_KEY: API key for authentication
+ * - LANGSMITH_PROJECT: Project name for traces (default: ultrathink-v2)
+ * - LANGSMITH_TRACING: Enable/disable tracing (v2, true, or false)
  */
 
 import { Client, RunTree } from 'langsmith';
@@ -19,12 +18,12 @@ import { createLogger } from '@/lib/logger';
 
 const log = createLogger('LangSmithTracing');
 
-// Configuration from environment (CC_ prefix)
+// Configuration from environment (uses standard LangSmith variables)
 const config = {
-  apiKey: process.env.CC_LANGSMITH_API_KEY,
-  project: process.env.CC_LANGSMITH_PROJECT || 'ultrathink-v2',
-  debug: process.env.CC_LANGSMITH_DEBUG === 'true',
-  enabled: process.env.TRACE_TO_LANGSMITH === 'true',
+  apiKey: process.env.LANGSMITH_API_KEY,
+  project: process.env.LANGSMITH_PROJECT || 'pr-virtual-helmet-80',
+  debug: process.env.LANGSMITH_TRACING === 'true',
+  enabled: process.env.LANGSMITH_TRACING === 'true' || process.env.LANGSMITH_TRACING === 'v2',
 };
 
 // LangSmith client (lazy initialized)

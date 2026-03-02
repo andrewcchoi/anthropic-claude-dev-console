@@ -15,10 +15,9 @@ describe('LangSmith Tracing Configuration', () => {
     // Reset modules to pick up new env vars
     vi.resetModules();
     // Clear all env vars
-    delete process.env.CC_LANGSMITH_API_KEY;
-    delete process.env.CC_LANGSMITH_PROJECT;
-    delete process.env.TRACE_TO_LANGSMITH;
-    delete process.env.CC_LANGSMITH_DEBUG;
+    delete process.env.LANGSMITH_API_KEY;
+    delete process.env.LANGSMITH_PROJECT;
+    delete process.env.LANGSMITH_TRACING;
   });
 
   afterEach(() => {
@@ -28,9 +27,9 @@ describe('LangSmith Tracing Configuration', () => {
 
   describe('Environment Variables', () => {
     it('should read CC_ prefixed environment variables', async () => {
-      process.env.CC_LANGSMITH_API_KEY = 'test-api-key';
-      process.env.CC_LANGSMITH_PROJECT = 'test-project';
-      process.env.TRACE_TO_LANGSMITH = 'true';
+      process.env.LANGSMITH_API_KEY = 'test-api-key';
+      process.env.LANGSMITH_PROJECT = 'test-project';
+      process.env.LANGSMITH_TRACING = 'true';
       process.env.CC_LANGSMITH_DEBUG = 'true';
 
       const { getTracingConfig } = await import('@/lib/tracing/langsmith');
@@ -43,17 +42,17 @@ describe('LangSmith Tracing Configuration', () => {
     });
 
     it('should use default project name when not specified', async () => {
-      process.env.CC_LANGSMITH_API_KEY = 'test-key';
-      process.env.TRACE_TO_LANGSMITH = 'true';
+      process.env.LANGSMITH_API_KEY = 'test-key';
+      process.env.LANGSMITH_TRACING = 'true';
 
       const { getTracingConfig } = await import('@/lib/tracing/langsmith');
       const config = getTracingConfig();
 
-      expect(config.project).toBe('ultrathink-v2');
+      expect(config.project).toBe('pr-virtual-helmet-80');
     });
 
     it('should report apiKey as undefined when not set', async () => {
-      process.env.TRACE_TO_LANGSMITH = 'true';
+      process.env.LANGSMITH_TRACING = 'true';
 
       const { getTracingConfig } = await import('@/lib/tracing/langsmith');
       const config = getTracingConfig();
@@ -64,25 +63,25 @@ describe('LangSmith Tracing Configuration', () => {
 
   describe('Tracing Enabled Check', () => {
     it('should report tracing disabled when no API key', async () => {
-      process.env.TRACE_TO_LANGSMITH = 'true';
-      delete process.env.CC_LANGSMITH_API_KEY;
+      process.env.LANGSMITH_TRACING = 'true';
+      delete process.env.LANGSMITH_API_KEY;
 
       const { isTracingEnabled } = await import('@/lib/tracing/langsmith');
 
       expect(isTracingEnabled()).toBe(false);
     });
 
-    it('should report tracing disabled when TRACE_TO_LANGSMITH is false', async () => {
-      process.env.CC_LANGSMITH_API_KEY = 'test-key';
-      process.env.TRACE_TO_LANGSMITH = 'false';
+    it('should report tracing disabled when LANGSMITH_TRACING is false', async () => {
+      process.env.LANGSMITH_API_KEY = 'test-key';
+      process.env.LANGSMITH_TRACING = 'false';
 
       const { isTracingEnabled } = await import('@/lib/tracing/langsmith');
 
       expect(isTracingEnabled()).toBe(false);
     });
 
-    it('should report tracing disabled when TRACE_TO_LANGSMITH is not set', async () => {
-      process.env.CC_LANGSMITH_API_KEY = 'test-key';
+    it('should report tracing disabled when LANGSMITH_TRACING is not set', async () => {
+      process.env.LANGSMITH_API_KEY = 'test-key';
 
       const { isTracingEnabled } = await import('@/lib/tracing/langsmith');
 
@@ -90,8 +89,8 @@ describe('LangSmith Tracing Configuration', () => {
     });
 
     it('should report tracing enabled when both API key and flag are set', async () => {
-      process.env.CC_LANGSMITH_API_KEY = 'test-key';
-      process.env.TRACE_TO_LANGSMITH = 'true';
+      process.env.LANGSMITH_API_KEY = 'test-key';
+      process.env.LANGSMITH_TRACING = 'true';
 
       const { isTracingEnabled } = await import('@/lib/tracing/langsmith');
 
@@ -101,7 +100,7 @@ describe('LangSmith Tracing Configuration', () => {
 
   describe('Graceful Degradation', () => {
     it('should not throw when starting workflow trace with tracing disabled', async () => {
-      process.env.TRACE_TO_LANGSMITH = 'false';
+      process.env.LANGSMITH_TRACING = 'false';
 
       const { startWorkflowTrace } = await import('@/lib/tracing/langsmith');
 
@@ -114,7 +113,7 @@ describe('LangSmith Tracing Configuration', () => {
     });
 
     it('should not throw when ending workflow trace with tracing disabled', async () => {
-      process.env.TRACE_TO_LANGSMITH = 'false';
+      process.env.LANGSMITH_TRACING = 'false';
 
       const { endWorkflowTrace } = await import('@/lib/tracing/langsmith');
 
@@ -123,7 +122,7 @@ describe('LangSmith Tracing Configuration', () => {
     });
 
     it('should execute function even when tracing disabled', async () => {
-      process.env.TRACE_TO_LANGSMITH = 'false';
+      process.env.LANGSMITH_TRACING = 'false';
 
       const { traceSubagent } = await import('@/lib/tracing/langsmith');
 
@@ -149,7 +148,7 @@ describe('LangSmith Tracing Configuration', () => {
     });
 
     it('should capture errors from subagent execution', async () => {
-      process.env.TRACE_TO_LANGSMITH = 'false';
+      process.env.LANGSMITH_TRACING = 'false';
 
       const { traceSubagent } = await import('@/lib/tracing/langsmith');
 
@@ -172,7 +171,7 @@ describe('LangSmith Tracing Configuration', () => {
     });
 
     it('should track duration even when tracing disabled', async () => {
-      process.env.TRACE_TO_LANGSMITH = 'false';
+      process.env.LANGSMITH_TRACING = 'false';
 
       const { traceSubagent } = await import('@/lib/tracing/langsmith');
 
