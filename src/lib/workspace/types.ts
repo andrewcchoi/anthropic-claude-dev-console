@@ -96,6 +96,18 @@ export interface SSHProviderConfig extends BaseProviderConfig {
   hostKeyVerification?: 'strict' | 'tofu' | 'ask';
   persistConnection?: boolean;
   reconnectOnFailure?: boolean;
+
+  // Tailscale integration
+  tailscale?: {
+    /** Enable Tailscale for this connection */
+    enabled: boolean;
+    /** Tailscale device ID (required - unique identifier) */
+    deviceId: string;
+    /** Use Magic DNS instead of IP (default: false) */
+    useMagicDNS?: boolean;
+    /** Fail if connection would use DERP relay (default: false) */
+    requireDirect?: boolean;
+  };
 }
 
 export type ProviderConfig =
@@ -195,7 +207,21 @@ export type WorkspaceErrorCode =
   | 'VALIDATION_ERROR'
   | 'NOT_FOUND'
   | 'PERMISSION_DENIED'
-  | 'CONFLICT';
+  | 'CONFLICT'
+  // Tailscale-specific error codes
+  | 'TAILSCALE_NOT_INSTALLED'
+  | 'TAILSCALE_VERSION_ERROR'
+  | 'TAILSCALE_NOT_LOGGED_IN'
+  | 'TAILSCALE_NOT_CONNECTED'
+  | 'TAILSCALE_DEVICE_NOT_FOUND'
+  | 'TAILSCALE_DEVICE_OFFLINE'
+  | 'TAILSCALE_RELAY_NOT_ALLOWED'
+  | 'TAILSCALE_TIMEOUT'
+  | 'TAILSCALE_PERMISSION_DENIED'
+  | 'TAILSCALE_HOSTNAME_COLLISION'
+  | 'TAILSCALE_INVALID_IP'
+  | 'TAILSCALE_INVALID_HOSTNAME'
+  | 'SSH_NOT_AVAILABLE';
 
 export interface WorkspaceError extends Error {
   code: WorkspaceErrorCode;

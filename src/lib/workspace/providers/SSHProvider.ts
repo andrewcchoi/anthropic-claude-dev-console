@@ -9,6 +9,7 @@ import { promises as fs } from 'fs';
 import { join, dirname, basename } from 'path';
 import { tmpdir } from 'os';
 
+import * as net from 'net';
 import { BaseProvider } from './BaseProvider';
 import { SSHConnectionPool, type ConnectionConfig, type PooledConnection } from '../ssh/SSHConnectionPool';
 import { HostKeyManager, type HostKeyVerificationMode } from '../ssh/HostKeyManager';
@@ -29,6 +30,13 @@ import {
   NotFoundError,
   FileSystemError,
 } from '../errors';
+import {
+  getTailscaleManager,
+  TailscaleDeviceNotFoundError,
+  TailscaleDeviceOfflineError,
+  TailscaleRelayNotAllowedError,
+  SSHNotAvailableError,
+} from '../tailscale';
 
 /**
  * Validate SSH hostname
@@ -93,6 +101,14 @@ export class SSHProvider extends BaseProvider {
   private connection: PooledConnection | null = null;
   private sftp: SFTPWrapper | null = null;
 
+  // Tailscale integration
+  private tailscaleConfig?: {
+    enabled: boolean;
+    deviceId: string;
+    useMagicDNS?: boolean;
+    requireDirect?: boolean;
+  };
+
   constructor(config: SSHProviderConfig & { id?: string; name?: string }) {
     const hostname = (config as any).hostname || (config as any).host;
     const port = (config as any).port ?? 22;
@@ -135,6 +151,11 @@ export class SSHProvider extends BaseProvider {
     this.remotePath = remotePath;
     this.pool = getConnectionPool();
     this.hostKeyManager = new HostKeyManager((config as any).hostKeyVerification ?? 'tofu');
+
+    // Store Tailscale config if provided
+    if ((config as any).tailscale?.enabled) {
+      this.tailscaleConfig = (config as any).tailscale;
+    }
   }
 
   // ============================================================================
@@ -146,13 +167,36 @@ export class SSHProvider extends BaseProvider {
       hostname: this.hostname,
       port: this.port,
       username: this.username,
+      tailscale: this.tailscaleConfig?.enabled ?? false,
     });
 
     try {
+      // Resolve hostname via Tailscale if enabled
+      let resolvedHost = this.hostname;
+      let resolvedPort = this.port;
+
+      if (this.tailscaleConfig?.enabled) {
+        const resolution = await this.resolveTailscaleHost();
+        resolvedHost = resolution.host;
+        resolvedPort = resolution.port;
+
+        this.log('info', 'Tailscale resolution complete', {
+          original: this.hostname,
+          resolved: resolvedHost,
+          method: resolution.method,
+        });
+      }
+
+      // Test SSH connectivity before full connection
+      const sshTest = await this.testSSHConnection(resolvedHost, resolvedPort);
+      if (!sshTest.reachable) {
+        throw new SSHNotAvailableError(resolvedHost, resolvedPort);
+      }
+
       // Acquire connection from pool
       const connectionConfig: ConnectionConfig = {
-        hostname: this.hostname,
-        port: this.port,
+        hostname: resolvedHost,
+        port: resolvedPort,
         username: this.username,
         password: this.password,
         privateKey: this.privateKey,
@@ -202,6 +246,111 @@ export class SSHProvider extends BaseProvider {
 
     this.cleanup();
     this.log('info', 'Disconnected');
+  }
+
+  // ============================================================================
+  // Tailscale Integration
+  // ============================================================================
+
+  /**
+   * Resolve hostname via Tailscale
+   * Returns the resolved host and port for connection
+   */
+  private async resolveTailscaleHost(): Promise<{
+    host: string;
+    port: number;
+    method: 'tailscaleIP' | 'magicDNS' | 'fallback';
+  }> {
+    if (!this.tailscaleConfig?.enabled) {
+      return { host: this.hostname, port: this.port, method: 'fallback' };
+    }
+
+    const tailscale = getTailscaleManager();
+
+    // Get device by ID (unambiguous lookup)
+    const device = await tailscale.getDeviceById(this.tailscaleConfig.deviceId);
+
+    if (!device) {
+      throw new TailscaleDeviceNotFoundError(this.tailscaleConfig.deviceId);
+    }
+
+    if (!device.online) {
+      throw new TailscaleDeviceOfflineError(device.hostname);
+    }
+
+    // Check for requireDirect - verify P2P connection
+    if (this.tailscaleConfig.requireDirect) {
+      const pingResult = await tailscale.ping(device);
+
+      if (pingResult.via === 'relay') {
+        throw new TailscaleRelayNotAllowedError(device.hostname, {
+          suggestion:
+            'Direct connection required but traffic would go through DERP relay. ' +
+            'This may be due to NAT traversal failure or firewall restrictions. ' +
+            'Disable requireDirect to allow relay connections, or check network settings.',
+        });
+      }
+
+      this.log('info', 'Direct Tailscale connection confirmed', {
+        device: device.hostname,
+        latency: pingResult.latency,
+      });
+    }
+
+    // Use Magic DNS or Tailscale IP
+    const host = this.tailscaleConfig.useMagicDNS ? device.dnsName : device.tailscaleIP;
+    const method = this.tailscaleConfig.useMagicDNS ? 'magicDNS' : 'tailscaleIP';
+
+    this.log('debug', 'Tailscale host resolved', {
+      deviceId: device.id,
+      hostname: device.hostname,
+      resolved: host,
+      method,
+    });
+
+    return { host, port: this.port, method };
+  }
+
+  /**
+   * Test if SSH server is running on target device
+   * Quick TCP connection check before full SSH handshake
+   */
+  private async testSSHConnection(
+    host: string,
+    port: number,
+    timeout: number = 5000
+  ): Promise<{
+    reachable: boolean;
+    error?: string;
+  }> {
+    return new Promise((resolve) => {
+      const socket = new net.Socket();
+
+      const timer = setTimeout(() => {
+        socket.destroy();
+        resolve({ reachable: false, error: 'Connection timeout' });
+      }, timeout);
+
+      socket.on('connect', () => {
+        clearTimeout(timer);
+        socket.destroy();
+        resolve({ reachable: true });
+      });
+
+      socket.on('error', (err: NodeJS.ErrnoException) => {
+        clearTimeout(timer);
+        socket.destroy();
+        resolve({
+          reachable: false,
+          error:
+            err.code === 'ECONNREFUSED'
+              ? `SSH server not running on port ${port}`
+              : err.message,
+        });
+      });
+
+      socket.connect(port, host);
+    });
   }
 
   // ============================================================================

@@ -201,8 +201,11 @@ export async function POST(req: NextRequest) {
             if (streamClosed) return;
             try {
               controller.enqueue(data);
-            } catch (e) {
-              log.error('Failed to enqueue data', { error: e });
+            } catch (e: any) {
+              // Client disconnected - mark stream as closed to stop further attempts
+              streamClosed = true;
+              // Debug level - this is expected when clients navigate away
+              log.debug('Stream closed by client', { code: e?.code });
             }
           };
 

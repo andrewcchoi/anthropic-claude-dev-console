@@ -5,11 +5,15 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { X, Info, FolderOpen } from 'lucide-react';
 import { showToast } from '@/lib/utils/toast';
 import { DirectoryBrowser } from './DirectoryBrowser';
-import type { ProviderConfig } from '@/lib/workspace/types';
+import { SSHWorkspaceForm } from './SSHWorkspaceForm';
+import { createLogger } from '@/lib/logger';
+import type { ProviderConfig, SSHProviderConfig } from '@/lib/workspace/types';
+
+const log = createLogger('AddWorkspaceDialog');
 
 interface AddWorkspaceDialogProps {
   isOpen: boolean;
@@ -24,6 +28,38 @@ export function AddWorkspaceDialog({ isOpen, onClose, onAdd }: AddWorkspaceDialo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBrowsing, setIsBrowsing] = useState(false);
 
+  // All hooks must be called before any early returns (Rules of Hooks)
+  const handleSSHSubmit = useCallback(async (config: SSHProviderConfig) => {
+    log.info('SSH workspace submission', { host: config.host, useTailscale: !!config.tailscale });
+    setIsSubmitting(true);
+
+    try {
+      // Generate name from host/device
+      const workspaceName = name.trim() || (
+        config.tailscale?.deviceId
+          ? `SSH: ${config.host}`
+          : `SSH: ${config.host}`
+      );
+
+      await onAdd(config, { name: workspaceName });
+      showToast('SSH workspace added successfully', 'success');
+      onClose();
+
+      // Reset form
+      setName('');
+      setType('local');
+    } catch (error) {
+      log.error('Failed to add SSH workspace', { error });
+      showToast(
+        error instanceof Error ? error.message : 'Failed to add SSH workspace',
+        'error'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [name, onAdd, onClose]);
+
+  // Early return AFTER all hooks
   if (!isOpen) return null;
 
   const handleSubmit = async () => {
@@ -61,6 +97,7 @@ export function AddWorkspaceDialog({ isOpen, onClose, onAdd }: AddWorkspaceDialo
     onClose();
     setName('');
     setPath('/workspace');
+    setType('local');
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -75,7 +112,9 @@ export function AddWorkspaceDialog({ isOpen, onClose, onAdd }: AddWorkspaceDialo
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col">
+      <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full overflow-hidden flex flex-col max-h-[90vh] ${
+        type === 'ssh' ? 'max-w-lg' : 'max-w-md'
+      }`}>
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
@@ -90,7 +129,7 @@ export function AddWorkspaceDialog({ isOpen, onClose, onAdd }: AddWorkspaceDialo
         </div>
 
         {/* Content */}
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-4 overflow-y-auto">
           {/* Help Section */}
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
             <div className="flex items-start gap-2">
@@ -131,15 +170,17 @@ export function AddWorkspaceDialog({ isOpen, onClose, onAdd }: AddWorkspaceDialo
               </button>
               <button
                 onClick={() => setType('ssh')}
-                disabled
-                className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 opacity-50 cursor-not-allowed"
-                title="Coming soon"
+                className={`flex-1 px-3 py-2 rounded-lg border transition-colors ${
+                  type === 'ssh'
+                    ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-500 text-blue-700 dark:text-blue-300'
+                    : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                }`}
               >
                 🔐 SSH
               </button>
             </div>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Git and SSH support coming soon
+              {type === 'ssh' ? 'Connect to remote machines via SSH or Tailscale' : 'Git support coming soon'}
             </p>
           </div>
 
@@ -190,28 +231,41 @@ export function AddWorkspaceDialog({ isOpen, onClose, onAdd }: AddWorkspaceDialo
             </div>
           )}
 
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Press Enter to add, Esc to cancel
-          </p>
+          {/* SSH Configuration */}
+          {type === 'ssh' && (
+            <SSHWorkspaceForm
+              onSubmit={handleSSHSubmit}
+              onCancel={handleCancel}
+              isSubmitting={isSubmitting}
+            />
+          )}
+
+          {type === 'local' && (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Press Enter to add, Esc to cancel
+            </p>
+          )}
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
-          <button
-            onClick={handleCancel}
-            disabled={isSubmitting}
-            className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={!path.trim() || isSubmitting}
-            className="px-4 py-2 rounded-lg bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {isSubmitting ? 'Adding...' : 'Add Workspace'}
-          </button>
-        </div>
+        {/* Footer - Only show for non-SSH types (SSH has its own buttons) */}
+        {type !== 'ssh' && (
+          <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+            <button
+              onClick={handleCancel}
+              disabled={isSubmitting}
+              className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!path.trim() || isSubmitting}
+              className="px-4 py-2 rounded-lg bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isSubmitting ? 'Adding...' : 'Add Workspace'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Directory Browser */}
