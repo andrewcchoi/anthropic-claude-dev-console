@@ -28,6 +28,38 @@ export function AddWorkspaceDialog({ isOpen, onClose, onAdd }: AddWorkspaceDialo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBrowsing, setIsBrowsing] = useState(false);
 
+  // All hooks must be called before any early returns (Rules of Hooks)
+  const handleSSHSubmit = useCallback(async (config: SSHProviderConfig) => {
+    log.info('SSH workspace submission', { host: config.host, useTailscale: !!config.tailscale });
+    setIsSubmitting(true);
+
+    try {
+      // Generate name from host/device
+      const workspaceName = name.trim() || (
+        config.tailscale?.deviceId
+          ? `SSH: ${config.host}`
+          : `SSH: ${config.host}`
+      );
+
+      await onAdd(config, { name: workspaceName });
+      showToast('SSH workspace added successfully', 'success');
+      onClose();
+
+      // Reset form
+      setName('');
+      setType('local');
+    } catch (error) {
+      log.error('Failed to add SSH workspace', { error });
+      showToast(
+        error instanceof Error ? error.message : 'Failed to add SSH workspace',
+        'error'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [name, onAdd, onClose]);
+
+  // Early return AFTER all hooks
   if (!isOpen) return null;
 
   const handleSubmit = async () => {
@@ -67,36 +99,6 @@ export function AddWorkspaceDialog({ isOpen, onClose, onAdd }: AddWorkspaceDialo
     setPath('/workspace');
     setType('local');
   };
-
-  const handleSSHSubmit = useCallback(async (config: SSHProviderConfig) => {
-    log.info('SSH workspace submission', { host: config.host, useTailscale: !!config.tailscale });
-    setIsSubmitting(true);
-
-    try {
-      // Generate name from host/device
-      const workspaceName = name.trim() || (
-        config.tailscale?.deviceId
-          ? `SSH: ${config.host}`
-          : `SSH: ${config.host}`
-      );
-
-      await onAdd(config, { name: workspaceName });
-      showToast('SSH workspace added successfully', 'success');
-      onClose();
-
-      // Reset form
-      setName('');
-      setType('local');
-    } catch (error) {
-      log.error('Failed to add SSH workspace', { error });
-      showToast(
-        error instanceof Error ? error.message : 'Failed to add SSH workspace',
-        'error'
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [name, onAdd, onClose]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !isSubmitting) {
